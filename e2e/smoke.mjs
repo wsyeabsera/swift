@@ -92,6 +92,10 @@ try {
     const f1 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); await web.getByTestId('undo').click(); await web.waitForTimeout(300); const f2 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); await web.getByTestId('redo').click(); await web.waitForTimeout(300); const f3 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); await web.getByTestId('undo').click(); await web.waitForTimeout(300); await web.keyboard.press('Meta+Shift+z'); await web.waitForTimeout(300); const f4 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); await web.keyboard.press('Meta+z'); await web.waitForTimeout(300); const f5 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
     cv.local = { f0, f1, f2, f3, f4, f5, status: (await web.textContent('[data-testid=say-status]'))?.trim() };
     await web.getByTestId('say-input').focus(); await web.keyboard.press('ArrowUp'); const up = await web.getByTestId('say-input').inputValue(); await web.keyboard.press('ArrowDown'); const down = await web.getByTestId('say-input').inputValue(); cv.hist = { up, down };
+    // suggestion chips for the selection: a chip applies instantly through the local tier; undo restores
+    await web.waitForSelector('[data-testid=chip]', { timeout: 4000 }); const chipLabels = await web.$$eval('[data-testid=chip]', (e) => e.map((x) => x.textContent)); const c0 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
+    await web.getByTestId('chip').filter({ hasText: 'Bigger' }).click(); await web.waitForFunction(() => /^Local/.test(document.querySelector('[data-testid=say-status]').textContent), null, { timeout: 3000 }); await web.waitForTimeout(200); const c1 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); await web.getByTestId('undo').click(); await web.waitForTimeout(300);
+    cv.chips = { chipLabels, c0, c1, back: await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')) };
     await web.evaluate(() => document.activeElement?.blur()); const l0 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')); await web.keyboard.press('ArrowRight'); await web.waitForTimeout(300); const l1 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')); await web.keyboard.press('Shift+ArrowDown'); await web.waitForTimeout(300);
     const t1 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'top')); await web.getByTestId('undo').click(); await web.getByTestId('undo').click(); await web.waitForTimeout(400); cv.nudge = { l0, l1, t1, back: await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')) };
     // holding an arrow key = ONE undo step (rapid nudges on the same property coalesce)
@@ -196,7 +200,8 @@ try {
   const zoomSelOk = cv0.zoomSel.sAfter > cv0.zoomSel.sBefore;
   const resizeOk = Math.abs(cv0.resize.dw - cv0.resize.expW) <= 2 && Math.abs(cv0.resize.dh - cv0.resize.expH) <= 2 && Math.abs(cv0.resize.backW) < 0.5 && Math.abs(cv0.resize.backH) < 0.5;
   const dragOk = resizeOk &&  Math.abs(cv0.drag.moveX - cv0.drag.expX) <= 2 && Math.abs(cv0.drag.moveY - cv0.drag.expY) <= 2 && cv0.drag.stillSel === 'clock' && cv0.drag.backX === 0 && cv0.drag.backY === 0;
-  const holdOk = cv0.nudgeHold.moved === 5 && cv0.nudgeHold.steps === 1 && cv0.nudgeHold.back === 0;
+  const chipsOk = cv0.chips.chipLabels.includes('Bigger') && cv0.chips.chipLabels.includes('Hide') && cv0.chips.c1 !== cv0.chips.c0 && cv0.chips.back === cv0.chips.c0;
+  const holdOk = chipsOk &&  cv0.nudgeHold.moved === 5 && cv0.nudgeHold.steps === 1 && cv0.nudgeHold.back === 0;
   const navOk = holdOk &&  dragOk &&  zoomSelOk &&  cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
   const nudgeOk = navOk &&  cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
   const histOk = nudgeOk &&  ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';

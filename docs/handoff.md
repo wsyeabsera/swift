@@ -1,6 +1,6 @@
 # Handoff (2026-11-02, fourth goal hour in progress)
 
-## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (87), `npm run e2e` (pass)
+## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (89), `npm run e2e` (pass)
 - Autosave/restore of the design (`doc.ts`, localStorage, 1 s debounce, all-or-nothing parse, save errors shown, Reset button); Spark ids continue after restore.
 - Spark: Keep take / Discard takes (`kept` flag on FrameDef), Cancel Spark (AbortSignal through runSpark/runSay; late ops dropped, no repair turn), cap of 8 unreviewed takes (`canSpark`).
 - ⌘D duplicate frame (`canvas/frames.ts`), Delete removes the selected element (one undo step via snapshot; frame root protected), ⌘0 fit, ⌘1 actual size, Escape deselects.
@@ -29,6 +29,7 @@
 - Drag the selected positioned element to move it (Canvas `onMove` → App `moveElement`; press inside the selection box = move, elsewhere = pan; live left/top edits, ONE undo step via a start snapshot). Static elements are not draggable (no left/top).
 - Resize: a round handle at the bottom-right of the selection (not on a frame root) drags width/height (live, 4 px floor, ONE undo step).
 - e2e perf budgets live in `e2e/budgets.json` (Tier-0 edit p95 16 ms, first edit 50 ms, pan/zoom frame gap p95 34 ms; measured 9.3 ms); a regression fails `npm run e2e` with "BUDGET FAILED: <name> measured X >= limit Y" (proven by setting a limit to 1).
+- Suggestion chips above the Say bar for the selection (`say/suggest.ts`: Bigger/Smaller/Bold/Hide + brand colours); each chip runs the local tier (instant).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

@@ -21,6 +21,7 @@ import { kitColors, loadBrand, saveBrand } from './brand';
 import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
 import { pushHistory, step } from './say/history';
 import { localEdits } from './say/local';
+import { suggestions, type SuggestProps } from './say/suggest';
 import { canSpark, discardTakes, isTake, keepTake, runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
 const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Diagram'] as const;
@@ -74,8 +75,8 @@ export function App() {
     const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => { setFrames((e) => [...e, ...f]); setPainting(new Set(f.map((x) => x.id))); }, signal: ac.signal, tokens: brand, running: takesRunning.current, onTakeDone: (id) => setPainting((p) => { const n = new Set(p); n.delete(id); return n; }) }); setPainting(new Set()); sparkAbort.current = null;
     const ok = r.takes.filter((t) => t.result.applied.length > 0).length; const err = r.takes.find((t) => t.result.error)?.result.error; const rej = r.takes.reduce((n, t) => n + t.result.rejected.length, 0); setSparkStatus(`${r.takes.length} takes · ${ok} changed${r.firstPaintMs !== null ? ` · first paint ${r.firstPaintMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${rej ? ` · ${rej} rejected` : ''}${err ? ` · ${err}` : ''}`); setSparking(false);
   }, [frames, selection, sparking, brand]);
-  const say = useCallback(async () => {
-    const text = sayText.trim(); const c = conn.current; if (!text || !window.__swift || !c || saying) return;
+  const say = useCallback(async (override?: string) => {
+    const text = (override ?? sayText).trim(); const c = conn.current; if (!text || !window.__swift || !c || saying) return;
     sayHist.current = pushHistory(sayHist.current, text); histPos.current = sayHist.current.length;
     if (selection && !pendingAsk && window.__swift) { // local tier: unambiguous requests on the selection never reach Claude
       const t0 = performance.now(); const sel = selection; const edits = await localEdits(text, { get: (p) => window.__swift!.get(sel.frameId, sel.el, p) });
@@ -201,6 +202,10 @@ export function App() {
     history.current.push({ kind: 'say', frameId: selection.frameId, snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setSelection(null); setRevision((n) => n + 1); setSayStatus(`Removed #${selection.el}`);
   }, [selection, frames]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return; e.preventDefault(); void removeSelected(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [removeSelected]);
+  // Suggestion chips for the selection: what its computed style allows, answered by the local tier.
+  const [selProps, setSelProps] = useState<SuggestProps | null>(null);
+  useEffect(() => { let alive = true; setSelProps(null); if (!selection) return; void window.__swift?.props(selection.frameId, selection.el, ['font-size', 'font-weight', 'opacity']).then((p) => { if (alive && p) setSelProps(p as SuggestProps); }); return () => { alive = false; }; }, [selection, revision]);
+  const chips = useMemo(() => (selProps ? suggestions(selProps, brand) : []), [selProps, brand]);
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   const dot = helper.status === 'connected' ? 'ok' : helper.status === 'connecting' ? 'warn' : 'bad';
@@ -243,6 +248,11 @@ export function App() {
       <Canvas onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => setFrames((f) => renameFrame(f, id, t))} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
       <Layers frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
+      {chips.length > 0 && !saying && !sayText && !pendingAsk && (
+        <div className="gl isl chips" role="group" aria-label="Suggestions" data-testid="chips">
+          {chips.map((c) => <button key={c.label} className="rb btn chip" onClick={() => void say(c.text)} data-testid="chip">{c.label}</button>)}
+        </div>
+      )}
       <form className="gl isl say" aria-label="Say" onSubmit={(e) => { e.preventDefault(); void say(); }}>
         <input ref={sayRef} data-testid="say-input" aria-label="Say what to change" title="⌘K" placeholder={pendingAsk ? `Claude asks: ${pendingAsk.question}` : selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => { setSayText(e.target.value); histPos.current = sayHist.current.length; }} onKeyDown={(e) => { if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return; const h = sayHist.current; if (h.length === 0) return; e.preventDefault(); if (histPos.current >= h.length) draft.current = sayText; const r = step(h, histPos.current, e.key === 'ArrowUp' ? -1 : 1, draft.current); histPos.current = r.pos; setSayText(r.text); }} onFocus={() => conn.current?.prewarm()} disabled={saying} />
         <button type="submit" className="rb btn say-go" data-testid="say-button" disabled={saying || !sayText.trim()}>Say</button>
