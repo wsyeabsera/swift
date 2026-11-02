@@ -3,16 +3,18 @@ import { useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { Appearance } from './Appearance';
 import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type ThemeChoice } from './theme';
 import { Inspector, Layers } from './Panels';
-import { Canvas, type Sel } from './canvas/Canvas';
-import { makeFrames } from './canvas/fixtures';
+import { Canvas, liveApi, type Sel } from './canvas/Canvas';
+import { makeFrames, type FrameDef } from './canvas/fixtures';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSay } from './say/say';
+import { runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
 const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Diagram'] as const;
 export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
-  const frames = useMemo(() => makeFrames(20), []);
+  const baseFrames = useMemo(() => makeFrames(20), []); const [extra, setExtra] = useState<FrameDef[]>([]); const frames = useMemo(() => [...baseFrames, ...extra], [baseFrames, extra]);
+  const sparkN = useRef(0); const [sparkStatus, setSparkStatus] = useState(''); const [sparking, setSparking] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const swatchRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
   useEffect(() => saveTheme(theme), [theme]);
@@ -28,10 +30,16 @@ export function App() {
     setTier0(`Tier 0 · ${r.ms.toFixed(1)} ms`); setRevision((n) => n + 1);
   }, []);
   const undo = useCallback(async () => { const e = history.current.pop(); if (!e) return; setEdits(history.current.length); if (e.kind === 'say') { await window.__swift?.load(e.frameId, e.snapshot); setRevision((n) => n + 1); setSayStatus('Say undone'); } else await edit(e.frameId, e.el, e.prop, e.before, false); }, [edit]);
+  const spark = useCallback(async () => {
+    const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? 'tv')); if (!window.__swift || !c || !base || sparking) return;
+    setSparking(true); setSparkStatus('Sparking 4 directions…');
+    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => setExtra((e) => [...e, ...f]) });
+    const ok = r.takes.filter((t) => t.result.applied.length > 0).length; const err = r.takes.find((t) => t.result.error)?.result.error; const rej = r.takes.reduce((n, t) => n + t.result.rejected.length, 0); setSparkStatus(`${r.takes.length} takes · ${ok} changed${r.firstPaintMs !== null ? ` · first paint ${r.firstPaintMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${rej ? ` · ${rej} rejected` : ''}${err ? ` · ${err}` : ''}`); setSparking(false);
+  }, [frames, selection, sparking]);
   const say = useCallback(async () => {
-    const text = sayText.trim(); const api = window.__swift; const c = conn.current; if (!text || !api || !c || saying) return;
+    const text = sayText.trim(); const c = conn.current; if (!text || !window.__swift || !c || saying) return;
     const frameId = selection?.frameId ?? 'tv'; const root = frames.find((f) => f.id === frameId)?.root ?? 'tv'; setSaying(true); setSayStatus('Saying…');
-    const r = await runSay({ api, send: c.say, frameId, root, request: selection ? `${text} (the selected element is #${selection.el})` : text });
+    const r = await runSay({ api: liveApi, send: c.say, frameId, root, request: selection ? `${text} (the selected element is #${selection.el})` : text });
     if (r.applied.length > 0) { history.current.push({ kind: 'say', frameId, snapshot: r.snapshot }); setEdits(history.current.length); }
     setSayStatus(r.error && r.applied.length === 0 ? `Say failed: ${r.error}` : `${r.applied.length} applied${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''}${r.firstMs !== null ? ` · first change ${r.firstMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${r.asked[0] ? ` · Claude asks: ${r.asked[0]}` : ''}`);
     setRevision((n) => n + 1); setSaying(false);
@@ -68,8 +76,10 @@ export function App() {
       <footer className="gl isl tools" aria-label="Canvas tools">
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
         <button className="rb btn" onClick={() => void edit('tv', 'clock', 'font-size', '280px')}>Clock bigger</button>
+        <button className="rb btn" onClick={() => void spark()} disabled={sparking} data-testid="spark-button">Spark ×4</button>
         <button className="rb btn" onClick={() => void undo()} disabled={edits === 0} data-testid="undo">Undo{edits ? ` (${edits})` : ''}</button>
         <span className="mono mu" data-testid="tier0">{tier0 || 'Tier 0 · ready'}</span>
+        {sparkStatus && <span className="mono mu" data-testid="spark-status" role="status">{sparkStatus}</span>}
       </footer>
     </div>
   );

@@ -1,0 +1,18 @@
+import { expect, test, vi } from 'vitest';
+import type { CanvasApi } from '../canvas/Canvas';
+import type { FrameDef } from '../canvas/fixtures';
+import { DIRECTIONS, runSpark, takeFrame } from './spark';
+import type { SayEvent } from './say';
+const base: FrameDef = { id: 'tv', root: 'tv', title: 'TV · Idle 1920×1080', x: 0, y: 0, w: 1920, h: 1080, html: '<div id="tv"></div>' };
+test('takes are laid out above the base, two per row, without overlapping', () => {
+  const t = [0, 1, 2, 3].map((i) => takeFrame(base, i, `t${i}`, 'x', '')); expect(t[0]!.y).toBeLessThan(0); expect(t[1]!.x).toBeGreaterThan(t[0]!.x + base.w); expect(t[2]!.y).toBeLessThan(t[0]!.y); expect(new Set(t.map((f) => `${f.x},${f.y}`)).size).toBe(4); expect(t[0]!.title).toBe('TV · x');
+});
+test('directions are distinct prompts', () => { expect(new Set(DIRECTIONS.map((d) => d.prompt)).size).toBe(DIRECTIONS.length); });
+test('runSpark clones the base into n frames and runs one Say per frame in parallel', async () => {
+  const seen: string[] = []; const added: FrameDef[] = [];
+  const api = { snapshot: vi.fn(async (id: string) => (id === 'tv' ? '<div id="tv"></div>' : added.some((f) => f.id === id) ? '<div id="tv"></div>' : '')), tree: vi.fn(async () => [{ id: 'tv', parent: null, depth: 0, tag: 'div', text: '' }]),
+    edit: vi.fn(async () => ({ ok: true, ms: 1, before: '' })), fitTo: vi.fn() } as unknown as CanvasApi; let n = 0;
+  const send = (_s: string, request: string, on: (e: SayEvent) => void) => { seen.push(request); setTimeout(() => { on({ kind: 'delta', text: '{"op":"set","id":"tv","prop":"opacity","value":"0.9"}\n' }); on({ kind: 'done' }); }, 5); };
+  const r = await runSpark({ api, send, base, n: 3, nextId: () => `tv-t${++n}`, addFrames: (f) => added.push(...f) });
+  expect(added.map((f) => f.id)).toEqual(['tv-t1', 'tv-t2', 'tv-t3']); expect(new Set(seen).size).toBe(3); expect(r.takes.every((t) => t.result.applied.length === 1)).toBe(true); expect(r.firstPaintMs).not.toBeNull(); expect(api.fitTo).toHaveBeenCalledWith(['tv-t1', 'tv-t2', 'tv-t3']);
+});

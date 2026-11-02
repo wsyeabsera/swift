@@ -5,7 +5,7 @@ import { fit, isVisible, panBy, screenToWorld, transformCss, zoomAt, type View }
 
 export type Sel = { frameId: string; el: string };
 export type CanvasApi = {
-  frames: string[]; view: () => View; setView: (v: View) => void; fitAll: () => void; visibleCount: () => number;
+  frames: string[]; view: () => View; setView: (v: View) => void; fitAll: () => void; fitTo: (ids: string[]) => void; visibleCount: () => number;
   edit: (frameId: string, el: string, prop: string, value: string) => Promise<{ ok: boolean; ms: number; before: string }>;
   get: (frameId: string, el: string, prop: string) => Promise<string | undefined>;
   props: (frameId: string, el: string, props: string[]) => Promise<Record<string, string> | undefined>;
@@ -20,6 +20,8 @@ export type CanvasApi = {
 declare global { interface Window { __swift?: CanvasApi } }
 declare const chrome: { runtime?: { id?: string; getURL: (p: string) => string } } | undefined;
 const EXT_FRAME = typeof chrome !== 'undefined' && chrome?.runtime?.id ? chrome.runtime.getURL('frame.html') : null;
+/** The canvas API is rebuilt whenever the frame list changes (new bridges), so long-running work (Say, Spark) must not hold on to one instance: this always delegates to the current one. */
+export const liveApi: CanvasApi = new Proxy({} as CanvasApi, { get: (_t, k: string) => { const api = window.__swift; if (!api) throw new Error('canvas not ready'); return (api as unknown as Record<string, unknown>)[k]; } });
 const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
 
 /** Infinite canvas: one transformed world layer, one sandboxed iframe per frame, offscreen frames frozen (display:none, spike #1706).
@@ -31,7 +33,7 @@ export function Canvas({ frames, selection, onSelect, revision, onReady }: { fra
   const bridges = useMemo(() => new Map(frames.map((f) => [f.id, new FrameBridge(() => iframes.current.get(f.id)?.contentWindow)])), [frames]);
   const [visible, setVisible] = useState<Set<string>>(() => new Set(frames.map((f) => f.id))); const visRef = useRef(visible);
   const [selRect, setSelRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const onSelectRef = useRef(onSelect); onSelectRef.current = onSelect; const onReadyRef = useRef(onReady); onReadyRef.current = onReady;
+  const fitted = useRef(false); const onSelectRef = useRef(onSelect); onSelectRef.current = onSelect; const onReadyRef = useRef(onReady); onReadyRef.current = onReady;
   const sync = useCallback(() => {
     const host = hostRef.current; const world = worldRef.current; if (!host || !world) return;
     const v = viewRef.current; world.style.transform = transformCss(v); world.style.setProperty('--inv', String(1 / v.s));
@@ -40,7 +42,7 @@ export function Canvas({ frames, selection, onSelect, revision, onReady }: { fra
   }, [frames]);
   useEffect(() => {
     const host = hostRef.current; if (!host) return;
-    const { width, height } = host.getBoundingClientRect(); viewRef.current = fit(frames, width, height, 90); sync();
+    const { width, height } = host.getBoundingClientRect(); if (!fitted.current) { viewRef.current = fit(frames, width, height, 90); fitted.current = true; } sync();
     const rect = () => host.getBoundingClientRect();
     const onWheel = (e: WheelEvent) => { e.preventDefault(); const r = rect(); viewRef.current = e.ctrlKey || e.metaKey ? zoomAt(viewRef.current, e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.01)) : panBy(viewRef.current, -e.deltaX, -e.deltaY); sync(); };
     let drag: { x: number; y: number; sx: number; sy: number; moved: boolean } | null = null;
@@ -62,7 +64,8 @@ export function Canvas({ frames, selection, onSelect, revision, onReady }: { fra
     const bridge = (id: string) => bridges.get(id);
     window.__swift = {
       frames: frames.map((f) => f.id), view: () => ({ ...viewRef.current }), setView: (v) => { viewRef.current = v; sync(); },
-      fitAll: () => { const r = rect(); viewRef.current = fit(frames, r.width, r.height, 90); sync(); }, visibleCount: () => visRef.current.size,
+      fitAll: () => { const r = rect(); viewRef.current = fit(frames, r.width, r.height, 90); sync(); },
+      fitTo: (ids) => { const r = rect(); viewRef.current = fit(frames.filter((f) => ids.includes(f.id)), r.width, r.height, 110); sync(); }, visibleCount: () => visRef.current.size,
       edit: async (id, el, prop, value) => { const t0 = performance.now(); const r = await bridge(id)?.request({ t: 'edit', el, prop, value }); return { ok: !!r?.ok, ms: performance.now() - t0, before: r?.before ?? '' }; },
       get: async (id, el, prop) => (await bridge(id)?.request({ t: 'get', el, prop }))?.value,
       props: async (id, el, props) => (await bridge(id)?.request({ t: 'props', el, props }))?.values,

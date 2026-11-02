@@ -39,6 +39,10 @@ try {
   await web.mouse.click(5, 400); await web.waitForTimeout(300); cv.cleared = (await web.textContent('[data-testid=inspector-id]'))?.trim();
   // Tier-0 budget (task #1676): 30 edits through the bridge, p95 under 16 ms
   const times = await web.evaluate(async () => { const t = []; for (let i = 0; i < 30; i++) { const r = await window.__swift.edit('tv', 'clock', 'color', `hsl(${i * 12} 80% 70%)`); t.push(r.ms); } return t; }); times.sort((a, b) => a - b); cv.tier0p95 = +times[Math.floor(times.length * 0.95)].toFixed(2); cv.tier0max = +times.at(-1).toFixed(2);
+  // Spark x4: four takes, each a clone of the TV frame with its own Say, in parallel (fake Claude: every take gets the same recorded answer)
+  await web.evaluate(() => window.__swift.fitAll()); await web.getByTestId('spark-button').click();
+  await web.waitForFunction(() => /takes/.test(document.querySelector('[data-testid=spark-status]')?.textContent ?? ''), null, { timeout: 20000 }); cv.sparkStatus = (await web.textContent('[data-testid=spark-status]'))?.trim();
+  cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
   // Appearance popover (rule H7) + theme persistence
   const th = {}; await web.getByTestId('appearance-button').click(); await web.waitForSelector('[data-testid=appearance]'); await web.getByRole('button', { name: 'Mount Fuji' }).click(); await web.waitForTimeout(250);
   th.bgAfterPick = await web.evaluate(() => getComputedStyle(document.querySelector('.kit-root')).getPropertyValue('--bg-image')); th.modeClass = await web.evaluate(() => document.querySelector('.kit-root').className);
@@ -56,6 +60,7 @@ try {
   const selOk = cv0.selected === 'clock' && cv0.layers.includes('clock') && cv0.layers.includes('recent') && cv0.inspectorEdit === '300px' && cv0.afterUndo === cv0.startFs && cv0.pickedLayer === 'date' && cv0.cleared === 'nothing selected';
   const sayOk = cv0.sayStatus.includes('3 applied') && cv0.sayStatus.includes('1 rejected') && cv0.sayApplied.fontSize === '300px' && cv0.sayApplied.dateOpacity === '0.5' && cv0.sayApplied.token === '#30d158' && cv0.sayUndone.fontSize === cv0.sayUndone.before && cv0.sayUndone.dateOpacity === cv0.sayUndone.beforeOp && cv0.sayUndone.status === 'Say undone';
   const themeOk = cv0.theme.bgAfterPick.includes('fuji') && cv0.theme.modeClass.includes('m-light') && cv0.theme.blur.trim() === '48px' && cv0.theme.escClosed && cv0.theme.focusBack === 'appearance-button' && cv0.theme.scrimClosed && cv0.theme.persisted;
+  const sparkOk = cv0.spark.ids.length === 4 && cv0.spark.sizes.every((x) => x === '300px') && /4 takes · 4 changed/.test(cv0.sparkStatus) && /first paint/.test(cv0.sparkStatus);
   const extOk = out.extEdit.ok && out.extRead === '260px';
-  const ok = canvasOk && selOk && sayOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { canvasOk, selOk, sayOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
+  const ok = canvasOk && selOk && sayOk && sparkOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { canvasOk, selOk, sayOk, sparkOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
 } catch (e) { console.error(e); kill(); process.exit(1); }

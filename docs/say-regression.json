@@ -1,0 +1,302 @@
+[
+ {
+  "req": "make the clock bigger",
+  "route": "property",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 1735,
+  "failed": false,
+  "status": "1 applied · first change 1735 ms · 1.7 s"
+ },
+ {
+  "req": "use the brand blue for the title",
+  "route": "token",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 3.3 s · Claude asks: No title element exists in this tree. Did you mean the clock or the RECENT heading?"
+ },
+ {
+  "req": "swap to the research-radar palette",
+  "route": "token",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 1.5 s · Claude asks: The research-radar palette isn't in this tree. Paste its color values (for example --ac, --ok, --warn, --bg) and I'll apply them."
+ },
+ {
+  "req": "make this card feel calmer and more premium",
+  "route": "full",
+  "applied": 13,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 2625,
+  "failed": false,
+  "status": "13 applied · first change 2625 ms · 3.8 s"
+ },
+ {
+  "req": "round the corners more",
+  "route": "property",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 1178,
+  "failed": false,
+  "status": "1 applied · first change 1178 ms · 1.2 s"
+ },
+ {
+  "req": "change the accent to green",
+  "route": "token",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 1186,
+  "failed": false,
+  "status": "1 applied · first change 1186 ms · 1.2 s"
+ },
+ {
+  "req": "add a QR code on the left that links to the remote",
+  "route": "full",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 2.3 s · Claude asks: Which URL should the QR code link to? I don't have the remote's address, and the tree has no existing QR element to edit."
+ },
+ {
+  "req": "move the Recent panel to the right",
+  "route": "property",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 1520,
+  "failed": false,
+  "status": "1 applied · first change 1520 ms · 1.5 s"
+ },
+ {
+  "req": "use Barlow instead of Inter",
+  "route": "token",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 1799,
+  "failed": false,
+  "status": "1 applied · first change 1799 ms · 1.8 s"
+ },
+ {
+  "req": "redesign the idle screen for a couch 3 meters away",
+  "route": "full",
+  "applied": 23,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 3388,
+  "failed": false,
+  "status": "23 applied · first change 3388 ms · 5.3 s"
+ },
+ {
+  "req": "increase padding to 32",
+  "route": "property",
+  "applied": 3,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 3523,
+  "failed": false,
+  "status": "3 applied · first change 3523 ms · 3.7 s"
+ },
+ {
+  "req": "make the glass thicker",
+  "route": "token",
+  "applied": 3,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 2122,
+  "failed": false,
+  "status": "3 applied · first change 2122 ms · 2.3 s"
+ },
+ {
+  "req": "turn this into a dark theme",
+  "route": "token",
+  "applied": 4,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 2711,
+  "failed": false,
+  "status": "4 applied · first change 2711 ms · 3.1 s"
+ },
+ {
+  "req": "add a second row with the next three links and a progress bar",
+  "route": "full",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 6249,
+  "failed": false,
+  "status": "1 applied · first change 6249 ms · 6.2 s"
+ },
+ {
+  "req": "nudge the title up 8 px",
+  "route": "property",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 2.1 s · Claude asks: No element named 'title' exists in the tree. Did you mean the clock (#clock, top:86px) or the date (#date, top:340px)?"
+ },
+ {
+  "req": "make the button text bigger",
+  "route": "property",
+  "applied": 0,
+  "rejected": 1,
+  "asked": false,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 1 rejected · 1.4 s"
+ },
+ {
+  "req": "use the warning colour for the border",
+  "route": "token",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 851,
+  "failed": false,
+  "status": "1 applied · first change 851 ms · 0.9 s"
+ },
+ {
+  "req": "write a friendlier empty state",
+  "route": "full",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 2.6 s · Claude asks: The tree has no empty-state element; RECENT always shows three rows. Should I add a hidden empty-state message inside #recent, or do you want me to restyle an existing element?"
+ },
+ {
+  "req": "hide the date",
+  "route": "property",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 690,
+  "failed": false,
+  "status": "1 applied · first change 690 ms · 0.7 s"
+ },
+ {
+  "req": "make the whole thing feel like Apple TV",
+  "route": "full",
+  "applied": 20,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 4112,
+  "failed": false,
+  "status": "20 applied · first change 4112 ms · 6.2 s"
+ },
+ {
+  "req": "set the background to the lake photo",
+  "route": "token",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 1.1 s · Claude asks: I need the lake photo (an image file or URL) to set it as the background; the tree has no image token or photo to reference, and I can't guess which file it is."
+ },
+ {
+  "req": "align everything to the left",
+  "route": "property",
+  "applied": 4,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 3354,
+  "failed": false,
+  "status": "4 applied · first change 3354 ms · 3.6 s"
+ },
+ {
+  "req": "add a settings sheet with three toggles",
+  "route": "full",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 7694,
+  "failed": false,
+  "status": "1 applied · first change 7694 ms · 7.7 s"
+ },
+ {
+  "req": "make the text white",
+  "route": "token",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 2794,
+  "failed": false,
+  "status": "1 applied · first change 2794 ms · 2.8 s"
+ },
+ {
+  "req": "shrink the thumbnail to 120 px",
+  "route": "property",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 1.7 s · Claude asks: The tree has no thumbnail element. Which element should shrink to 120 px? Available ids: tv, clock, date, recent, recent-h, row1, row1-t, row1-m, row2, row2-t, row2-m, row3, row3-t, row3-m."
+ },
+ {
+  "req": "generate four more directions for this card",
+  "route": "full",
+  "applied": 4,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 4674,
+  "failed": false,
+  "status": "4 applied · first change 4674 ms · 6.4 s"
+ },
+ {
+  "req": "use the success green for confidence above 0.9",
+  "route": "token",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 1.8 s · Claude asks: The tree has no confidence element or score. Which element should turn green when confidence is above 0.9? Or should I add one?"
+ },
+ {
+  "req": "reduce the blur",
+  "route": "property",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 1526,
+  "failed": false,
+  "status": "1 applied · first change 1526 ms · 1.5 s"
+ },
+ {
+  "req": "make the digest email shorter and punchier",
+  "route": "full",
+  "applied": 0,
+  "rejected": 0,
+  "asked": true,
+  "firstMs": null,
+  "failed": false,
+  "status": "0 applied · 1.3 s · Claude asks: The tree has no digest email element. Did you mean the RECENT card (ids recent, row1-t to row3-t), and should I shorten those labels?"
+ },
+ {
+  "req": "swap the font weight to 300",
+  "route": "property",
+  "applied": 1,
+  "rejected": 0,
+  "asked": false,
+  "firstMs": 2253,
+  "failed": false,
+  "status": "1 applied · first change 2253 ms · 2.3 s"
+ }
+]

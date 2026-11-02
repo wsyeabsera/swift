@@ -42,3 +42,5 @@ button:disabled{opacity:.45;cursor:default}
 .bds{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.bd{height:52px;border-radius:14px;background-size:cover;background-position:center;box-shadow:0 0 0 1px var(--bd)}.bd.on{box-shadow:0 0 0 3px var(--ac)}
 .segs{display:flex;gap:6px}.segs .seg{flex:1}.accs{display:flex;gap:10px;padding:0 6px}.acc{width:30px;height:30px;border-radius:50%;box-shadow:0 0 0 1px var(--bd)}.acc.on{box-shadow:0 0 0 3px var(--tx)}
 .m-light .mark{color:#fff}
+
+.tools{white-space:nowrap;max-width:calc(100vw - 32px)}.btn{white-space:nowrap}.tools [data-testid=spark-status]{max-width:340px;overflow:hidden;text-overflow:ellipsis}
