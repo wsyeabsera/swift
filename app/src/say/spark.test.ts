@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import type { CanvasApi } from '../canvas/Canvas';
 import type { FrameDef } from '../canvas/fixtures';
-import { DIRECTIONS, discardTakes, isTake, keepTake, runSpark, takeFrame } from './spark';
+import { canSpark, DIRECTIONS, discardTakes, isTake, keepTake, runSpark, takeFrame } from './spark';
 import type { SayEvent } from './say';
 const base: FrameDef = { id: 'tv', root: 'tv', title: 'TV · Idle 1920×1080', x: 0, y: 0, w: 1920, h: 1080, html: '<div id="tv"></div>' };
 test('takes are laid out above the base, two per row, without overlapping', () => {
@@ -20,4 +20,8 @@ test('keep promotes one take, discard removes the rest and never touches real fr
   const f = [base, { ...base, id: 'tv-t1' }, { ...base, id: 'tv-t2' }]; const kept = keepTake(f, 'tv-t2');
   expect(isTake(kept[1]!)).toBe(true); expect(isTake(kept[2]!)).toBe(false); expect(discardTakes(kept).map((x) => x.id)).toEqual(['tv', 'tv-t2']);
   expect(keepTake(f, 'tv')).toEqual(f); expect(discardTakes([base])).toEqual([base]);
+});
+test('spark is refused while too many takes are unreviewed', () => {
+  const many = Array.from({ length: 5 }, (_, i) => ({ ...base, id: `tv-t${i + 1}` })); expect(canSpark([base], 4)).toEqual({ ok: true }); expect(canSpark(many, 3)).toEqual({ ok: true });
+  const r = canSpark(many, 4); expect(r.ok).toBe(false); expect(r.ok === false && r.reason).toContain('5 takes waiting'); expect(canSpark(keepTake(many, 'tv-t1'), 4).ok).toBe(true);
 });

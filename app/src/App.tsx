@@ -11,7 +11,7 @@ import { clearDoc, loadDoc, nextSparkN, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
 import { localEdits } from './say/local';
-import { discardTakes, isTake, keepTake, runSpark } from './say/spark';
+import { canSpark, discardTakes, isTake, keepTake, runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
 const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Diagram'] as const;
 export function App() {
@@ -41,6 +41,7 @@ export function App() {
   const undo = useCallback(async () => { const e = history.current.pop(); if (!e) return; setEdits(history.current.length); if (e.kind === 'say') { await window.__swift?.load(e.frameId, e.snapshot); setRevision((n) => n + 1); setSayStatus('Say undone'); } else await edit(e.frameId, e.el, e.prop, e.before, false); }, [edit]);
   const spark = useCallback(async () => {
     const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? 'tv')); if (!window.__swift || !c || !base || sparking) return;
+    const gate = canSpark(frames, 4); if (!gate.ok) { setSparkStatus(gate.reason); return; }
     setSparking(true); setSparkStatus('Sparking 4 directions…'); const ac = new AbortController(); sparkAbort.current = ac;
     const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => setFrames((e) => [...e, ...f]), signal: ac.signal }); sparkAbort.current = null;
     const ok = r.takes.filter((t) => t.result.applied.length > 0).length; const err = r.takes.find((t) => t.result.error)?.result.error; const rej = r.takes.reduce((n, t) => n + t.result.rejected.length, 0); setSparkStatus(`${r.takes.length} takes · ${ok} changed${r.firstPaintMs !== null ? ` · first paint ${r.firstPaintMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${rej ? ` · ${rej} rejected` : ''}${err ? ` · ${err}` : ''}`); setSparking(false);

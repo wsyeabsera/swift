@@ -32,3 +32,6 @@ export async function runSpark(a: { api: CanvasApi; send: SayTransport; base: Fr
 export const isTake = (f: FrameDef): boolean => /-t\d+$/.test(f.id) && !f.kept;
 export const discardTakes = (frames: FrameDef[]): FrameDef[] => frames.filter((f) => !isTake(f));
 export const keepTake = (frames: FrameDef[], id: string): FrameDef[] => frames.map((f) => (f.id === id && isTake(f) ? { ...f, kept: true } : f));
+/** Each take is a live iframe (~2.5 MB) plus a Claude session: cap the unreviewed takes so Spark cannot pile up silently. */
+export const MAX_TAKES = 8;
+export const canSpark = (frames: FrameDef[], n: number): { ok: true } | { ok: false; reason: string } => { const open = frames.filter(isTake).length; return open + n > MAX_TAKES ? { ok: false, reason: `${open} takes waiting: keep or discard some first (max ${MAX_TAKES})` } : { ok: true }; };
