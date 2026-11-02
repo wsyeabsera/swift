@@ -14,6 +14,7 @@
 - Redo: ⌘⇧Z / Redo button (redo stack cleared by any new action; say entries swap snapshots).
 - Export button: selected frame as a standalone HTML download (`canvas/exportHtml.ts`).
 - "+ phone/desktop/tv" add an empty preset frame (`newFrame`).
+- Delete frame button (history entry `frameDel`, undo restores at the same index with its edits; last frame protected).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

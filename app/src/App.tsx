@@ -39,7 +39,7 @@ export function App() {
   const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
   const [tier0, setTier0] = useState<string>('');
   const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
-  type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string };
+  type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string } | { kind: 'frameDel'; frameId: string; frame: FrameDef; index: number };
   const history = useRef<Entry[]>([]); const [edits, setEdits] = useState(0);
   const edit = useCallback(async (frameId: string, el: string, prop: string, value: string, record = true) => {
     const r = await window.__swift?.edit(frameId, el, prop, value); if (!r?.ok) return;
@@ -50,12 +50,14 @@ export function App() {
   const undo = useCallback(async () => {
     const e = history.current.pop(); if (!e || !window.__swift) return; setEdits(history.current.length);
     if (e.kind === 'say') { const after = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); redoStack.current.push({ kind: 'say', frameId: e.frameId, snapshot: after }); setRevision((n) => n + 1); setSayStatus('Say undone'); }
+    else if (e.kind === 'frameDel') { setFrames((f) => (f.some((x) => x.id === e.frame.id) ? f : [...f.slice(0, e.index), e.frame, ...f.slice(e.index)])); redoStack.current.push(e); setSayStatus('Frame restored'); }
     else { await edit(e.frameId, e.el, e.prop, e.before, false); redoStack.current.push(e); }
     setRedos(redoStack.current.length);
   }, [edit]);
   const redo = useCallback(async () => {
     const e = redoStack.current.pop(); if (!e || !window.__swift) return; setRedos(redoStack.current.length);
     if (e.kind === 'say') { const before = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); history.current.push({ kind: 'say', frameId: e.frameId, snapshot: before }); setRevision((n) => n + 1); setSayStatus('Redone'); }
+    else if (e.kind === 'frameDel') { setFrames((f) => f.filter((x) => x.id !== e.frame.id)); setSelection(null); history.current.push(e); setSayStatus('Frame deleted'); }
     else { await edit(e.frameId, e.el, e.prop, e.after, false); history.current.push(e); }
     setEdits(history.current.length);
   }, [edit]);
@@ -127,6 +129,12 @@ export function App() {
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, importOpen, appearanceOpen]);
   const addFrame = useCallback((kind: PresetKey) => { const f = newFrame(frames, kind); setFrames((x) => [...x, newFrame(x, kind)]); setSayStatus(`Added ${f.title}`); setTimeout(() => window.__swift?.fitTo([f.id]), 200); }, [frames]);
+  // Delete the selected frame (always keeps at least one); undo puts it back at the same place with its edits.
+  const deleteFrame = useCallback(async () => {
+    const id = selection?.frameId; const index = frames.findIndex((f) => f.id === id); const f = frames[index]; if (!id || !f || !window.__swift) return; if (frames.length <= 1) { setSayStatus('Cannot delete the last frame'); return; }
+    const html = (await window.__swift.snapshot(id)) || f.html; history.current.push({ kind: 'frameDel', frameId: id, frame: { ...f, html }, index }); redoStack.current = []; setRedos(0); setEdits(history.current.length);
+    setFrames((x) => x.filter((y) => y.id !== id)); setSelection(null); setSayStatus(`Deleted ${f.title}`);
+  }, [frames, selection]);
   // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
   const exportFrame = useCallback(async () => {
     const f = frames.find((x) => x.id === (selection?.frameId ?? 'tv')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
@@ -175,6 +183,7 @@ export function App() {
         <button className="rb btn" onClick={() => selection && setFrames((f) => keepTake(f, selection.frameId))} disabled={!selIsTake} data-testid="keep-take">Keep take</button>
         <button className="rb btn" onClick={discard} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
         {(Object.keys(PRESETS) as PresetKey[]).map((k) => <button key={k} className="rb btn" onClick={() => addFrame(k)} data-testid={`add-${k}`} title={`New ${PRESETS[k].label} frame`}>+ {k}</button>)}
+        <button className="rb btn" onClick={() => void deleteFrame()} disabled={!selection} data-testid="delete-frame" title="Delete the selected frame (undoable)">Delete frame</button>
         <button className="rb btn" onClick={() => void exportFrame()} data-testid="export">Export</button>
         <button className="rb btn" onClick={resetDesign} data-testid="reset">Reset</button>
         <button className="rb btn" onClick={() => void undo()} disabled={edits === 0} data-testid="undo">Undo{edits ? ` (${edits})` : ''}</button>

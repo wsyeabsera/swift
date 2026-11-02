@@ -54,7 +54,11 @@ try {
     cv.rename = { renamed, escKept: (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1, inputGone: (await web.$('[data-testid=frame-name]')) === null }; }
   // + phone adds an empty preset frame whose root id is addressable
   { const n0 = await web.evaluate(() => window.__swift.frames.length); await web.getByTestId('add-phone').click(); await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n + 1, n0, { timeout: 4000 }); await web.waitForTimeout(400);
-    cv.added = await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), width: await window.__swift.get('phone-1', 'phone-1', 'width') })); }
+    cv.added = await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), width: await window.__swift.get('phone-1', 'phone-1', 'width') }));
+    // delete that frame, then undo brings it back (same place, with its markup)
+    await web.evaluate(() => window.__swift.fitTo(['phone-1'])); await web.waitForTimeout(250); const c = await web.evaluate(() => { const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(c.x, c.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 });
+    await web.getByTestId('delete-frame').click(); await web.waitForTimeout(400); const gone = await web.evaluate(() => !window.__swift.frames.includes('phone-1')); await web.getByTestId('undo').click(); await web.waitForTimeout(600);
+    cv.frameDel = { gone, back: await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), n: window.__swift.frames.length, width: await window.__swift.get('phone-1', 'phone-1', 'width') })), n0: n0 + 1 }; }
   // Canvas keys: ⌘1 actual size, ⌘0 fit, Escape deselects
   { await web.keyboard.press('Meta+1'); await web.waitForTimeout(150); const s1 = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Meta+0'); await web.waitForTimeout(150); const s0 = await web.evaluate(() => window.__swift.view().s);
     await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(150); const p1 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(p1.x, p1.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 }); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
@@ -127,7 +131,8 @@ try {
   const extOk = out.extEdit.ok && out.extRead === '260px';
   const busyOk = cv0.busy.saw && cv0.busy.left === 0;
   const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
-  const addOk = cv0.added.has && cv0.added.width === '390px';
+  const frameDelOk = cv0.frameDel.gone && cv0.frameDel.back.has && cv0.frameDel.back.n === cv0.frameDel.n0 && cv0.frameDel.back.width === '390px';
+  const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
   const exportOk = addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
   const histOk = ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
