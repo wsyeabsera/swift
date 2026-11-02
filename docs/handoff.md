@@ -40,6 +40,7 @@
 - SPARK SPEED: each take is asked for "the single most visible change FIRST, then at most 6 more". Real Claude (`node e2e/real-spark.mjs`): first paint 4.5 s -> 1.6-2.3 s, all four takes 25.9 s -> 3.2-5.0 s; takes still distinct. The real-*.mjs scripts now use a temp SWIFT_DATA_DIR (they used ~/.swift-canvas and polluted restores).
 - Frame rename is undoable/redoable (history entry `rename`). e2e gotcha: after clicking Undo/Redo the button keeps focus and Enter/Shift+Enter then ignore the canvas by design: blur before key tests.
 - Zoom readout in the header (click = actual size, polled 4x/s). Header guard: the e2e asserts the header stays ONE row (height < 90): a wider speed island once wrapped over the canvas and silently broke click-selection (the helper text is now "helper · claude ready", full version in the tooltip).
+- Known flake: once, `npm run helper:test` showed 1 failed test right after the UI contrast run finished (30 passed / 1 failed); 4 re-runs and 2 earlier runs were clean. Suspect a timing-based Say/WebSocket integration test under load; if it recurs, run `cargo test -p swift-canvas-helper -- --nocapture` and record the test name.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 
