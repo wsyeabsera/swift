@@ -14,6 +14,7 @@ import { firstChild, parentOf } from './canvas/tree';
 import { compareSet } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
 import { starterFrames } from './canvas/starter';
+import { addItem, loadLibrary, saveLibrary, uniquifyIds, type LibItem } from './library';
 import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
@@ -32,6 +33,7 @@ export function App() {
   const [reg] = useState<Registry>(() => loadRegistry()); const project = activeProject(reg);
   const hadLocal = useRef(loadDoc(undefined, project.id) !== null); const [ready, setReady] = useState(hadLocal.current); const [epoch, setEpoch] = useState(0);
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
+  const [library, setLibrary] = useState<LibItem[]>(() => loadLibrary());
   const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand(undefined, project.id));
   const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const takesRunning = useRef(new Map<string, AbortController>()); const [painting, setPainting] = useState<Set<string>>(new Set()); const [sparking, setSparking] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null); const [shortcutsOpen, setShortcutsOpen] = useState(false); const [frameMenuOpen, setFrameMenuOpen] = useState(false); const fmRef = useRef<HTMLButtonElement>(null); const fileRef = useRef<HTMLInputElement>(null); const kbRef = useRef<HTMLButtonElement>(null);
@@ -157,6 +159,17 @@ export function App() {
     const next = addProject(reg, uniqueName(reg.list, r.project.name)); if (!next) { setSayStatus('Too many projects'); return; }
     const e1 = saveDoc(r.project.frames, undefined, next.active); if (e1) { setSayStatus(`Not opened: ${e1}`); return; } saveBrand(r.project.brand, undefined, next.active); void goTo(next);
   }, [reg, goTo]);
+  // Shared library: save the selected element (markup + origin project), insert it into any frame later (ids de-duplicated, one undo step).
+  const saveToLibrary = useCallback(async () => {
+    if (!selection || !window.__swift) return; const html = await window.__swift.outer(selection.frameId, selection.el); const r = addItem(library, selection.el, project.name, html);
+    if (!r.ok) { setSayStatus(`Library: ${r.error}`); return; } const err = saveLibrary(r.list); setLibrary(r.list); setSayStatus(err ? `Saved for now, not stored: ${err}` : `Saved #${selection.el} to the library`);
+  }, [selection, library, project.name]);
+  const insertFromLibrary = useCallback(async (item: LibItem) => {
+    const api = window.__swift; const f = frames.find((x) => x.id === (selection?.frameId ?? frames[0]?.id)); if (!api || !f) return;
+    const taken = new Set((await api.tree(f.id)).map((n) => n.id)); const html = uniquifyIds(item.html, taken); const snapshot = await api.snapshot(f.id);
+    if (!(await api.add(f.id, f.root, html))) { setSayStatus(`Could not insert ${item.name}`); return; }
+    history.current.push({ kind: 'say', frameId: f.id, snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setRevision((n) => n + 1); setSayStatus(`Inserted ${item.name} (from ${item.origin}) into ${f.title}`);
+  }, [frames, selection]);
   // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
   const exportFrame = useCallback(async () => {
     const f = frames.find((x) => x.id === (selection?.frameId ?? frames[0]?.id ?? '')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
@@ -233,6 +246,9 @@ export function App() {
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportFrame(); }} data-testid="export">Export HTML</button>
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void deleteFrame(); }} disabled={!selection} data-testid="delete-frame" title="Delete the selected frame (undoable)">Delete frame</button>
             </div>
+            <h2>Library <span className="mono mu">shared across projects</span></h2>
+            <div className="projs"><button className="rb btn" onClick={() => void saveToLibrary()} disabled={!selection} data-testid="lib-save">Save selection</button></div>
+            <ul className="liblist" data-testid="library">{library.slice(0, 12).map((it) => (<li key={it.id}><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void insertFromLibrary(it); }} data-testid="lib-item" title={`Insert into the selected frame`}>{it.name}<span className="mono mu"> · {it.origin}</span></button></li>))}{library.length === 0 && <li className="mu">Nothing saved yet.</li>}</ul>
             <h2>Project</h2>
             <div className="projs"><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportProject(); }} data-testid="export-project">Export project file</button><button className="rb btn" onClick={() => fileRef.current?.click()} data-testid="open-project">Open project file…</button><button className="rb btn" onClick={resetDesign} data-testid="reset">Reset design</button></div>
           </div>
