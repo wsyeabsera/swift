@@ -45,6 +45,12 @@ try {
   await web.evaluate(() => window.__swift.fitAll()); await web.getByTestId('spark-button').click();
   await web.waitForFunction(() => /takes/.test(document.querySelector('[data-testid=spark-status]')?.textContent ?? ''), null, { timeout: 20000 }); cv.sparkStatus = (await web.textContent('[data-testid=spark-status]'))?.trim();
   cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
+  // Delete removes the selected element, Undo brings it back (the frame root is protected)
+  await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); { const q = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 40 * v.s, y: v.y + 40 * v.s }; }); await web.mouse.click(q.x, q.y); await web.waitForTimeout(300); } await web.getByRole('button', { name: /^date/ }).click(); await web.waitForTimeout(300);
+  const selBefore = (await web.textContent('[data-testid=inspector-id]'))?.trim(); await web.keyboard.press('Delete'); await web.waitForTimeout(400); const afterDel = (await web.textContent('[data-testid=say-status]'))?.trim(); const dg = await web.evaluate(async () => { const o = {}; for (const f of window.__swift.frames.filter((x) => x === 'tv' || x.startsWith('tv-t'))) o[f] = (await window.__swift.tree(f)).some((n) => n.id === 'date'); return o; }); const delGone = dg.tv === false;
+  await web.getByTestId('undo').click(); await web.waitForTimeout(400); const delBack = await web.evaluate(async () => (await window.__swift.tree('tv')).some((n) => n.id === 'date'));
+  const rp = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 40 * v.s, y: v.y + 40 * v.s }; }); await web.mouse.click(rp.x, rp.y); await web.waitForTimeout(300); await web.keyboard.press('Delete'); await web.waitForTimeout(300); const rootKept = await web.evaluate(async () => (await window.__swift.tree('tv')).some((n) => n.id === 'tv'));
+  cv.del = { delGone, delBack, rootKept, status: (await web.textContent('[data-testid=say-status]'))?.trim() };
   // Keep one take, discard the rest: only the kept take stays (and the base frames are untouched)
   await web.evaluate(() => window.__swift.fitTo(['tv-t2'])); await web.waitForTimeout(200); const tp = await web.evaluate(() => { const v = window.__swift.view(); const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(tp.x, tp.y); await web.waitForFunction(() => !document.querySelector('[data-testid=keep-take]').disabled, null, { timeout: 4000 });
   await web.getByTestId('keep-take').click(); await web.getByTestId('discard-takes').click(); await web.waitForTimeout(500);
@@ -83,6 +89,7 @@ try {
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
   const takesOk = cv0.takes.spark.length === 1 && cv0.takes.total === 21;
-  const docOk = takesOk &&  cv0.docRestored.sameFrames && cv0.docRestored.more && cv0.docRestored.color;
+  const delOk = cv0.del.delGone && cv0.del.delBack && cv0.del.rootKept;
+  const docOk = delOk &&  takesOk &&  cv0.docRestored.sameFrames && cv0.docRestored.more && cv0.docRestored.color;
   const ok = docOk && canvasOk && selOk && sayOk && sparkOk && importOk && cmdKOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { docOk, canvasOk, selOk, sayOk, sparkOk, importOk, cmdKOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
 } catch (e) { console.error(e); kill(); process.exit(1); }

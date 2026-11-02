@@ -65,6 +65,13 @@ export function App() {
   const takeCount = useMemo(() => frames.filter(isTake).length, [frames]); const selIsTake = !!selection && frames.some((f) => f.id === selection.frameId && isTake(f));
   const discard = useCallback(() => { const gone = new Set(frames.filter(isTake).map((f) => f.id)); history.current = history.current.filter((e) => !gone.has(e.frameId)); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded`); }, [frames, selection]);
   const resetDesign = useCallback(() => { clearDoc(); location.reload(); }, []);
+  // Delete / Backspace removes the selected element (never a frame root); one snapshot makes it one undo step.
+  const removeSelected = useCallback(async () => {
+    if (!selection || !window.__swift) return; const f = frames.find((x) => x.id === selection.frameId); if (!f || f.root === selection.el) return;
+    const snapshot = await window.__swift.snapshot(selection.frameId); if (!(await window.__swift.remove(selection.frameId, selection.el))) { setSayStatus(`Could not remove #${selection.el}`); return; }
+    history.current.push({ kind: 'say', frameId: selection.frameId, snapshot }); setEdits(history.current.length); setSelection(null); setRevision((n) => n + 1); setSayStatus(`Removed #${selection.el}`);
+  }, [selection, frames]);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return; e.preventDefault(); void removeSelected(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [removeSelected]);
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   const dot = helper.status === 'connected' ? 'ok' : helper.status === 'connecting' ? 'warn' : 'bad';
