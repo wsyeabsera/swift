@@ -1,6 +1,6 @@
 # Handoff (2026-11-02, fourth goal hour in progress)
 
-## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (78), `npm run e2e` (pass)
+## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (80), `npm run e2e` (pass)
 - Autosave/restore of the design (`doc.ts`, localStorage, 1 s debounce, all-or-nothing parse, save errors shown, Reset button); Spark ids continue after restore.
 - Spark: Keep take / Discard takes (`kept` flag on FrameDef), Cancel Spark (AbortSignal through runSpark/runSay; late ops dropped, no repair turn), cap of 8 unreviewed takes (`canSpark`).
 - ⌘D duplicate frame (`canvas/frames.ts`), Delete removes the selected element (one undo step via snapshot; frame root protected), ⌘0 fit, ⌘1 actual size, Escape deselects.
@@ -24,6 +24,7 @@
 - Frame ▾ menu in the tools bar holds + presets, Export HTML, Delete frame, Reset design (no overflow at 1280 px; the demo Clock bigger button is gone). Keys are unchanged.
 - Project files: Frame ▾ → Export project file / Open project file… (`projectFile.ts`, version 1 JSON with name, frames, brand; opens as a NEW project, never overwrites; junk refused with a reason).
 - Memory guard (helper `mem.rs`): a Say/Spark take is refused with a clear message when available memory (vm_stat free+inactive+speculative) is below `SWIFT_MIN_FREE_MB` (default 1200); macOS only, allows elsewhere.
+- Frame ▾ → Compare with original: selected take/copy + its original fill the view (`canvas/compare.ts`). Rule of thumb: new toolbar actions go in a menu; the bar overflow is asserted in e2e.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

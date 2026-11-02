@@ -57,6 +57,9 @@ try {
   // Frame menu (rule H7): Esc closes with focus back; the tools bar no longer overflows
   { await web.getByTestId('frame-menu').click(); await web.waitForSelector('[data-testid=frame-popover]'); await web.keyboard.press('Escape'); await web.waitForTimeout(150);
     cv.frameMenu = { closed: (await web.$('[data-testid=frame-popover]')) === null, focusBack: await web.evaluate(() => document.activeElement?.getAttribute('data-testid')), overflow: await web.evaluate(() => { const t = document.querySelector('.tools'); return t.scrollWidth - t.clientWidth; }) }; }
+  // Compare: a selected take (or copy) can be shown next to its original (both frames fill the view)
+  { await web.evaluate(() => window.__swift.fitTo(['tv-t2'])); await web.waitForTimeout(250); const c = await web.evaluate(() => { const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(c.x, c.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 });
+    const sTake = await web.evaluate(() => window.__swift.view().s); await web.getByTestId('frame-menu').click(); await web.getByTestId('compare').click(); await web.waitForTimeout(250); const v = await web.evaluate(() => ({ s: window.__swift.view().s, vis: window.__swift.visibleCount() })); await web.keyboard.press('Escape'); await web.waitForTimeout(150); cv.compare = { sTake, sBoth: v.s, vis: v.vis }; }
   // Rename a frame by double-clicking its label (Enter commits, Escape cancels)
   { await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const lab = web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).first(); await lab.dblclick(); await web.getByTestId('frame-name').fill('Hero TV'); await web.keyboard.press('Enter'); await web.waitForTimeout(300);
     const renamed = (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1; await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).first().dblclick(); await web.getByTestId('frame-name').fill('Nope'); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
@@ -160,7 +163,8 @@ try {
   const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
   const frameDelOk = cv0.frameDel.gone && cv0.frameDel.back.has && cv0.frameDel.back.n === cv0.frameDel.n0 && cv0.frameDel.back.width === '390px';
   const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
-  const frameMenuOk = cv0.frameMenu.closed && cv0.frameMenu.focusBack === 'frame-menu' && cv0.frameMenu.overflow <= 1;
+  const compareOk = cv0.compare.sBoth < cv0.compare.sTake && cv0.compare.vis >= 2;
+  const frameMenuOk = compareOk &&  cv0.frameMenu.closed && cv0.frameMenu.focusBack === 'frame-menu' && cv0.frameMenu.overflow <= 1;
   const shortcutsOk = frameMenuOk &&  cv0.shortcuts.rows >= 10 && cv0.shortcuts.closed && cv0.shortcuts.focusBack === 'shortcuts-button';
   const projectFileOk = cv0.projectFile.name === 'tvdash.swiftcanvas.json' && cv0.projectFile.project === 'tvdash 2' && cv0.projectFile.frames === cv0.projectFile.n0 && /Cannot open/.test(cv0.projectFile.junkStatus) && cv0.projectFile.stillHere === 'tvdash 2';
   const flushOk = projectFileOk &&  shortcutsOk &&  cv0.flush === true;

@@ -11,6 +11,7 @@ import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
 import { nudge } from './canvas/nudge';
 import { firstChild, parentOf } from './canvas/tree';
+import { compareSet } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
 import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
@@ -113,6 +114,7 @@ export function App() {
   // Switching: flush the current design first (a failed save stops the switch), then store the registry and reload into the other project.
   const goTo = useCallback(async (next: Registry | null) => { if (!next) { setSayStatus('Could not create a project from that name'); return; } const err = await persist(); if (err) { setSayStatus(`Not switching: ${err}`); return; } const e2 = saveRegistry(next); if (e2) { setSayStatus(`Not switching: ${e2}`); return; } location.reload(); }, [persist]);
   const takeCount = useMemo(() => frames.filter(isTake).length, [frames]); const selIsTake = !!selection && frames.some((f) => f.id === selection.frameId && isTake(f));
+  const cmp = useMemo(() => (selection ? compareSet(frames, selection.frameId) : null), [frames, selection]);
   const discard = useCallback(() => { const gone = new Set(frames.filter(isTake).map((f) => f.id)); history.current = history.current.filter((e) => !gone.has(e.frameId)); redoStack.current = redoStack.current.filter((e) => !gone.has(e.frameId)); setRedos(redoStack.current.length); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded`); }, [frames, selection]);
   const resetDesign = useCallback(() => { clearDoc(undefined, project.id); location.reload(); }, [project.id]);
   // ⌘D duplicates the selected frame (its current HTML), then selects nothing so the copy can be picked by clicking.
@@ -200,6 +202,7 @@ export function App() {
             <div className="projs">{(Object.keys(PRESETS) as PresetKey[]).map((k) => <button key={k} className="rb btn" onClick={() => { addFrame(k); setFrameMenuOpen(false); }} data-testid={`add-${k}`} title={`New ${PRESETS[k].label} frame`}>+ {k}</button>)}</div>
             <h2>Selected frame</h2>
             <div className="projs">
+              <button className="rb btn" onClick={() => { setFrameMenuOpen(false); if (cmp) window.__swift?.fitTo(cmp); }} disabled={!cmp} data-testid="compare" title="Show the selected take or copy next to its original">Compare with original</button>
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportFrame(); }} data-testid="export">Export HTML</button>
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void deleteFrame(); }} disabled={!selection} data-testid="delete-frame" title="Delete the selected frame (undoable)">Delete frame</button>
             </div>
