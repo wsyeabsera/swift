@@ -13,6 +13,7 @@ import { movedPos, nudge, resizedSize, startPos } from './canvas/nudge';
 import { firstChild, parentOf } from './canvas/tree';
 import { compareSet } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
+import { starterFrames } from './canvas/starter';
 import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
@@ -169,11 +170,13 @@ export function App() {
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection]);
+  const nudgeChain = useRef<Promise<void>>(Promise.resolve());
   // Arrow keys nudge the selected element (Shift = 10 px) when it is positioned (static elements are left alone).
   useEffect(() => {
     const k = async (e: KeyboardEvent) => {
       if (!selection || !e.key.startsWith('Arrow') || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
-      const props = await window.__swift?.props(selection.frameId, selection.el, ['position', 'left', 'top']); if (!props) return; const n = nudge(props, e.key, e.shiftKey); if (!n) return; e.preventDefault(); void edit(selection.frameId, selection.el, n.prop, n.value, true, true);
+      const key = e.key, shift = e.shiftKey, sel = selection; // serialized: each nudge reads the position AFTER the previous one landed (held keys repeat faster than a round trip)
+      nudgeChain.current = nudgeChain.current.then(async () => { const props = await window.__swift?.props(sel.frameId, sel.el, ['position', 'left', 'top']); if (!props) return; const n = nudge(props, key, shift); if (!n) return; await edit(sel.frameId, sel.el, n.prop, n.value, true, true); });
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, edit]);
@@ -217,7 +220,7 @@ export function App() {
           <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>{project.name}</b><span className="mono mu">{frames.length} frames</span></button>
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
-        {importOpen && conn.current && <ImportProject scan={conn.current.scan} pick={conn.current.pickFolder} projects={reg.list} kits={Object.fromEntries(reg.list.map((p) => [p.id, kitColors(p.id === project.id ? brand : loadBrand(undefined, p.id))]))} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
+        {importOpen && conn.current && <ImportProject scan={conn.current.scan} pick={conn.current.pickFolder} projects={reg.list} kits={Object.fromEntries(reg.list.map((p) => [p.id, kitColors(p.id === project.id ? brand : loadBrand(undefined, p.id))]))} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next && !reg.list.some((p) => p.id === next.active)) { saveDoc(starterFrames(name, t), undefined, next.active); } if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
         <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="project-file-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { setFrameMenuOpen(false); void openProjectFile(f); } }} />
         {frameMenuOpen && (<>
           <div className="scrim" onClick={() => { setFrameMenuOpen(false); fmRef.current?.focus(); }} aria-hidden="true" />
