@@ -29,7 +29,7 @@ Electron is the fallback host (same web app).
 | Frame gotcha | acks from offscreen sandboxed frames must not wait on rAF | Chrome pauses rAF there | measured |
 | Glass | Liquid Glass in the shared `.gl` rule; refraction optional | glass + refraction over the moving canvas: pan p95 9.1 ms at 40 frames | measured |
 | Say | warm Haiku session, subtree in, JSONL ops out, apply op-by-op | first complete op 0.66-1.27 s, 5/5 valid; Sonnet 1.1-1.9 s, 4/5 valid (spikes/latency) | measured, small sample |
-| Spark | N parallel sessions (N from measurement) | 12 sessions did not slow each other (trivial prompts); real Spark, memory, usage burn not measured | assumed |
+| Spark | N parallel sessions, pool with idle shutdown | 12 real Say sessions: cold first paint 1.5-1.8 s, warm 0.85-1.4 s, 12/12 valid; ~3.0 GB RSS for 12 processes; usage burn not measured (spikes/latency) | measured, memory is the cost |
 | Local models | MLX Qwen3-4B routes token / property / full | 97% (29/30), median 199 ms with a cached prefix (spikes/localmodel); Apple's model unavailable (macOS 15.5) | measured, optimistic |
 | Language split | TS for UI/Claude/MCP/document; Rust for the helper and bulk compute | re-theme 5k nodes: TS 2.5 us vs WASM 2.7 us; 20k-node diff 514 us vs 28 us (42x with SIMD); hit-test 1.4x (spikes/core) | measured; WASM only for bulk scans |
 | Build on tldraw? | No | paid license + watermark for production; no HTML-shape evidence (spikes/canvas/BUILD-VS-BUY.md) | provisional |

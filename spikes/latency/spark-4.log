@@ -1,0 +1,3 @@
+model=haiku
+turn 1: first token 1396 ms, first complete op undefined ms, total 1587 ms, 1 ops, valid JSONL true
+turn 2: first token 621 ms, first complete op 842 ms, total 854 ms, 2 ops, valid JSONL true
