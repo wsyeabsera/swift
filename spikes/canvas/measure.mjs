@@ -11,9 +11,9 @@ const MODES = (process.env.MODES || 'plain,shadow,same,sandbox').split(','), FRE
 for (const mode of MODES) for (const freeze of FREEZES) for (const glass of GLASS) for (const N of NS) {
   const b = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: false, args: ['--window-size=1440,960', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--disable-background-timer-throttling', '--disable-features=CalculateNativeWinOcclusion'] });
   const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto(`file://${dir}/index.html?mode=${mode}&n=${N}&freeze=${freeze}&glass=${glass}`); await page.waitForFunction('window.__ready');
+  await page.goto(`file://${dir}/index.html?mode=${mode}&n=${N}&freeze=${freeze}&glass=${glass}${process.env.IMG ? '&img8k=' + process.env.IMG : ''}`); await page.waitForFunction('window.__ready');
   const r = await page.evaluate(() => window.runBench()); r.rssMB = rss(mainPid()); results.push(r);
-  console.log(`${mode.padEnd(8)} freeze=${freeze} glass=${glass} n=${N} | pan p50 ${r.pan.p50} p95 ${r.pan.p95} max ${r.pan.max} >20ms ${r.pan.over20}/${r.pan.n} | zoom p95 ${r.zoom.p95} max ${r.zoom.max} | tier0(visible ${r.visibleFrames}) p50 ${r.tier0.p50} p95 ${r.tier0.p95} ms | RSS ${r.rssMB} MB`);
+  console.log(`${mode.padEnd(8)} freeze=${freeze} glass=${glass} img=${process.env.IMG || '-'} n=${N} | pan p50 ${r.pan.p50} p95 ${r.pan.p95} max ${r.pan.max} >20ms ${r.pan.over20}/${r.pan.n} | zoom p95 ${r.zoom.p95} max ${r.zoom.max} | tier0(visible ${r.visibleFrames}) p50 ${r.tier0.p50} p95 ${r.tier0.p95} ms | RSS ${r.rssMB} MB`);
   await b.close();
 }
 fs.writeFileSync(`${dir}/results-glass.json`, JSON.stringify(results, null, 1));

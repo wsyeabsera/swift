@@ -47,3 +47,13 @@ No dropped frames in any run (0 of 300). Glass and even refraction are free on t
 - **Baseline matters:** 2 frames already read 868 MB. That is mostly Chrome itself (browser, GPU and renderer processes, a headed window under Playwright). Going from 40 to 80 frames adds ~100 MB: **~2.5 MB per frame** for this content. The old "1 GB for 20 frames" worry and the 600 MB target were the wrong metric; budget **marginal MB per frame**, and re-measure with real UIs (images, fonts, video).
 - **Level-of-detail decision (provisional): freeze-only with `display:none` for offscreen frames.** No bitmap capture: frame time is already at the display rate at 80 frames, and bitmap capture adds an async step and blur-on-swap risk. Revisit if real content (8K images, video, heavy blur) pushes the frame time or memory.
 - Pan p95 stays 8.8-9.3 ms (display refresh) at 80 frames in every mode: 0 dropped frames out of 300.
+
+## Pass 4: an 8K image frame inside the canvas (same-origin iframes, freeze on, 20 frames + 1 image frame; real auto-label photo, 7680x4320 JPEG 10.3 MB; 2026-11-02)
+| Image frame | Pan p95 | Zoom p95 | Chrome RSS |
+|---|---|---|---|
+| none (baseline) | 10.2 ms | 10.1 ms | 796 MB |
+| full 8K JPEG shown at 1920x1080 CSS size | 10.1 ms | 10.2 ms | 942 MB (+146 MB) |
+| the 1920 px preview from the sharp pyramid | 9.8 ms | 10.0 ms | 901 MB (+105 MB) |
+- **No effect on frame time** (0 frames over 20 ms in 300 either way). A plain `<img>` of the full 8K file costs ~150 MB (Chrome decodes at the displayed size); the preview saves only ~40 MB (within the run-to-run noise of ±50-100 MB).
+- Practical rule: show the **preview** while zoomed out and load tiles only when the user zooms toward 100% of the real pixels (auto-label box editing). Not measured: the cost of decoding the full 130 MB bitmap at 100% zoom, and tile swapping while panning at high zoom.
+- Gotcha fixed in the harness: Tier-0 edit targets must be frames with a DOM (the image frame has none).

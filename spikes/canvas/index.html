@@ -22,6 +22,8 @@ for(let i=0;i<N;i++){const [k,w,h]=KINDS[ORDER[i%ORDER.length]];if(x+w>9000){x=0
   f.doc=`<!doctype html><style>html,body{margin:0}${css(w,h)}</style>${inner(w,h,i)}${script}`;ifr.srcdoc=f.doc;el.appendChild(ifr);f.ifr=ifr}
  else{const host=el;const root=mode==='shadow'?host.attachShadow({mode:'open'}):host;root.innerHTML=`<style>${css(w,h)}</style>${inner(w,h,i)}`;f.root=root}
  world.appendChild(el);frames.push(f);x+=w+120;rowH=Math.max(rowH,h)}
+
+const IMG=q.get('img8k');if(IMG){const el=document.createElement('div');el.className='fr';el.style.cssText='left:2000px;top:100px;width:1920px;height:1080px;z-index:5';const im=document.createElement('img');im.src=IMG==='full'?'../imaging/test8k.jpg':'../imaging/out/sharp-1920.jpg';im.style.cssText='width:1920px;height:1080px;display:block;object-fit:cover';el.appendChild(im);world.appendChild(el);frames.push({el,x:2000,y:100,w:1920,h:1080,vis:true})}
 const state={tx:0,ty:0,s:.25};const apply=()=>{world.style.transform=`translate(${state.tx}px,${state.ty}px) scale(${state.s})`;if(freeze)for(const f of frames){const l=f.x*state.s+state.tx,t=f.y*state.s+state.ty,v=l<innerWidth&&l+f.w*state.s>0&&t<innerHeight&&t+f.h*state.s>0;if(v!==f.vis){f.vis=v;if(FZ==='1')f.el.style.visibility=v?'visible':'hidden';else if(FZ==='2')f.el.style.display=v?'block':'none';else if(FZ==='3'&&f.ifr){if(v){f.ifr.srcdoc=f.doc}else{f.ifr.removeAttribute('srcdoc');f.ifr.src='about:blank'}}}}};
 const stats=a=>{a=[...a].sort((p,q)=>p-q);const g=p=>a[Math.min(a.length-1,Math.floor(a.length*p))];return{n:a.length,p50:+g(.5).toFixed(1),p95:+g(.95).toFixed(1),max:+a[a.length-1].toFixed(1),over20:a.filter(v=>v>20).length}};
 function anim(ms,step){return new Promise(res=>{const d=[];let last=0,t0=0;const tick=t=>{if(!t0){t0=t;last=t;requestAnimationFrame(tick);return}d.push(t-last);last=t;const p=Math.min(1,(t-t0)/ms);step(p);apply();p<1?requestAnimationFrame(tick):res(stats(d))};requestAnimationFrame(tick)})}
@@ -29,7 +31,7 @@ window.runBench=async()=>{const out={mode,N,freeze};apply();await new Promise(r=
  state.s=.25;state.tx=0;state.ty=0;out.pan=await anim(2500,p=>{state.tx=-p*4000});
  state.tx=-200;state.ty=-100;out.zoom=await anim(2500,p=>{const s=.1+p*.5;state.tx=-200+(1-s/.25)*0;state.s=s});
  state.s=.25;state.tx=-600;state.ty=0;apply();await new Promise(r=>setTimeout(r,800));
- const inView=frames.filter(f=>{const l=f.x*state.s+state.tx,t=f.y*state.s+state.ty;return l<innerWidth&&l+f.w*state.s>0&&t<innerHeight&&t+f.h*state.s>0});out.visibleFrames=inView.length;const lat=[];for(let i=0;i<30;i++){const f=inView[i%inView.length];const v='hsl('+(i*37%360)+' 80% 70%)';const t0=performance.now();
+ const inView=frames.filter(f=>(f.ifr||f.root)&&(()=>{const l=f.x*state.s+state.tx,t=f.y*state.s+state.ty;return l<innerWidth&&l+f.w*state.s>0&&t<innerHeight&&t+f.h*state.s>0})());out.visibleFrames=inView.length;const lat=[];for(let i=0;i<30;i++){const f=inView[i%inView.length];const v='hsl('+(i*37%360)+' 80% 70%)';const t0=performance.now();
   if(mode==='sandbox'){await new Promise(res=>{const id='e'+i;pending.set(id,res);setTimeout(()=>{if(pending.delete(id))res()},3000);f.ifr.contentWindow.postMessage({t:'edit',id,v},'*')});lat.push(performance.now()-t0)}
   else{const r=f.ifr?f.ifr.contentDocument.getElementById('r'):f.root.getElementById?f.root.getElementById('r'):f.root.querySelector('#r');r.style.setProperty('--c',v);await new Promise(res=>requestAnimationFrame(res));lat.push(performance.now()-t0)}}
  out.tier0=stats(lat);return out};
