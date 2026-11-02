@@ -1,4 +1,9 @@
-# Handoff (2026-11-02, end of the second goal hour)
+# Handoff (2026-11-02, updated at the end of the third goal hour)
+
+## Third hour: the app exists (read this first)
+Built in `~/Hobby/swift-canvas`, all verified (`npm run typecheck`, `npm test` 29, `npm run helper:test` 27, `npm run e2e`, `npm run e2e:contrast` 48/48): web app + MV3 extension + Rust helper; canvas (20 sandboxed frames, pan/zoom, freeze, bridge); select/layers/inspector/undo; **Say** through the real local Claude Code (29/30 valid, `docs/slice.md`); **Spark x4** (4 distinct real takes in 10-14 s); theme pipeline with Appearance popover; **Import** brand tokens from a repo folder (scanner run on hearth, research-radar, auto-label). Commands in CLAUDE.md. The owner said "start the tasks" so the recommended answers of #1669 were used and #1670 sign-off is NOT recorded: revisit on review.
+Next: #1713 local tier (token/property edits instant), #1734 smaller subtree summary, #1731 repair + `ask` UX, #1733 Spark cap/memory guard + cancel/keep (#1739), #1673 project file + switcher, #1710 Rust core only if needed, #1730 port `--sheen` to the design KIT, #1721 re-plan.
+
 
 ## State
 - Mockups: https://claude.ai/artifact/9JQD7AcKDh7FgGxhPurcxh version 21: 25 boards, all pass `node qa/smoke.mjs` (design folder `~/Hobby/swift-canvas-design`), contrast 16/16 at thin/regular/thick glass.
