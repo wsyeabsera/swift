@@ -1,0 +1,18 @@
+/* Liquid Glass chrome (from KIT.md section I). Dark theme tokens; one .gl rule. */
+:root { --base:#0b0d12; --tx:#f6f7fa; --mu:#e4e8ef; --ac:#7cf0d0; --ok:#30d158; --warn:#ffb340; --bad:#ff6961; --blur:28px; --rim:1;
+  --glass:color-mix(in srgb,#97a3a9 28%,rgba(12,14,20,.86)); --bd:rgba(255,255,255,.18); --sh:0 10px 40px rgba(0,0,0,.4); }
+* { box-sizing: border-box; } body { margin:0; }
+.kit-root { min-height:100vh; color:var(--tx); background:var(--base) center/cover no-repeat; font:13px/1.4 Inter,system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+.rb { border:0; background:none; padding:0; margin:0; font:inherit; color:inherit; cursor:pointer; }
+button:focus-visible { outline:2px solid var(--ac); outline-offset:2px; }
+.mono { font-family:'JetBrains Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums; } .mu { color:var(--mu); opacity:.8; }
+.gl{background:radial-gradient(120% 70% at 18% -10%,rgba(255,255,255,calc(.22*var(--rim,1))),transparent 55%),linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.02) 45%,rgba(255,255,255,.05)),var(--glass);backdrop-filter:blur(var(--blur)) saturate(190%) brightness(1.05);-webkit-backdrop-filter:blur(var(--blur)) saturate(190%) brightness(1.05);border:1px solid var(--bd);box-shadow:inset 1.5px 1.5px 0 -.5px rgba(255,255,255,calc(.5*var(--rim,1))),inset -1px -1px 0 -.5px rgba(255,255,255,calc(.16*var(--rim,1))),inset 0 0 22px rgba(255,255,255,calc(.06*var(--rim,1))),0 1px 1px rgba(0,0,0,.18),var(--sh)}
+.btn,.seg,.chip{transition:transform .35s cubic-bezier(.34,1.56,.64,1)} .btn:active,.seg:active,.chip:active{transform:scale(.97)}
+.kit-top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:16px; flex-wrap:wrap; }
+.isl { height:52px; border-radius:26px; display:flex; align-items:center; gap:10px; padding:0 18px; }
+.mark { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; background:var(--ac); color:#04221a; }
+.pj { display:flex; flex-direction:column; line-height:1.15; } .lens { padding:6px; gap:2px; }
+.seg { height:40px; padding:0 14px; border-radius:20px; } .seg.on { background:rgba(255,255,255,.14); }
+.speed .dot { width:8px; height:8px; border-radius:50%; } .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+.stage { display:grid; place-items:center; padding:12vh 16px; } .card { max-width:520px; padding:28px; border-radius:30px; } .card h1 { margin:0 0 8px; font:600 28px 'Inter Tight',Inter,sans-serif; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }

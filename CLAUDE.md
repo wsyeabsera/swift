@@ -15,3 +15,9 @@ key), Liquid Glass UI, speed is the product, quality bar (failure modes tested, 
 - Playwright extension tests need the Playwright-matched Chromium (branded Chrome ignores `--load-extension`).
 - Python for MLX: `uv venv --python 3.12` (3.15 has no `sentencepiece` wheel).
 - Keep outputs short; this repo is built with token cost in mind (ws-command caveman).
+
+## Commands (the app, since 2026-11-02)
+- `npm run dev` (Vite on http://localhost:5173, HMR), `npm run build` (writes the extension's app page into `extension/app`), `npm run typecheck` (tsc 7), `npm test` (Vitest), `npm run test:changed`.
+- `npm run helper` (Rust helper on 127.0.0.1:7431; needs `SWIFT_DEV=1` for the dev page, or `SWIFT_ALLOWED_ORIGINS=chrome-extension://<id>` and `SWIFT_HELPER_TOKEN=<token>`), `npm run helper:test` (8 tests incl. a real WebSocket server).
+- `npm run e2e`: builds, starts helper + dev server, loads the unpacked extension in Playwright's Chromium, checks web page and extension connect and a wrong origin is refused. Load the extension by hand: chrome://extensions -> Load unpacked -> `extension/`.
+- Layout: `app/` (React + Vite, strict TS), `extension/` (MV3 shell), `helper/` (Rust, tungstenite), `e2e/`, `spikes/`, `docs/`.
