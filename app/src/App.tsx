@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
+import { Canvas } from './canvas/Canvas';
+import { makeFrames } from './canvas/fixtures';
 import { connectHelper, type HelperState } from './helper';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
 const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Diagram'] as const;
 export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' });
+  const frames = useMemo(() => makeFrames(20), []);
+  const [tier0, setTier0] = useState<string>('');
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
   useEffect(() => connectHelper(TOKEN, setHelper), []);
   const dot = helper.status === 'connected' ? 'ok' : helper.status === 'connecting' ? 'warn' : 'bad';
@@ -22,7 +27,12 @@ export function App() {
           <span className="mono">{helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}</span>
         </div>
       </header>
-      <main className="stage"><div className="gl card"><h1>Swift Canvas</h1><p className="mu">Empty canvas. The shell, the Liquid Glass chrome and the helper link are live; frames, Say and Spark come next.</p></div></main>
+      <Canvas frames={frames} />
+      <footer className="gl isl tools" aria-label="Canvas tools">
+        <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
+        <button className="rb btn" onClick={async () => { const r = await window.__swift?.edit('tv', 'clock', 'font-size', '280px'); if (r) setTier0(`Tier 0 · ${r.ms.toFixed(1)} ms`); }}>Clock bigger</button>
+        <span className="mono mu" data-testid="tier0">{tier0 || 'Tier 0 · ready'}</span>
+      </footer>
     </div>
   );
 }

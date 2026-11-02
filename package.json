@@ -5,19 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts",
-    "build": "vite build --config vite.config.ts",
+    "build": "vite build --config vite.config.ts && cp app/src/canvas/bridge-frame.js extension/frame.js",
     "typecheck": "tsc -p .",
     "test": "vitest run",
     "test:changed": "vitest --changed",
     "helper": "cargo run -q -p swift-canvas-helper",
     "helper:test": "cargo test -q -p swift-canvas-helper",
-    "e2e": "cargo build -q -p swift-canvas-helper && vite build --config vite.config.ts && node e2e/smoke.mjs"
+    "e2e": "cargo build -q -p swift-canvas-helper && npm run -s build && node e2e/smoke.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",

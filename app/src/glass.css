@@ -16,3 +16,10 @@ button:focus-visible { outline:2px solid var(--ac); outline-offset:2px; }
 .speed .dot { width:8px; height:8px; border-radius:50%; } .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
 .stage { display:grid; place-items:center; padding:12vh 16px; } .card { max-width:520px; padding:28px; border-radius:30px; } .card h1 { margin:0 0 8px; font:600 28px 'Inter Tight',Inter,sans-serif; }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+
+.canvas{position:fixed;inset:0;overflow:hidden;touch-action:none;cursor:default} .canvas.grab{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.fr{position:absolute;overflow:visible;border-radius:12px;box-shadow:0 0 0 1px rgba(255,255,255,.25),0 20px 60px rgba(0,0,0,.35);background:#000}
+.fr iframe{border-radius:12px}.fr-label{position:absolute;left:0;top:-34px;font:500 22px 'JetBrains Mono',monospace;color:#fff;text-shadow:0 1px 8px #000a;white-space:nowrap}
+.kit-top{position:relative;z-index:5;pointer-events:none}.kit-top>*{pointer-events:auto}
+.tools{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:5}.btn{height:36px;padding:0 16px;border-radius:18px;background:rgba(255,255,255,.12)}
