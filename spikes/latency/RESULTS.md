@@ -60,3 +60,13 @@ real parallel Spark (memory, usage drop per Spark) still not measured. Subscript
 - Even with `--tools ''`, Claude Code's own prompt is ~2.8k cached tokens per session; the subtree and instructions add ~2.5k once.
 - **A Spark of 12 cold sessions is ~64k input tokens (about 30k cache-written, 34k cache-read) plus ~0.4k output at this output size: roughly $0.007 API-equivalent.** Whole-direction outputs (2-4k tokens each) would dominate: ~12 x 3k = ~36k output tokens.
 - The subscription's own usage meter is still not readable from here; token counts are the usable proxy for the Account board's "cost before you run" estimate (cost per Say ~0.0005-0.0009 USD-equivalent, ~5.3k tokens).
+
+## Pass 6: 30 varied Say requests in ONE warm Haiku session (`MANY=1 node say.mjs haiku 30`, requests from `spikes/localmodel/cases.json`)
+- First visible change (first complete op, or the whole answer when it is a single op): **p50 1.15 s, p95 2.38 s, max 2.59 s**: the p95 misses the 1.5 s target (the 5-request pass looked better because it was a small, easy sample).
+- **No latency growth** over the session: first token median 1.24 s for turns 2-11, 0.82 s for the last 10 turns. Slow turns are the ones with long or prose answers.
+- **Only 19/30 answers were valid JSONL.** 11 invalid, by request type: full 6/9, token 3/10, property 2/11. They are requests the tree cannot satisfy ("add a QR code", "write a friendlier empty state", "button text bigger" when the tree has no button, "lake photo"), where the model answers in prose. The op language needs `add`/`remove` ops, an `ask`/`cannot` op, a validate-and-repair loop, and the subtree must include enough context.
+- By route (from the table below, written when this was recorded):
+  - token: n=10 first visible p50 1267 ms, max 2590 ms, valid 7/10
+  - property: n=10 first visible p50 985 ms, max 1290 ms, valid 8/10
+  - full: n=9 first visible p50 1322 ms, max 1855 ms, valid 3/9
+- Implication: send **token and property edits through the local tier first** (instant preview, #1713) and use Claude for the creative ones; budget Say by route (property/token 1.0-1.3 s; creative up to ~2.6 s) instead of one number.
