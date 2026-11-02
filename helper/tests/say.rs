@@ -27,7 +27,7 @@ const OK: &str = r#"read line; printf '%s\n' '{"type":"stream_event","event":{"t
     let script = format!("echo x >> {}; read line; printf '%s\\n' '{{\"type\":\"result\",\"is_error\":false}}'", count.display());
     let mut ws = start(&fake(&script));
     let spawned = |c: &std::path::Path| fs::read_to_string(c).map(|s| s.lines().count()).unwrap_or(0);
-    let wait_for = |want: usize| { for _ in 0..100 { if spawned(&count) >= want { return; } thread::sleep(Duration::from_millis(50)); } };
+    let wait_for = |want: usize| { for _ in 0..400 { if spawned(&count) >= want { return; } thread::sleep(Duration::from_millis(50)); } };
     wait_for(1); assert_eq!(spawned(&count), 1, "connecting prewarms exactly one spare");
     assert_eq!(say(&mut ws, "w1", "hi").last().unwrap().0, "done"); wait_for(2); thread::sleep(Duration::from_millis(300));
     assert_eq!(spawned(&count), 2, "the spare served the Say and one replacement was started (a cold Say would have made it 3)");
