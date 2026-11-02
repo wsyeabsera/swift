@@ -7,6 +7,7 @@ import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
+import { nudge } from './canvas/nudge';
 import { exportDoc, exportName } from './canvas/exportHtml';
 import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
@@ -140,6 +141,14 @@ export function App() {
     const f = frames.find((x) => x.id === (selection?.frameId ?? 'tv')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
     const url = URL.createObjectURL(new Blob([exportDoc(f.title, html)], { type: 'text/html' })); const link = document.createElement('a'); link.href = url; link.download = exportName(f.title); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
   }, [frames, selection]);
+  // Arrow keys nudge the selected element (Shift = 10 px) when it is positioned (static elements are left alone).
+  useEffect(() => {
+    const k = async (e: KeyboardEvent) => {
+      if (!selection || !e.key.startsWith('Arrow') || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
+      const props = await window.__swift?.props(selection.frameId, selection.el, ['position', 'left', 'top']); if (!props) return; const n = nudge(props, e.key, e.shiftKey); if (!n) return; e.preventDefault(); void edit(selection.frameId, selection.el, n.prop, n.value);
+    };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  }, [selection, edit]);
   // Delete / Backspace removes the selected element (never a frame root); one snapshot makes it one undo step.
   const removeSelected = useCallback(async () => {
     if (!selection || !window.__swift) return; const f = frames.find((x) => x.id === selection.frameId); if (!f || f.root === selection.el) return;

@@ -1,0 +1,6 @@
+import { expect, test } from 'vitest';
+import { nudge } from './nudge';
+const abs = { position: 'absolute', left: '115px', top: '86px' };
+test('arrows move by 1, shift by 10, on the right axis', () => { expect(nudge(abs, 'ArrowRight', false)).toEqual({ prop: 'left', value: '116px' }); expect(nudge(abs, 'ArrowLeft', true)).toEqual({ prop: 'left', value: '105px' }); expect(nudge(abs, 'ArrowUp', false)).toEqual({ prop: 'top', value: '85px' }); expect(nudge(abs, 'ArrowDown', true)).toEqual({ prop: 'top', value: '96px' }); });
+test('static elements, auto/percent offsets and other keys are left alone', () => { expect(nudge({ position: 'static', left: '0px', top: '0px' }, 'ArrowUp', false)).toBeNull(); expect(nudge({ position: 'absolute', left: 'auto', top: '1px' }, 'ArrowLeft', false)).toBeNull(); expect(nudge({ position: 'absolute', left: '5%', top: '1px' }, 'ArrowLeft', false)).toBeNull(); expect(nudge(abs, 'a', false)).toBeNull(); expect(nudge({}, 'ArrowUp', false)).toBeNull(); });
+test('negative and fractional positions work', () => { expect(nudge({ position: 'fixed', left: '-3px', top: '0.5px' }, 'ArrowLeft', true)).toEqual({ prop: 'left', value: '-13px' }); expect(nudge({ position: 'relative', left: '1.25px', top: '0.5px' }, 'ArrowDown', false)).toEqual({ prop: 'top', value: '1.5px' }); });
