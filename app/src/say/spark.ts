@@ -16,14 +16,14 @@ export type SparkResult = { takes: { id: string; name: string; result: SayResult
 async function waitFrame(api: CanvasApi, id: string, timeoutMs = 4000): Promise<boolean> {
   const t0 = performance.now(); while (performance.now() - t0 < timeoutMs) { if ((await api.snapshot(id)).length > 0) return true; await new Promise((r) => setTimeout(r, 40)); } return false;
 }
-export async function runSpark(a: { api: CanvasApi; send: SayTransport; base: FrameDef; n: number; nextId: () => string; addFrames: (f: FrameDef[]) => void; signal?: AbortSignal }): Promise<SparkResult> {
+export async function runSpark(a: { api: CanvasApi; send: SayTransport; base: FrameDef; n: number; nextId: () => string; addFrames: (f: FrameDef[]) => void; signal?: AbortSignal; tokens?: Record<string, string> }): Promise<SparkResult> {
   const t0 = performance.now(); const html = await a.api.snapshot(a.base.id); const dirs = DIRECTIONS.slice(0, Math.max(1, Math.min(a.n, DIRECTIONS.length)));
   const frames = dirs.map((d, i) => takeFrame(a.base, i, a.nextId(), d.name, html)); a.addFrames(frames);
   await Promise.all(frames.map((f) => waitFrame(a.api, f.id))); a.api.fitTo(frames.map((f) => f.id)); // only now does the live API know the new frames
   let firstPaint: number | null = null;
   const takes = await Promise.all(frames.map(async (f, i) => {
     const dir = dirs[i]!;
-    const result = await runSay({ api: a.api, send: a.send, frameId: f.id, root: f.root, request: dir.prompt, signal: a.signal });
+    const result = await runSay({ api: a.api, send: a.send, frameId: f.id, root: f.root, request: dir.prompt, signal: a.signal, tokens: a.tokens });
     if (result.firstMs !== null && firstPaint === null) firstPaint = performance.now() - t0; return { id: f.id, name: dir.name, result };
   }));
   return { takes, firstPaintMs: firstPaint, totalMs: performance.now() - t0 };

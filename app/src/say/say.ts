@@ -17,10 +17,10 @@ async function applyOp(api: CanvasApi, frameId: string, root: string, op: Op): P
   }
 }
 /** One Say: snapshot (for one-step undo), build the prompt from the frame, stream ops, validate each line as it completes and apply the good ones at once. */
-export async function runSay(a: { api: CanvasApi; send: SayTransport; frameId: string; root: string; request: string; now?: () => number; signal?: AbortSignal }): Promise<SayResult> {
+export async function runSay(a: { api: CanvasApi; send: SayTransport; frameId: string; root: string; request: string; now?: () => number; signal?: AbortSignal; tokens?: Record<string, string> }): Promise<SayResult> {
   const now = a.now ?? (() => performance.now()); const t0 = now();
   const snapshot = await a.api.snapshot(a.frameId); const tree = await a.api.tree(a.frameId); const ids = new Set(tree.map((n) => n.id));
-  const system = buildSystemPrompt({ tokens: BRAND_TOKENS, ids: [...ids], tree: snapshot });
+  const system = buildSystemPrompt({ tokens: a.tokens ?? BRAND_TOKENS, ids: [...ids], tree: snapshot });
   const res: SayResult = { applied: [], asked: [], rejected: [], firstMs: null, totalMs: 0, snapshot };
   const splitter = new LineSplitter(); let chain: Promise<void> = Promise.resolve();
   const handle = (line: string) => { chain = chain.then(async () => {

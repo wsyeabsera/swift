@@ -11,6 +11,7 @@ import { duplicateFrame, duplicateId } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
+import { loadBrand, saveBrand } from './brand';
 import { localEdits } from './say/local';
 import { canSpark, discardTakes, isTake, keepTake, runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
@@ -19,6 +20,7 @@ export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc() ?? makeFrames(20)); const [saveStatus, setSaveStatus] = useState('');
+  const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand());
   const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const [sparking, setSparking] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
@@ -44,9 +46,9 @@ export function App() {
     const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? 'tv')); if (!window.__swift || !c || !base || sparking) return;
     const gate = canSpark(frames, 4); if (!gate.ok) { setSparkStatus(gate.reason); return; }
     setSparking(true); setSparkStatus('Sparking 4 directions…'); const ac = new AbortController(); sparkAbort.current = ac;
-    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => setFrames((e) => [...e, ...f]), signal: ac.signal }); sparkAbort.current = null;
+    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => setFrames((e) => [...e, ...f]), signal: ac.signal, tokens: brand }); sparkAbort.current = null;
     const ok = r.takes.filter((t) => t.result.applied.length > 0).length; const err = r.takes.find((t) => t.result.error)?.result.error; const rej = r.takes.reduce((n, t) => n + t.result.rejected.length, 0); setSparkStatus(`${r.takes.length} takes · ${ok} changed${r.firstPaintMs !== null ? ` · first paint ${r.firstPaintMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${rej ? ` · ${rej} rejected` : ''}${err ? ` · ${err}` : ''}`); setSparking(false);
-  }, [frames, selection, sparking]);
+  }, [frames, selection, sparking, brand]);
   const say = useCallback(async () => {
     const text = sayText.trim(); const c = conn.current; if (!text || !window.__swift || !c || saying) return;
     if (selection && !pendingAsk && window.__swift) { // local tier: unambiguous requests on the selection never reach Claude
@@ -55,12 +57,12 @@ export function App() {
     }
     const frameId = selection?.frameId ?? 'tv'; const root = frames.find((f) => f.id === frameId)?.root ?? 'tv'; setSaying(true); setSayStatus('Saying…');
     const base = pendingAsk ? `${pendingAsk.original}\n\nYou asked: "${pendingAsk.question}". My answer: ${text}` : text; setPendingAsk(null);
-    const r = await runSayRepairing({ api: liveApi, send: c.say, frameId, root, request: selection ? `${base} (the selected element is #${selection.el})` : base });
+    const r = await runSayRepairing({ api: liveApi, send: c.say, frameId, root, request: selection ? `${base} (the selected element is #${selection.el})` : base, tokens: brand });
     if (r.asked[0] && r.applied.length === 0) setPendingAsk({ question: r.asked[0], original: pendingAsk ? pendingAsk.original : text }); setSayText('');
     if (r.applied.length > 0) { history.current.push({ kind: 'say', frameId, snapshot: r.snapshot }); setEdits(history.current.length); }
     setSayStatus(r.error && r.applied.length === 0 ? `Say failed: ${r.error}` : `${r.applied.length} applied${r.repaired ? ` · ${r.repaired} repaired` : ''}${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''}${r.firstMs !== null ? ` · first change ${r.firstMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${r.asked[0] ? ` · Claude asks: ${r.asked[0]}` : ''}`);
     setRevision((n) => n + 1); setSaying(false);
-  }, [sayText, saying, selection, frames, pendingAsk, edit]);
+  }, [sayText, saying, selection, frames, pendingAsk, edit, brand]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void undo(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo]);
   // Autosave: after the document changes settle, snapshot every frame (current HTML) and store the design; a failure is shown, not swallowed.
   useEffect(() => {
@@ -109,7 +111,7 @@ export function App() {
           <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>tvdash</b><span className="mono mu">idle-refresh</span></button>
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
-        {importOpen && conn.current && <ImportProject scan={conn.current.scan} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
+        {importOpen && conn.current && <ImportProject scan={conn.current.scan} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
           {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => setLens(l)}>{l}</button>))}
