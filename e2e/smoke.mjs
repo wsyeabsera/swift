@@ -66,7 +66,8 @@ try {
   // Rename a frame by double-clicking its label (Enter commits, Escape cancels)
   { await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const lab = web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).first(); await lab.dblclick(); await web.getByTestId('frame-name').fill('Hero TV'); await web.keyboard.press('Enter'); await web.waitForTimeout(300);
     const renamed = (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1; await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).first().dblclick(); await web.getByTestId('frame-name').fill('Nope'); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
-    cv.rename = { renamed, escKept: (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1, inputGone: (await web.$('[data-testid=frame-name]')) === null }; }
+    await web.getByTestId('undo').click(); await web.waitForTimeout(300); const undone = (await web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).count()) === 1; await web.getByTestId('redo').click(); await web.waitForTimeout(300); const redone = (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1;
+    cv.rename = { undone, redone, renamed, escKept: (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1, inputGone: (await web.$('[data-testid=frame-name]')) === null }; }
   // + phone adds an empty preset frame whose root id is addressable
   { const n0 = await web.evaluate(() => window.__swift.frames.length); await web.getByTestId('frame-menu').click(); await web.getByTestId('add-phone').click(); await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n + 1, n0, { timeout: 4000 }); await web.waitForTimeout(400);
     cv.added = await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), width: await window.__swift.get('phone-1', 'phone-1', 'width') }));
@@ -113,7 +114,7 @@ try {
     const u0 = parseInt((await web.textContent('[data-testid=undo]')).match(/\((\d+)\)/)?.[1] ?? '0'); const a0 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'left'))); for (let i = 0; i < 5; i++) await web.keyboard.press('ArrowRight'); await web.waitForTimeout(400);
     const a1 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'left'))); const u1 = parseInt((await web.textContent('[data-testid=undo]')).match(/\((\d+)\)/)?.[1] ?? '0'); await web.getByTestId('undo').click(); await web.waitForTimeout(300); const a2 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')));
     cv.nudgeHold = { moved: a1 - a0, steps: u1 - u0, back: a2 - a0 }; }
-    await web.keyboard.press('Shift+Enter'); await web.waitForTimeout(300); const par = (await web.textContent('[data-testid=inspector-id]'))?.trim(); await web.keyboard.press('Enter'); await web.waitForTimeout(300); const child = (await web.textContent('[data-testid=inspector-id]'))?.trim();  cv.nav = { par, child };
+    await web.evaluate(() => document.activeElement?.blur()); await web.keyboard.press('Shift+Enter'); await web.waitForTimeout(300); const par = (await web.textContent('[data-testid=inspector-id]'))?.trim(); await web.keyboard.press('Enter'); await web.waitForTimeout(300); const child = (await web.textContent('[data-testid=inspector-id]'))?.trim();  cv.nav = { par, child };
     // drag the selected clock: it moves with the pointer (zoom-aware), and ONE undo puts it back
     await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(250); const box = await (await web.$('[data-testid=sel]')).boundingBox(); const sc = await web.evaluate(() => window.__swift.view().s);
     const dl0 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'left'))); const dt0 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'top')));
@@ -211,7 +212,7 @@ try {
   const projectFileOk = cv0.projectFile.name === 'tvdash.swiftcanvas.json' && cv0.projectFile.project === 'tvdash 2' && cv0.projectFile.frames === cv0.projectFile.n0 && /Cannot open/.test(cv0.projectFile.junkStatus) && cv0.projectFile.stillHere === 'tvdash 2';
   const flushOk = projectFileOk &&  shortcutsOk &&  cv0.flush === true;
   const exportOk = flushOk &&  addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
-  const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
+  const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.undone && cv0.rename.redone && cv0.rename.escKept && cv0.rename.inputGone;
   const zoomSelOk = cv0.zoomSel.sAfter > cv0.zoomSel.sBefore;
   const resizeOk = Math.abs(cv0.resize.dw - cv0.resize.expW) <= 2 && Math.abs(cv0.resize.dh - cv0.resize.expH) <= 2 && Math.abs(cv0.resize.backW) < 0.5 && Math.abs(cv0.resize.backH) < 0.5;
   const dragOk = resizeOk &&  Math.abs(cv0.drag.moveX - cv0.drag.expX) <= 2 && Math.abs(cv0.drag.moveY - cv0.drag.expY) <= 2 && cv0.drag.stillSel === 'clock' && cv0.drag.backX === 0 && cv0.drag.backY === 0;

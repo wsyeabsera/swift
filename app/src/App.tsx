@@ -50,7 +50,7 @@ export function App() {
   const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
   const [tier0, setTier0] = useState<string>('');
   const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
-  type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string } | { kind: 'frameDel'; frameId: string; frame: FrameDef; index: number } | { kind: 'discard'; frameId: string; items: { frame: FrameDef; index: number }[] };
+  type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string } | { kind: 'frameDel'; frameId: string; frame: FrameDef; index: number } | { kind: 'discard'; frameId: string; items: { frame: FrameDef; index: number }[] } | { kind: 'rename'; frameId: string; before: string; after: string };
   const history = useRef<Entry[]>([]); const [edits, setEdits] = useState(0);
   const lastEditAt = useRef(0);
   const edit = useCallback(async (frameId: string, el: string, prop: string, value: string, record = true, coalesce = false) => {
@@ -63,6 +63,7 @@ export function App() {
     const e = history.current.pop(); if (!e || !window.__swift) return; setEdits(history.current.length);
     if (e.kind === 'say') { const after = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); redoStack.current.push({ kind: 'say', frameId: e.frameId, snapshot: after }); setRevision((n) => n + 1); setSayStatus('Say undone'); }
     else if (e.kind === 'frameDel') { setFrames((f) => (f.some((x) => x.id === e.frame.id) ? f : [...f.slice(0, e.index), e.frame, ...f.slice(e.index)])); redoStack.current.push(e); setSayStatus('Frame restored'); }
+    else if (e.kind === 'rename') { setFrames((f) => f.map((x) => (x.id === e.frameId ? { ...x, title: e.before } : x))); redoStack.current.push(e); setSayStatus('Rename undone'); }
     else if (e.kind === 'discard') { setFrames((f) => { const out = [...f]; for (const it of [...e.items].sort((p, q) => p.index - q.index)) if (!out.some((x) => x.id === it.frame.id)) out.splice(Math.min(it.index, out.length), 0, it.frame); return out; }); redoStack.current.push(e); setSayStatus(`${e.items.length} takes restored`); }
     else { await edit(e.frameId, e.el, e.prop, e.before, false); redoStack.current.push(e); }
     setRedos(redoStack.current.length);
@@ -71,6 +72,7 @@ export function App() {
     const e = redoStack.current.pop(); if (!e || !window.__swift) return; setRedos(redoStack.current.length);
     if (e.kind === 'say') { const before = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); history.current.push({ kind: 'say', frameId: e.frameId, snapshot: before }); setRevision((n) => n + 1); setSayStatus('Redone'); }
     else if (e.kind === 'frameDel') { setFrames((f) => f.filter((x) => x.id !== e.frame.id)); setSelection(null); history.current.push(e); setSayStatus('Frame deleted'); }
+    else if (e.kind === 'rename') { setFrames((f) => f.map((x) => (x.id === e.frameId ? { ...x, title: e.after } : x))); history.current.push(e); setSayStatus('Rename redone'); }
     else if (e.kind === 'discard') { const ids = new Set(e.items.map((i) => i.frame.id)); setFrames((f) => f.filter((x) => !ids.has(x.id))); setSelection(null); history.current.push(e); setSayStatus(`${ids.size} takes discarded`); }
     else { await edit(e.frameId, e.el, e.prop, e.after, false); history.current.push(e); }
     setEdits(history.current.length);
@@ -274,7 +276,7 @@ export function App() {
           <span className="mono">{helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}</span>
         </div>
       </header>
-      <Canvas onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => setFrames((f) => renameFrame(f, id, t))} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
+      <Canvas onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => { const next = renameFrame(frames, id, t); if (next === frames) return; const before = frames.find((f) => f.id === id)?.title ?? ''; const after = next.find((f) => f.id === id)?.title ?? ''; history.current.push({ kind: 'rename', frameId: id, before, after }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setFrames(next); }} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
       <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       {chips.length > 0 && !saying && !sayText && !pendingAsk && (
