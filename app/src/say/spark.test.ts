@@ -14,7 +14,7 @@ test('runSpark clones the base into n frames and runs one Say per frame in paral
     edit: vi.fn(async () => ({ ok: true, ms: 1, before: '' })), fitTo: vi.fn() } as unknown as CanvasApi; let n = 0;
   const send = (_s: string, request: string, on: (e: SayEvent) => void) => { seen.push(request); setTimeout(() => { on({ kind: 'delta', text: '{"op":"set","id":"tv","prop":"opacity","value":"0.9"}\n' }); on({ kind: 'done' }); }, 5); };
   const r = await runSpark({ api, send, base, n: 3, nextId: () => `tv-t${++n}`, addFrames: (f) => added.push(...f) });
-  expect(added.map((f) => f.id)).toEqual(['tv-t1', 'tv-t2', 'tv-t3']); expect(new Set(seen).size).toBe(3); expect(r.takes.every((t) => t.result.applied.length === 1)).toBe(true); expect(r.firstPaintMs).not.toBeNull(); expect(api.fitTo).toHaveBeenCalledWith(['tv-t1', 'tv-t2', 'tv-t3']);
+  expect(added.map((f) => f.id)).toEqual(['tv-t1', 'tv-t2', 'tv-t3']); expect(new Set(seen).size).toBe(3); expect(seen.every((r) => r.includes('most visible change FIRST'))).toBe(true); expect(r.takes.every((t) => t.result.applied.length === 1)).toBe(true); expect(r.firstPaintMs).not.toBeNull(); expect(api.fitTo).toHaveBeenCalledWith(['tv-t1', 'tv-t2', 'tv-t3']);
 });
 test('keep promotes one take, discard removes the rest and never touches real frames', () => {
   const f = [base, { ...base, id: 'tv-t1' }, { ...base, id: 'tv-t2' }]; const kept = keepTake(f, 'tv-t2');

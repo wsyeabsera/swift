@@ -24,7 +24,7 @@ export async function runSpark(a: { api: CanvasApi; send: SayTransport; base: Fr
   const takes = await Promise.all(frames.map(async (f, i) => {
     const dir = dirs[i]!;
     const own = new AbortController(); a.running?.set(f.id, own); const signal = a.signal ? AbortSignal.any([a.signal, own.signal]) : own.signal; // cancel one take, or all of them
-    const result = await runSay({ api: a.api, send: a.send, frameId: f.id, root: f.root, request: dir.prompt, signal, tokens: a.tokens }); a.running?.delete(f.id); a.onTakeDone?.(f.id);
+    const result = await runSay({ api: a.api, send: a.send, frameId: f.id, root: f.root, request: `${dir.prompt} Emit the single most visible change FIRST (one op per line), then at most 6 more.`, signal, tokens: a.tokens }); a.running?.delete(f.id); a.onTakeDone?.(f.id);
     if (result.firstMs !== null && firstPaint === null) firstPaint = performance.now() - t0; return { id: f.id, name: dir.name, result };
   }));
   return { takes, firstPaintMs: firstPaint, totalMs: performance.now() - t0 };
