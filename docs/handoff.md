@@ -1,7 +1,7 @@
 # Handoff (2026-11-02, end of the second goal hour)
 
 ## State
-- Mockups: https://claude.ai/artifact/9JQD7AcKDh7FgGxhPurcxh version 20: 25 boards, all pass `node qa/smoke.mjs` (design folder `~/Hobby/swift-canvas-design`), contrast 16/16 at thin/regular/thick glass.
+- Mockups: https://claude.ai/artifact/9JQD7AcKDh7FgGxhPurcxh version 21: 25 boards, all pass `node qa/smoke.mjs` (design folder `~/Hobby/swift-canvas-design`), contrast 16/16 at thin/regular/thick glass.
 - All Phase 1 spikes are done and written up in `spikes/*/RESULTS.md`; decisions in `docs/architecture.md` (draft 2). ws-command project `swift`, groups "Swift Canvas 0..5" (tasks #1664-#1750).
 - Hard rules: all Claude work through the local Claude Code login (no API key); Liquid Glass UI; speed is the product; quality bar (failure modes tested).
 
