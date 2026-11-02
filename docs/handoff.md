@@ -32,6 +32,7 @@
 - Suggestion chips above the Say bar for the selection (`say/suggest.ts`: Bigger/Smaller/Bold/Hide + brand colours); each chip runs the local tier (instant).
 - Layers: an eye button per element toggles `visibility:hidden` (undoable; the bridge tree reports own inline `hidden`).
 - New projects from a scanned folder start with an ON-BRAND screen (`canvas/starter.ts`: bg/fg/accent/card/border tokens as CSS variables) instead of a generic dark one; arrow nudges are serialized (a held key repeated faster than the props round trip and lost presses: found by the e2e hold check).
+- Fixed: the default frame was hard-coded to `tv`, so Layers/Say/Spark/export targeted a missing frame in other projects; it is now the selection, else the first frame.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

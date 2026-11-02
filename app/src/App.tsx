@@ -70,7 +70,7 @@ export function App() {
     setEdits(history.current.length);
   }, [edit]);
   const spark = useCallback(async () => {
-    const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? 'tv')); if (!window.__swift || !c || !base || sparking) return;
+    const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? frames[0]?.id ?? '')); if (!window.__swift || !c || !base || sparking) return;
     const gate = canSpark(frames, 4); if (!gate.ok) { setSparkStatus(gate.reason); return; }
     setSparking(true); setSparkStatus('Sparking 4 directions…'); const ac = new AbortController(); sparkAbort.current = ac;
     const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => { setFrames((e) => [...e, ...f]); setPainting(new Set(f.map((x) => x.id))); }, signal: ac.signal, tokens: brand, running: takesRunning.current, onTakeDone: (id) => setPainting((p) => { const n = new Set(p); n.delete(id); return n; }) }); setPainting(new Set()); sparkAbort.current = null;
@@ -83,7 +83,7 @@ export function App() {
       const t0 = performance.now(); const sel = selection; const edits = await localEdits(text, { get: (p) => window.__swift!.get(sel.frameId, sel.el, p) });
       if (edits) { for (const e of edits) await edit(sel.frameId, sel.el, e.prop, e.value); setSayText(''); setSayStatus(`Local · ${edits.map((e) => `${e.prop}: ${e.value}`).join(', ')} · ${(performance.now() - t0).toFixed(0)} ms`); return; }
     }
-    const frameId = selection?.frameId ?? 'tv'; const root = frames.find((f) => f.id === frameId)?.root ?? 'tv'; setSaying(true); setSayStatus('Saying…');
+    const frameId = selection?.frameId ?? frames[0]?.id ?? ''; const root = frames.find((f) => f.id === frameId)?.root ?? frameId; setSaying(true); setSayStatus('Saying…');
     const base = pendingAsk ? `${pendingAsk.original}\n\nYou asked: "${pendingAsk.question}". My answer: ${text}` : text; setPendingAsk(null);
     const r = await runSayRepairing({ api: liveApi, send: c.say, frameId, root, request: selection ? `${base} (the selected element is #${selection.el})` : base, tokens: brand, selected: selection?.el });
     if (r.asked[0] && r.applied.length === 0) setPendingAsk({ question: r.asked[0], original: pendingAsk ? pendingAsk.original : text }); setSayText('');
@@ -159,7 +159,7 @@ export function App() {
   }, [reg, goTo]);
   // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
   const exportFrame = useCallback(async () => {
-    const f = frames.find((x) => x.id === (selection?.frameId ?? 'tv')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
+    const f = frames.find((x) => x.id === (selection?.frameId ?? frames[0]?.id ?? '')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
     const url = URL.createObjectURL(new Blob([exportDoc(f.title, html)], { type: 'text/html' })); const link = document.createElement('a'); link.href = url; link.download = exportName(f.title); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
   }, [frames, selection]);
   // Enter selects the first child, Shift+Enter the parent (outside inputs and buttons, where Enter has its own meaning).
@@ -217,7 +217,7 @@ export function App() {
       <header className="kit-top">
         <div className="gl isl" aria-label="Project">
           <span className="mark" aria-hidden>⚡</span>
-          <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>{project.name}</b><span className="mono mu">{frames.length} frames</span></button>
+          <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>{project.name}</b><span className="mono mu">{frames.length} {frames.length === 1 ? 'frame' : 'frames'}</span></button>
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
         {importOpen && conn.current && <ImportProject scan={conn.current.scan} pick={conn.current.pickFolder} projects={reg.list} kits={Object.fromEntries(reg.list.map((p) => [p.id, kitColors(p.id === project.id ? brand : loadBrand(undefined, p.id))]))} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next && !reg.list.some((p) => p.id === next.active)) { saveDoc(starterFrames(name, t), undefined, next.active); } if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
@@ -249,7 +249,7 @@ export function App() {
         </div>
       </header>
       <Canvas onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => setFrames((f) => renameFrame(f, id, t))} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
-      <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? 'tv', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
+      <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       {chips.length > 0 && !saying && !sayText && !pendingAsk && (
         <div className="gl isl chips" role="group" aria-label="Suggestions" data-testid="chips">
