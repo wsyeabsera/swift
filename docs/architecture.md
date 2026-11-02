@@ -51,6 +51,8 @@ Spark first paint < 2 s (not measured); contrast >= 4.5 on every backdrop in bot
 - **Local tier:** MLX Qwen3-4B routing 97% / 199 ms; Apple's on-device model is not available on macOS 15.
 - **Liquid Glass:** KIT.md section I; contrast checker `qa/contrast.mjs` (16/16 >= 4.5); popovers close on Escape with focus on the trigger (H7 addendum).
 
+## Dev speed floor (spikes/devspeed): `tsc` 7 (native) 0.25-0.7 s for 300 files, Biome ~1 s, Vitest one file 0.39 s and 300 files 6.6 s: the test runner is the slowest step; run affected tests on save.
+
 ## Commands (until the scaffold exists)
 `node spikes/latency/say.mjs haiku 5` (Say), `MANY=1 V3=1 node spikes/latency/say.mjs haiku 30`, `node spikes/canvas/measure.mjs 20`, `node spikes/host/measure-host.mjs`,
 `spikes/localmodel/.venv/bin/python spikes/localmodel/route2.py`, `cd ~/Hobby/swift-canvas-design/qa && node smoke.mjs | contrast.mjs | h7.mjs`.
