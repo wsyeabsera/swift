@@ -5,7 +5,7 @@ use tungstenite::{client::IntoClientRequest, connect, Message, WebSocket, stream
 type Ws = WebSocket<MaybeTlsStream<std::net::TcpStream>>;
 static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 fn fake(script: &str) -> String { let p = std::env::temp_dir().join(format!("fake-claude-{}-{}", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::SeqCst))); fs::write(&p, format!("#!/bin/sh\n{script}\n")).unwrap(); fs::set_permissions(&p, fs::Permissions::from_mode(0o755)).unwrap(); p.to_string_lossy().into_owned() }
-fn start(bin: &str) -> Ws { let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port(); let cfg = Config { port, token: "t".into(), allowed: vec!["chrome-extension://good".into()], claude_bin: bin.into(), model: "haiku".into(), project_roots: vec![] }; thread::spawn(move || { let _ = serve(l, cfg); });
+fn start(bin: &str) -> Ws { let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port(); let cfg = Config { port, token: "t".into(), allowed: vec!["chrome-extension://good".into()], claude_bin: bin.into(), model: "haiku".into(), project_roots: vec![], data_dir: std::env::temp_dir().join("sc-unused") }; thread::spawn(move || { let _ = serve(l, cfg); });
     let mut r = format!("ws://127.0.0.1:{port}/?token=t").into_client_request().unwrap(); r.headers_mut().insert("Origin", "chrome-extension://good".parse().unwrap()); let (mut ws, _) = connect(r).unwrap(); let _ = ws.read().unwrap(); ws }
 fn say(ws: &mut Ws, id: &str, request: &str) -> Vec<(String, String)> {
     ws.send(Message::text(serde_json::json!({ "type": "say", "id": id, "system": "SYS", "request": request }).to_string())).unwrap(); let mut out = vec![];

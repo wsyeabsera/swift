@@ -2,7 +2,7 @@
 use helper::{serve, Config};
 use std::{net::TcpListener, thread};
 use tungstenite::{client::IntoClientRequest, connect, Message};
-fn start() -> u16 { let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port(); let cfg = Config { port, token: "tok".into(), allowed: vec!["chrome-extension://good".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![] }; thread::spawn(move || { let _ = serve(l, cfg); }); port }
+fn start() -> u16 { let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port(); let cfg = Config { port, token: "tok".into(), allowed: vec!["chrome-extension://good".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![], data_dir: std::env::temp_dir().join("sc-unused") }; thread::spawn(move || { let _ = serve(l, cfg); }); port }
 fn req(port: u16, query: &str, origin: &str) -> tungstenite::handshake::client::Request { let mut r = format!("ws://127.0.0.1:{port}/{query}").into_client_request().unwrap(); if !origin.is_empty() { r.headers_mut().insert("Origin", origin.parse().unwrap()); } r }
 #[test] fn refuses_wrong_origin() { let p = start(); assert!(connect(req(p, "?token=tok", "http://evil.test")).is_err()); }
 #[test] fn refuses_missing_origin() { let p = start(); assert!(connect(req(p, "?token=tok", "")).is_err()); }

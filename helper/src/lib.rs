@@ -3,6 +3,7 @@
 //! the allow-list is empty by default, so nothing connects until an extension id (or dev origin) is configured.
 pub mod say;
 pub mod scan;
+pub mod store;
 use say::Pool;
 use std::{io, net::TcpListener, process::Command, sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc}, thread, time::Duration};
 use tungstenite::{accept_hdr, handshake::server::{ErrorResponse, Request, Response}, http, Error as WsError, Message};
@@ -11,7 +12,7 @@ pub const DEFAULT_PORT: u16 = 7431;
 pub const DEV_ORIGIN: &str = "http://localhost:5173";
 
 #[derive(Clone, Debug)]
-pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String>, pub claude_bin: String, pub model: String, pub project_roots: Vec<std::path::PathBuf> }
+pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String>, pub claude_bin: String, pub model: String, pub project_roots: Vec<std::path::PathBuf>, pub data_dir: std::path::PathBuf }
 
 /// Build the config from environment-like lookups (so it is testable without touching the process environment).
 pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn() -> String) -> Config {
@@ -20,7 +21,7 @@ pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn()
     if dev { allowed.push(DEV_ORIGIN.to_string()); }
     let token = get("SWIFT_HELPER_TOKEN").filter(|t| !t.is_empty()).unwrap_or_else(|| if dev { "dev-token".to_string() } else { random_token() });
     let port = get("SWIFT_HELPER_PORT").and_then(|p| p.parse().ok()).unwrap_or(DEFAULT_PORT);
-    Config { port, token, allowed, claude_bin: get("SWIFT_CLAUDE_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "claude".to_string()), model: get("SWIFT_CLAUDE_MODEL").filter(|m| !m.is_empty()).unwrap_or_else(|| "haiku".to_string()), project_roots: get("SWIFT_PROJECT_ROOTS").unwrap_or_default().split(':').filter(|s| !s.is_empty()).map(std::path::PathBuf::from).collect() }
+    Config { port, token, allowed, claude_bin: get("SWIFT_CLAUDE_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "claude".to_string()), model: get("SWIFT_CLAUDE_MODEL").filter(|m| !m.is_empty()).unwrap_or_else(|| "haiku".to_string()), project_roots: get("SWIFT_PROJECT_ROOTS").unwrap_or_default().split(':').filter(|s| !s.is_empty()).map(std::path::PathBuf::from).collect(), data_dir: get("SWIFT_DATA_DIR").filter(|d| !d.is_empty()).map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(get("HOME").unwrap_or_else(|| ".".to_string())).join(".swift-canvas")) }
 }
 
 /// Exact match only: "chrome-extension://abc" must not match "chrome-extension://abcd", and an empty Origin never matches.
@@ -100,6 +101,12 @@ fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<A
                 None => serde_json::json!({ "type": "project.scan", "id": id, "ok": false, "error": "folder not allowed (set SWIFT_PROJECT_ROOTS)" }),
                 Some(p) => match scan::scan_dir(&p) { Ok(s) => serde_json::json!({ "type": "project.scan", "id": id, "ok": true, "scan": s }), Err(e) => serde_json::json!({ "type": "project.scan", "id": id, "ok": false, "error": e.to_string() }) } };
                 let _ = tx.send(reply.to_string()); });
+        }
+        Some(t @ ("store.put" | "store.get")) => {
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let project = v.get("project").and_then(|x| x.as_str()).unwrap_or("").to_string(); let data = v.get("data").and_then(|x| x.as_str()).map(str::to_string);
+            let (tx, dir, kind) = (tx.clone(), cfg.data_dir.clone(), t.to_string());
+            thread::spawn(move || { let r = if kind == "store.put" { match data { Some(d) => store::put(&dir, &project, &d).map(|_| None), None => Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "no data")) } } else { store::get(&dir, &project) };
+                let reply = match r { Ok(d) => serde_json::json!({ "type": kind, "id": id, "ok": true, "data": d }), Err(e) => serde_json::json!({ "type": kind, "id": id, "ok": false, "error": e.to_string() }) }; let _ = tx.send(reply.to_string()); });
         }
         Some("prewarm") => { let pool = pool.clone(); thread::spawn(move || pool.prewarm()); }
         Some("say") => {
