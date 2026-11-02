@@ -25,7 +25,7 @@
 - Project files: Frame ▾ → Export project file / Open project file… (`projectFile.ts`, version 1 JSON with name, frames, brand; opens as a NEW project, never overwrites; junk refused with a reason).
 - Memory guard (helper `mem.rs`): a Say/Spark take is refused with a clear message when available memory (vm_stat free+inactive+speculative) is below `SWIFT_MIN_FREE_MB` (default 1200); macOS only, allows elsewhere.
 - Frame ▾ → Compare with original: selected take/copy + its original fill the view (`canvas/compare.ts`). Rule of thumb: new toolbar actions go in a menu; the bar overflow is asserted in e2e.
-- Big frames (#1734): over 6000 chars the Say prompt carries an outline of every element + the selected element markup (bridge `outer`), not a truncated tree (`treeContext`). NOT yet checked with real Claude on a big frame.
+- Big frames (#1734): over 6000 chars the Say prompt carries an outline of every element + the selected element markup (bridge `outer`), not a truncated tree (`treeContext`). Real Claude on an 18 KB frame (`node e2e/real-big-say.mjs "make the text of item 70 red"`): 1 applied, first change 1.4 s. The 30-request spike on small frames was not re-run (small frames are unchanged).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 
