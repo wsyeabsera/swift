@@ -13,6 +13,7 @@ import { connectHelper, type HelperConnection, type HelperState } from './helper
 import { runSayRepairing } from './say/say';
 import { loadBrand, saveBrand } from './brand';
 import { activeProject, addProject, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
+import { pushHistory, step } from './say/history';
 import { localEdits } from './say/local';
 import { canSpark, discardTakes, isTake, keepTake, runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
@@ -31,7 +32,7 @@ export function App() {
   useEffect(() => { (window as Window & { __theme?: unknown }).__theme = { set: (p: Partial<ThemeChoice>) => setTheme((t) => sanitize({ ...t, ...p })), get: () => theme }; }, [theme]);
   // Escape closes an open popover with focus ANYWHERE (a focused button that becomes disabled drops focus to <body>, outside any element handler); focus returns to its trigger.
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (importOpen) { setImportOpen(false); pjRef.current?.focus(); } else if (appearanceOpen) { setAppearanceOpen(false); swatchRef.current?.focus(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [importOpen, appearanceOpen]);
-  const sayRef = useRef<HTMLInputElement>(null);
+  const sayRef = useRef<HTMLInputElement>(null); const sayHist = useRef<string[]>([]); const histPos = useRef(0); const draft = useRef('');
   // ⌘K / Ctrl+K: jump to the Say input from anywhere (also closes an open popover so the keys are not swallowed).
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setImportOpen(false); setAppearanceOpen(false); sayRef.current?.focus(); sayRef.current?.select(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
   const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
@@ -54,6 +55,7 @@ export function App() {
   }, [frames, selection, sparking, brand]);
   const say = useCallback(async () => {
     const text = sayText.trim(); const c = conn.current; if (!text || !window.__swift || !c || saying) return;
+    sayHist.current = pushHistory(sayHist.current, text); histPos.current = sayHist.current.length;
     if (selection && !pendingAsk && window.__swift) { // local tier: unambiguous requests on the selection never reach Claude
       const t0 = performance.now(); const sel = selection; const edits = await localEdits(text, { get: (p) => window.__swift!.get(sel.frameId, sel.el, p) });
       if (edits) { for (const e of edits) await edit(sel.frameId, sel.el, e.prop, e.value); setSayText(''); setSayStatus(`Local · ${edits.map((e) => `${e.prop}: ${e.value}`).join(', ')} · ${(performance.now() - t0).toFixed(0)} ms`); return; }
@@ -143,7 +145,7 @@ export function App() {
       <Layers frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       <form className="gl isl say" aria-label="Say" onSubmit={(e) => { e.preventDefault(); void say(); }}>
-        <input ref={sayRef} data-testid="say-input" aria-label="Say what to change" title="⌘K" placeholder={pendingAsk ? `Claude asks: ${pendingAsk.question}` : selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => setSayText(e.target.value)} onFocus={() => conn.current?.prewarm()} disabled={saying} />
+        <input ref={sayRef} data-testid="say-input" aria-label="Say what to change" title="⌘K" placeholder={pendingAsk ? `Claude asks: ${pendingAsk.question}` : selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => { setSayText(e.target.value); histPos.current = sayHist.current.length; }} onKeyDown={(e) => { if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return; const h = sayHist.current; if (h.length === 0) return; e.preventDefault(); if (histPos.current >= h.length) draft.current = sayText; const r = step(h, histPos.current, e.key === 'ArrowUp' ? -1 : 1, draft.current); histPos.current = r.pos; setSayText(r.text); }} onFocus={() => conn.current?.prewarm()} disabled={saying} />
         <button type="submit" className="rb btn say-go" data-testid="say-button" disabled={saying || !sayText.trim()}>Say</button>
         <span className="mono mu say-status" data-testid="say-status" role="status">{sayStatus}</span>
       </form>
