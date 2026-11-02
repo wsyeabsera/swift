@@ -30,6 +30,7 @@
 - Resize: a round handle at the bottom-right of the selection (not on a frame root) drags width/height (live, 4 px floor, ONE undo step).
 - e2e perf budgets live in `e2e/budgets.json` (Tier-0 edit p95 16 ms, first edit 50 ms, pan/zoom frame gap p95 34 ms; measured 9.3 ms); a regression fails `npm run e2e` with "BUDGET FAILED: <name> measured X >= limit Y" (proven by setting a limit to 1).
 - Suggestion chips above the Say bar for the selection (`say/suggest.ts`: Bigger/Smaller/Bold/Hide + brand colours); each chip runs the local tier (instant).
+- Layers: an eye button per element toggles `visibility:hidden` (undoable; the bridge tree reports own inline `hidden`).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

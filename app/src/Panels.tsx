@@ -3,15 +3,15 @@ import type { TreeNode } from './canvas/bridge';
 import type { Sel } from './canvas/Canvas';
 export const INSPECT_PROPS = ['left', 'top', 'width', 'height', 'font-size', 'color', 'background-color', 'border-radius', 'opacity'] as const;
 /** Layers: the element tree (elements with ids) of the selected frame; clicking selects on the canvas. */
-export function Layers({ frameId, selection, onSelect, revision }: { frameId: string; selection: Sel | null; onSelect: (s: Sel) => void; revision: number }) {
+export function Layers({ frameId, selection, onSelect, onToggleHidden, revision }: { frameId: string; selection: Sel | null; onSelect: (s: Sel) => void; onToggleHidden?: (el: string, hidden: boolean) => void; revision: number }) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   useEffect(() => { let alive = true; void window.__swift?.tree(frameId).then((t) => { if (alive) setTree(t); }); return () => { alive = false; }; }, [frameId, revision]);
   return (
     <aside className="gl isl-panel layers" aria-label="Layers" data-testid="layers">
       <h2>Layers <span className="mono mu">{frameId}</span></h2>
       <ul>{tree.map((n) => (
-        <li key={n.id}><button className={`rb row${selection?.frameId === frameId && selection.el === n.id ? ' on' : ''}`} style={{ paddingLeft: 8 + n.depth * 14 }} onClick={() => onSelect({ frameId, el: n.id })}>
-          <span className="mono">{n.id}</span><span className="mu"> {n.text}</span></button></li>))}</ul>
+        <li key={n.id} className="lrow"><button className={`rb row${selection?.frameId === frameId && selection.el === n.id ? ' on' : ''}`} style={{ paddingLeft: 8 + n.depth * 14 }} onClick={() => onSelect({ frameId, el: n.id })}>
+          <span className="mono">{n.id}</span><span className="mu"> {n.text}</span></button>{onToggleHidden && <button className="rb eye" data-testid={`eye-${n.id}`} aria-label={`${n.hidden ? 'Show' : 'Hide'} ${n.id}`} aria-pressed={!!n.hidden} title={n.hidden ? 'Hidden: click to show' : 'Click to hide'} onClick={() => onToggleHidden(n.id, !n.hidden)}>{n.hidden ? '◌' : '●'}</button>}</li>))}</ul>
     </aside>
   );
 }

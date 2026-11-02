@@ -16,7 +16,7 @@ export type BridgeRequest =
   | { t: 'rect'; rid: number; el: string }
   | { t: 'props'; rid: number; el: string; props: string[] }
   | { t: 'tree'; rid: number };
-export type TreeNode = { id: string; parent: string | null; depth: number; tag: string; text: string };
+export type TreeNode = { id: string; parent: string | null; depth: number; tag: string; text: string; hidden?: boolean };
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 export type BridgeInput = DistributiveOmit<BridgeRequest, 'rid'>;
 export type BridgeReply = { t: 'reply'; rid: number; ok: boolean; value?: string; id?: string | null; before?: string; html?: string; rect?: { x: number; y: number; w: number; h: number }; values?: Record<string, string>; tree?: TreeNode[] };

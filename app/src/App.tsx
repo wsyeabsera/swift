@@ -246,7 +246,7 @@ export function App() {
         </div>
       </header>
       <Canvas onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => setFrames((f) => renameFrame(f, id, t))} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
-      <Layers frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
+      <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? 'tv', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       {chips.length > 0 && !saying && !sayText && !pendingAsk && (
         <div className="gl isl chips" role="group" aria-label="Suggestions" data-testid="chips">
