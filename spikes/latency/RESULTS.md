@@ -91,3 +91,5 @@ real parallel Spark (memory, usage drop per Spark) still not measured. Subscript
 - The op language fixes validity (19 -> 29-30 of 30): the failures were a missing vocabulary, not the model. Giving it tokens and ids cuts needless asks from 14 to 9.
 - Latency: p50 stays ~1.2 s; p95 rises to 2-3 s because `add` answers carry HTML. That is the creative route; token/property edits go through the local tier first.
 - The tested prompt is in `OPS-PROMPT.md` (the contract for task #1731). One of 30 was still invalid (a malformed line on "lake photo"): keep the validate-and-repair loop.
+| v4: v3 + four worked examples (edit, add, ask, token) | 30/30 | **13** (more, not fewer) | 1.37 / 2.29 / 2.95 s |
+- v4 shows that few-shot examples, especially the `ask` one, push the model toward asking more (13 vs 9 asks) without improving validity: **keep v3** as the contract. The levers that worked are vocabulary (add/remove/ask), tokens and ids in context, and "prefer a default over asking". Next tuning is the subtree summary (element roles and names), not more examples.

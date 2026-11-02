@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'; const require = createRequire(impor
 const model = process.argv[2] || 'haiku', turns = Number(process.argv[3] || 5);
 const rows = [1,2,3,4,5,6].map(k => `<div id="row${k}" class="row" style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,.1)"><span id="row${k}-t" style="font-size:22px">cloudflare/workers-sdk #${16550+k}</span><span id="row${k}-m" style="opacity:.6">PR · merged ${k}h ago</span></div>`).join('\n');
 const SUBTREE = `<div id="tv" style="width:1920px;height:1080px;background:linear-gradient(135deg,#0b1a3a,#0b3a2a)"><div id="clock" style="position:absolute;left:115px;top:86px;font-size:230px;font-weight:200">21:53</div><div id="date" style="position:absolute;left:120px;top:340px;font-size:34px;opacity:.7">Wednesday, 28 October</div><div id="recent" style="position:absolute;right:115px;top:140px;width:560px;padding:32px;border-radius:28px;background:rgba(255,255,255,.12);backdrop-filter:blur(24px)"><div id="recent-h" style="font-size:20px;letter-spacing:.1em">RECENT</div>${rows}</div></div>`;
-const V2 = process.env.V2 || process.env.V3; const IDS0 = null;
+const V2 = process.env.V2 || process.env.V3 || process.env.V4; const IDS0 = null;
 const IDS = new Set([...SUBTREE.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
 const SYS = V2 ? `You edit UI designs. Reply with ONLY JSON operations, one object per line (JSONL), no prose, no code fences, never explanations.
 Ops:
@@ -15,7 +15,7 @@ Ops:
 {"op":"ask","value":"<one short question or reason when the request cannot be done with this tree>"}
 Rules: use only ids that exist in the tree (new ids only in add). If the request names something not in the tree, or you need information (a photo, a palette), emit exactly one ask op instead. Always end with the ops, nothing else.${process.env.V3 ? `
 Tokens in scope (use these names and values): --ac #0a84ff (brand blue), --ok #30d158 (success green), --warn #ffb340 (warning), --bg #0b0b0f, --glass rgba(255,255,255,.12); fonts Inter, Barlow; scale: sizes in px. The tree has these elements only: ${[...IDS].join(', ')}.
-Prefer acting with a sensible default over asking: use ask only when the request needs an element that does not exist, or information you cannot guess (a photo, a URL, another project's palette). For 'add' requests, invent reasonable content.` : ''}
+Prefer acting with a sensible default over asking: use ask only when the request needs an element that does not exist, or information you cannot guess (a photo, a URL, another project's palette). For 'add' requests, invent reasonable content.${process.env.V4 ? `\nExamples:\nmake the clock bigger -> {"op":"set","id":"clock","prop":"font-size","value":"260px"}\nadd a QR code on the right -> {"op":"add","parent":"tv","id":"qr","html":"<div id='qr' style='position:absolute;right:120px;top:700px;width:180px;height:180px;background:#fff;border-radius:16px'></div>"}\nuse the photo I took yesterday -> {"op":"ask","value":"Which photo should I use?"}\nmake the heading brand blue -> {"op":"set","id":"recent-h","prop":"color","value":"#0a84ff"}` : ''}` : ''}
 Selected tree:
 ${SUBTREE}` : `You edit UI designs. Reply with ONLY JSON operations, one object per line (JSONL), no prose, no code fences. Ops: {"op":"set","id":"<element id>","prop":"<css property>","value":"<css value>"} and {"op":"token","name":"<css variable>","value":"<value>"}. Use only ids that exist in the tree.\nSelected tree:\n${SUBTREE}`;
 
