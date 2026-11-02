@@ -11,3 +11,5 @@ export function loadBrand(storage: Pick<Store, 'getItem'> | undefined = safe(), 
   try { const raw = storage?.getItem(key(project)); const o = raw ? (JSON.parse(raw) as unknown) : null; if (typeof o !== 'object' || o === null) return BRAND_TOKENS; const t = toBrandTokens(Object.entries(o).map(([name, value]) => ({ name, value: String(value) }))); return Object.keys(t).length ? t : BRAND_TOKENS; } catch { return BRAND_TOKENS; }
 }
 export function saveBrand(tokens: Record<string, string>, storage: Pick<Store, 'setItem'> | undefined = safe(), project = DEFAULT_PROJECT.id): string | null { try { if (!storage) return 'storage unavailable'; storage.setItem(key(project), JSON.stringify(tokens)); return null; } catch (e) { return e instanceof Error ? e.message : 'save failed'; } }
+/** Up to `n` colour values of a brand kit, for swatches. */
+export const kitColors = (tokens: Record<string, string>, n = 4): string[] => Object.values(tokens).filter((v) => /^(#[0-9a-f]{3,8}|rgba?\(|hsla?\(|oklch\()/i.test(v)).slice(0, n);

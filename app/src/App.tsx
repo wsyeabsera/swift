@@ -11,7 +11,7 @@ import { duplicateFrame, duplicateId, renameFrame } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
-import { loadBrand, saveBrand } from './brand';
+import { kitColors, loadBrand, saveBrand } from './brand';
 import { activeProject, addProject, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
 import { pushHistory, step } from './say/history';
 import { localEdits } from './say/local';
@@ -131,7 +131,7 @@ export function App() {
           <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>{project.name}</b><span className="mono mu">{frames.length} frames</span></button>
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
-        {importOpen && conn.current && <ImportProject scan={conn.current.scan} projects={reg.list} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
+        {importOpen && conn.current && <ImportProject scan={conn.current.scan} projects={reg.list} kits={Object.fromEntries(reg.list.map((p) => [p.id, kitColors(p.id === project.id ? brand : loadBrand(undefined, p.id))]))} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
           {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => setLens(l)}>{l}</button>))}
