@@ -17,6 +17,7 @@
 - Delete frame button (history entry `frameDel`, undo restores at the same index with its edits; last frame protected).
 - Arrow keys nudge the selected positioned element (Shift 10 px; `canvas/nudge.ts`), each a separate undo step.
 - Enter selects the first child, Shift+Enter the parent (`canvas/tree.ts`).
+- Autosave also flushes on visibilitychange→hidden (no 1 s wait).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

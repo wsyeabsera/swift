@@ -95,6 +95,7 @@ export function App() {
       setSaveStatus(err ? `not saved: ${err}` : backup && !backup.ok && backup.error !== 'helper offline' ? `saved · backup failed: ${backup.error}` : 'saved'); return err; } catch (e) { const m = e instanceof Error ? e.message : 'error'; setSaveStatus(`not saved: ${m}`); return m; }
   }, [frames, project.id, ready]);
   useEffect(() => { const t = setTimeout(() => void persist(), 1000); return () => clearTimeout(t); }, [persist, revision]);
+  useEffect(() => { const h = () => { if (document.visibilityState === 'hidden') void persist(); }; document.addEventListener('visibilitychange', h); return () => document.removeEventListener('visibilitychange', h); }, [persist]); // leaving the tab flushes at once, not after the 1 s debounce
   // First connect without a local copy (cleared browser data, new profile): restore the design from the helper's project file.
   useEffect(() => {
     if (ready || helper.status === 'connecting') return; if (helper.status === 'offline') { setReady(true); return; }

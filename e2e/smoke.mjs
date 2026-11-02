@@ -48,6 +48,9 @@ try {
   cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
   // Export: the selected frame downloads as a standalone HTML file with its current markup
   { const dl = web.waitForEvent('download', { timeout: 5000 }); await web.getByTestId('export').click(); const d = await dl; const tmp = path.join(os.tmpdir(), `sc-export-${Date.now()}.html`); await d.saveAs(tmp); const body = fs.readFileSync(tmp, 'utf8'); cv.exported = { name: d.suggestedFilename(), doctype: body.startsWith('<!doctype html>'), hasClock: body.includes('id="clock"') }; }
+  // Hiding the tab flushes the autosave at once (no 1 s wait): an edit made a moment ago is in storage
+  { await web.evaluate(() => window.__swift.edit('tv', 'date', 'letter-spacing', '3.25px')); await web.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); }); await web.waitForTimeout(350);
+    cv.flush = await web.evaluate(() => { const raw = localStorage.getItem('swift-canvas.doc.v1') ?? ''; return raw.includes('letter-spacing: 3.25px') || raw.includes('letter-spacing:3.25px'); }); await web.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' }); }); }
   // Rename a frame by double-clicking its label (Enter commits, Escape cancels)
   { await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const lab = web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).first(); await lab.dblclick(); await web.getByTestId('frame-name').fill('Hero TV'); await web.keyboard.press('Enter'); await web.waitForTimeout(300);
     const renamed = (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1; await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).first().dblclick(); await web.getByTestId('frame-name').fill('Nope'); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
@@ -136,7 +139,8 @@ try {
   const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
   const frameDelOk = cv0.frameDel.gone && cv0.frameDel.back.has && cv0.frameDel.back.n === cv0.frameDel.n0 && cv0.frameDel.back.width === '390px';
   const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
-  const exportOk = addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
+  const flushOk = cv0.flush === true;
+  const exportOk = flushOk &&  addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
   const navOk = cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
   const nudgeOk = navOk &&  cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
