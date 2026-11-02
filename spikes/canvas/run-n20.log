@@ -1,0 +1,8 @@
+plain    freeze=0 n=20 | pan p50 8.3 p95 9.2 max 9.4 >20ms 0/301 | zoom p95 9.2 max 9.4 | tier0(visible 17) p50 8.3 p95 8.4 ms | RSS 939 MB
+plain    freeze=1 n=20 | pan p50 8.3 p95 9.3 max 9.4 >20ms 0/301 | zoom p95 9.2 max 16.6 | tier0(visible 17) p50 8.3 p95 8.8 ms | RSS 927 MB
+shadow   freeze=0 n=20 | pan p50 8.3 p95 9.3 max 9.4 >20ms 0/300 | zoom p95 9.2 max 16.1 | tier0(visible 17) p50 8.3 p95 9.3 ms | RSS 966 MB
+shadow   freeze=1 n=20 | pan p50 8.3 p95 9.2 max 11.1 >20ms 0/300 | zoom p95 9.1 max 16.6 | tier0(visible 17) p50 8.3 p95 9.2 ms | RSS 969 MB
+same     freeze=0 n=20 | pan p50 8.3 p95 9.1 max 11.2 >20ms 0/300 | zoom p95 9 max 9.3 | tier0(visible 17) p50 8.3 p95 9.1 ms | RSS 1007 MB
+same     freeze=1 n=20 | pan p50 8.3 p95 9.3 max 9.4 >20ms 0/300 | zoom p95 9.3 max 9.4 | tier0(visible 17) p50 8.3 p95 9.3 ms | RSS 994 MB
+sandbox  freeze=0 n=20 | pan p50 8.3 p95 9.3 max 9.4 >20ms 0/300 | zoom p95 9.3 max 24.9 | tier0(visible 17) p50 8.2 p95 8.9 ms | RSS 865 MB
+sandbox  freeze=1 n=20 | pan p50 8.3 p95 9.2 max 9.4 >20ms 0/300 | zoom p95 9.3 max 66.4 | tier0(visible 17) p50 8.1 p95 8.9 ms | RSS 981 MB

@@ -8,11 +8,11 @@ const rss = (pid) => { const rows = execSync('ps -axo pid=,ppid=,rss=').toString
 const mainPid = () => { const l = execSync('ps -axo pid=,command=').toString().split('\n').find(x => x.includes('--window-size=1440,960') && !x.includes('Helper') && x.includes('Google Chrome')); return Number(l.trim().split(/\s+/)[0]); };
 const results = [];
 for (const mode of ['plain', 'shadow', 'same', 'sandbox']) for (const freeze of ['0', '1']) {
-  const b = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: false, args: ['--window-size=1440,960'] });
+  const b = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: false, args: ['--window-size=1440,960', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--disable-background-timer-throttling', '--disable-features=CalculateNativeWinOcclusion'] });
   const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto(`file://${dir}/index.html?mode=${mode}&n=${N}&freeze=${freeze}`); await page.waitForFunction('window.__ready');
   const r = await page.evaluate(() => window.runBench()); r.rssMB = rss(mainPid()); results.push(r);
-  console.log(`${mode.padEnd(8)} freeze=${freeze} n=${N} | pan p50 ${r.pan.p50} p95 ${r.pan.p95} max ${r.pan.max} >20ms ${r.pan.over20}/${r.pan.n} | zoom p95 ${r.zoom.p95} max ${r.zoom.max} | tier0 p50 ${r.tier0.p50} p95 ${r.tier0.p95} ms | RSS ${r.rssMB} MB`);
+  console.log(`${mode.padEnd(8)} freeze=${freeze} n=${N} | pan p50 ${r.pan.p50} p95 ${r.pan.p95} max ${r.pan.max} >20ms ${r.pan.over20}/${r.pan.n} | zoom p95 ${r.zoom.p95} max ${r.zoom.max} | tier0(visible ${r.visibleFrames}) p50 ${r.tier0.p50} p95 ${r.tier0.p95} ms | RSS ${r.rssMB} MB`);
   await b.close();
 }
 fs.writeFileSync(`${dir}/results-n${N}.json`, JSON.stringify(results, null, 1));

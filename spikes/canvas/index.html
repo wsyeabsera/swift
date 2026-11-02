@@ -17,7 +17,7 @@ for(let i=0;i<N;i++){const [k,w,h]=KINDS[ORDER[i%ORDER.length]];if(x+w>9000){x=0
  const el=document.createElement('div');el.className='fr';el.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
  const f={el,x,y,w,h,vis:true};
  if(mode==='same'||mode==='sandbox'){const ifr=document.createElement('iframe');ifr.width=w;ifr.height=h;
-  const script=mode==='sandbox'?`<script>onmessage=e=>{if(e.data.t==='edit'){document.getElementById('r').style.setProperty('--c',e.data.v);requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({t:'ack',id:e.data.id},'*')))}}<\/script>`:'';
+  const script=mode==='sandbox'?`<script>onmessage=e=>{if(e.data.t==='edit'){document.getElementById('r').style.setProperty('--c',e.data.v);requestAnimationFrame(()=>parent.postMessage({t:'ack',id:e.data.id},'*'))}}<\/script>`:'';
   if(mode==='sandbox')ifr.setAttribute('sandbox','allow-scripts');
   ifr.srcdoc=`<!doctype html><style>html,body{margin:0}${css(w,h)}</style>${inner(w,h,i)}${script}`;el.appendChild(ifr);f.ifr=ifr}
  else{const host=el;const root=mode==='shadow'?host.attachShadow({mode:'open'}):host;root.innerHTML=`<style>${css(w,h)}</style>${inner(w,h,i)}`;f.root=root}
@@ -29,9 +29,9 @@ window.runBench=async()=>{const out={mode,N,freeze};apply();await new Promise(r=
  state.s=.25;state.tx=0;state.ty=0;out.pan=await anim(2500,p=>{state.tx=-p*4000});
  state.tx=-200;state.ty=-100;out.zoom=await anim(2500,p=>{const s=.1+p*.5;state.tx=-200+(1-s/.25)*0;state.s=s});
  state.s=.25;state.tx=-600;state.ty=0;apply();await new Promise(r=>setTimeout(r,800));
- const lat=[];for(let i=0;i<30;i++){const f=frames[i%frames.length];const v='hsl('+(i*37%360)+' 80% 70%)';const t0=performance.now();
-  if(mode==='sandbox'){await new Promise(res=>{const id='e'+i;pending.set(id,res);f.ifr.contentWindow.postMessage({t:'edit',id,v},'*')});lat.push(performance.now()-t0)}
-  else{const r=f.ifr?f.ifr.contentDocument.getElementById('r'):f.root.getElementById?f.root.getElementById('r'):f.root.querySelector('#r');r.style.setProperty('--c',v);await new Promise(res=>requestAnimationFrame(()=>requestAnimationFrame(res)));lat.push(performance.now()-t0)}}
+ const inView=frames.filter(f=>{const l=f.x*state.s+state.tx,t=f.y*state.s+state.ty;return l<innerWidth&&l+f.w*state.s>0&&t<innerHeight&&t+f.h*state.s>0});out.visibleFrames=inView.length;const lat=[];for(let i=0;i<30;i++){const f=inView[i%inView.length];const v='hsl('+(i*37%360)+' 80% 70%)';const t0=performance.now();
+  if(mode==='sandbox'){await new Promise(res=>{const id='e'+i;pending.set(id,res);setTimeout(()=>{if(pending.delete(id))res()},3000);f.ifr.contentWindow.postMessage({t:'edit',id,v},'*')});lat.push(performance.now()-t0)}
+  else{const r=f.ifr?f.ifr.contentDocument.getElementById('r'):f.root.getElementById?f.root.getElementById('r'):f.root.querySelector('#r');r.style.setProperty('--c',v);await new Promise(res=>requestAnimationFrame(res));lat.push(performance.now()-t0)}}
  out.tier0=stats(lat);return out};
 window.__ready=true;
 </script>
