@@ -51,6 +51,9 @@ try {
   // Hiding the tab flushes the autosave at once (no 1 s wait): an edit made a moment ago is in storage
   { await web.evaluate(() => window.__swift.edit('tv', 'date', 'letter-spacing', '3.25px')); await web.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); }); await web.waitForTimeout(350);
     cv.flush = await web.evaluate(() => { const raw = localStorage.getItem('swift-canvas.doc.v1') ?? ''; return raw.includes('letter-spacing: 3.25px') || raw.includes('letter-spacing:3.25px'); }); await web.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' }); }); }
+  // Shortcuts sheet: ? opens it, Esc closes it with focus back on its button
+  { await web.mouse.click(5, 400); await web.keyboard.press('Shift+Slash'); await web.waitForSelector('[data-testid=shortcuts]', { timeout: 3000 }); const rows = await web.$$eval('[data-testid=shortcuts] dt', (e) => e.length); await web.keyboard.press('Escape'); await web.waitForTimeout(150);
+    cv.shortcuts = { rows, closed: (await web.$('[data-testid=shortcuts]')) === null, focusBack: await web.evaluate(() => document.activeElement?.getAttribute('data-testid')) }; }
   // Rename a frame by double-clicking its label (Enter commits, Escape cancels)
   { await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const lab = web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).first(); await lab.dblclick(); await web.getByTestId('frame-name').fill('Hero TV'); await web.keyboard.press('Enter'); await web.waitForTimeout(300);
     const renamed = (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1; await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).first().dblclick(); await web.getByTestId('frame-name').fill('Nope'); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
@@ -146,7 +149,8 @@ try {
   const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
   const frameDelOk = cv0.frameDel.gone && cv0.frameDel.back.has && cv0.frameDel.back.n === cv0.frameDel.n0 && cv0.frameDel.back.width === '390px';
   const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
-  const flushOk = cv0.flush === true;
+  const shortcutsOk = cv0.shortcuts.rows >= 10 && cv0.shortcuts.closed && cv0.shortcuts.focusBack === 'shortcuts-button';
+  const flushOk = shortcutsOk &&  cv0.flush === true;
   const exportOk = flushOk &&  addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
   const zoomSelOk = cv0.zoomSel.sAfter > cv0.zoomSel.sBefore;

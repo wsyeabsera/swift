@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { Appearance } from './Appearance';
 import { ImportProject } from './ImportProject';
+import { Shortcuts } from './Shortcuts';
 import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type ThemeChoice } from './theme';
 import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
@@ -29,15 +30,15 @@ export function App() {
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
   const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand(undefined, project.id));
   const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const takesRunning = useRef(new Map<string, AbortController>()); const [painting, setPainting] = useState<Set<string>>(new Set()); const [sparking, setSparking] = useState(false);
-  const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null);
+  const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null); const [shortcutsOpen, setShortcutsOpen] = useState(false); const kbRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
   useEffect(() => saveTheme(theme), [theme]);
   useEffect(() => { (window as Window & { __theme?: unknown }).__theme = { set: (p: Partial<ThemeChoice>) => setTheme((t) => sanitize({ ...t, ...p })), get: () => theme }; }, [theme]);
   // Escape closes an open popover with focus ANYWHERE (a focused button that becomes disabled drops focus to <body>, outside any element handler); focus returns to its trigger.
-  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (importOpen) { setImportOpen(false); pjRef.current?.focus(); } else if (appearanceOpen) { setAppearanceOpen(false); swatchRef.current?.focus(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [importOpen, appearanceOpen]);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (shortcutsOpen) { setShortcutsOpen(false); kbRef.current?.focus(); } else if (importOpen) { setImportOpen(false); pjRef.current?.focus(); } else if (appearanceOpen) { setAppearanceOpen(false); swatchRef.current?.focus(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [importOpen, appearanceOpen, shortcutsOpen]);
   const sayRef = useRef<HTMLInputElement>(null); const sayHist = useRef<string[]>([]); const histPos = useRef(0); const draft = useRef('');
   // ⌘K / Ctrl+K: jump to the Say input from anywhere (also closes an open popover so the keys are not swallowed).
-  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setImportOpen(false); setAppearanceOpen(false); sayRef.current?.focus(); sayRef.current?.select(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setImportOpen(false); setAppearanceOpen(false); setShortcutsOpen(false); sayRef.current?.focus(); sayRef.current?.select(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
   const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
   const [tier0, setTier0] = useState<string>('');
   const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
@@ -128,10 +129,11 @@ export function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); api.fitAll(); }
       else if ((e.metaKey || e.ctrlKey) && e.key === '1') { e.preventDefault(); const r = document.querySelector('[data-testid=canvas]')?.getBoundingClientRect(); const v = api.view(); if (r) api.setView(zoomAt(v, r.width / 2, r.height / 2, 1 / v.s)); }
       else if (e.code === 'Digit2' && e.shiftKey && !e.metaKey && !e.ctrlKey && selection) { e.preventDefault(); api.fitTo([selection.frameId]); }
-      else if (e.key === 'Escape' && !importOpen && !appearanceOpen && selection) setSelection(null);
+      else if (e.key === '?' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setImportOpen(false); setAppearanceOpen(false); setShortcutsOpen(true); }
+      else if (e.key === 'Escape' && !importOpen && !appearanceOpen && !shortcutsOpen && selection) setSelection(null);
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
-  }, [selection, importOpen, appearanceOpen]);
+  }, [selection, importOpen, appearanceOpen, shortcutsOpen]);
   const addFrame = useCallback((kind: PresetKey) => { const f = newFrame(frames, kind); setFrames((x) => [...x, newFrame(x, kind)]); setSayStatus(`Added ${f.title}`); setTimeout(() => window.__swift?.fitTo([f.id]), 200); }, [frames]);
   // Delete the selected frame (always keeps at least one); undo puts it back at the same place with its edits.
   const deleteFrame = useCallback(async () => {
@@ -179,12 +181,14 @@ export function App() {
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
         {importOpen && conn.current && <ImportProject scan={conn.current.scan} pick={conn.current.pickFolder} projects={reg.list} kits={Object.fromEntries(reg.list.map((p) => [p.id, kitColors(p.id === project.id ? brand : loadBrand(undefined, p.id))]))} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
+        {shortcutsOpen && <Shortcuts onClose={() => { setShortcutsOpen(false); kbRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
           {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => setLens(l)}>{l}</button>))}
         </nav>
         <div className="gl isl speed" role="status" aria-live="polite" data-testid="helper-status">
           <span className={`dot ${dot}`} aria-hidden />
+          <button ref={kbRef} className="rb btn kbbtn" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-expanded={shortcutsOpen} data-testid="shortcuts-button" onClick={() => setShortcutsOpen((o) => !o)}>?</button>
           <span className="mono">{helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}</span>
         </div>
       </header>

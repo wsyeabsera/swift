@@ -1,6 +1,6 @@
 # Handoff (2026-11-02, fourth goal hour in progress)
 
-## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (72), `npm run e2e` (pass)
+## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (73), `npm run e2e` (pass)
 - Autosave/restore of the design (`doc.ts`, localStorage, 1 s debounce, all-or-nothing parse, save errors shown, Reset button); Spark ids continue after restore.
 - Spark: Keep take / Discard takes (`kept` flag on FrameDef), Cancel Spark (AbortSignal through runSpark/runSay; late ops dropped, no repair turn), cap of 8 unreviewed takes (`canSpark`).
 - ⌘D duplicate frame (`canvas/frames.ts`), Delete removes the selected element (one undo step via snapshot; frame root protected), ⌘0 fit, ⌘1 actual size, Escape deselects.
@@ -20,6 +20,7 @@
 - Autosave also flushes on visibilitychange→hidden (no 1 s wait).
 - Folder picker: Import → Choose… runs the native dialog in the helper (`project.pick`, osascript; `SWIFT_PICKER_BIN` overrides, tests use a fake script); a folder picked in the dialog becomes an allowed root for this helper run (consent by gesture; a folder the client merely names stays refused); empty folders show an empty state.
 - Shift+2 zooms to the selected frame.
+- "?" opens the shortcuts sheet (`Shortcuts.tsx`; keep SHORTCUTS in sync when adding keys).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 
