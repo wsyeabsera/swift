@@ -14,6 +14,7 @@ key), Liquid Glass UI, speed is the product, quality bar (failure modes tested, 
 - Tests must not call real Claude: use the record/replay fakes (task #1723); real Claude only in the nightly eval.
 - Playwright extension tests need the Playwright-matched Chromium (branded Chrome ignores `--load-extension`).
 - Extension gotcha (found 2026-11-02): inline `srcdoc` frames inherit the extension page's CSP, so their bridge script is blocked. In the extension, frames are the manifest sandbox page `extension/frame.html` (+ `frame.js`, copied from `app/src/canvas/bridge-frame.js` by `npm run build`) and receive the design by a `load` message; the dev web page uses inline srcdoc. A test guards the two copies against drift.
+- e2e hygiene: `npm run e2e` exits at once with a message if port 7431 is taken (a stale helper from a manual run hides its own roots/config and gives confusing failures); the e2e scripts start Vite directly (not through `npx`) so killing the child really stops it. ⌘K / Ctrl+K focuses the Say input.
 - Python for MLX: `uv venv --python 3.12` (3.15 has no `sentencepiece` wheel).
 - Keep outputs short; this repo is built with token cost in mind (ws-command caveman).
 

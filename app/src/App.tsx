@@ -22,6 +22,9 @@ export function App() {
   useEffect(() => { (window as Window & { __theme?: unknown }).__theme = { set: (p: Partial<ThemeChoice>) => setTheme((t) => sanitize({ ...t, ...p })), get: () => theme }; }, [theme]);
   // Escape closes an open popover with focus ANYWHERE (a focused button that becomes disabled drops focus to <body>, outside any element handler); focus returns to its trigger.
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (importOpen) { setImportOpen(false); pjRef.current?.focus(); } else if (appearanceOpen) { setAppearanceOpen(false); swatchRef.current?.focus(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [importOpen, appearanceOpen]);
+  const sayRef = useRef<HTMLInputElement>(null);
+  // ⌘K / Ctrl+K: jump to the Say input from anywhere (also closes an open popover so the keys are not swallowed).
+  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setImportOpen(false); setAppearanceOpen(false); sayRef.current?.focus(); sayRef.current?.select(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
   const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
   const [tier0, setTier0] = useState<string>('');
   const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
@@ -75,7 +78,7 @@ export function App() {
       <Layers frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       <form className="gl isl say" aria-label="Say" onSubmit={(e) => { e.preventDefault(); void say(); }}>
-        <input data-testid="say-input" aria-label="Say what to change" placeholder={pendingAsk ? `Claude asks: ${pendingAsk.question}` : selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => setSayText(e.target.value)} onFocus={() => conn.current?.prewarm()} disabled={saying} />
+        <input ref={sayRef} data-testid="say-input" aria-label="Say what to change" title="⌘K" placeholder={pendingAsk ? `Claude asks: ${pendingAsk.question}` : selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => setSayText(e.target.value)} onFocus={() => conn.current?.prewarm()} disabled={saying} />
         <button type="submit" className="rb btn say-go" data-testid="say-button" disabled={saying || !sayText.trim()}>Say</button>
         <span className="mono mu say-status" data-testid="say-status" role="status">{sayStatus}</span>
       </form>

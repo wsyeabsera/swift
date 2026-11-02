@@ -3,7 +3,7 @@
 import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import path from 'node:path';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const MIN = 4.5;
 const waitHttp = async (url) => { for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('timeout'); };
-const vite = spawn('npx', ['vite', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' });
+const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' });
 try {
   await waitHttp('http://localhost:5173/');
   const b = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true }); const p = await b.newPage({ viewport: { width: 1440, height: 900 } });

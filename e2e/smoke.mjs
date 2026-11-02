@@ -1,11 +1,13 @@
 // End-to-end smoke: helper + dev server + the app as a plain web page AND as the real unpacked extension. Also: a wrong origin must be refused.
 // node e2e/smoke.mjs   (needs: cargo build, npm run build, Playwright's Chromium)
-import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path'; import http from 'node:http';
+import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path'; import http from 'node:http'; import net from 'node:net';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const out = {}; const procs = [];
 const kill = () => procs.forEach(p => p.kill());
 const waitHttp = async (url) => { for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('timeout ' + url); };
+const inUse = (port) => new Promise((res) => { const c = net.connect(port, '127.0.0.1'); c.on('connect', () => { c.destroy(); res(true); }); c.on('error', () => res(false)); });
+for (const port of [7431]) if (await inUse(port)) { console.error(`port ${port} is already in use (a stale helper from an earlier run?): stop it first, e.g. pkill -f target/debug/swift-canvas-helper`); process.exit(2); }
 try {
-  const vite = spawn('npx', ['vite', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' }); procs.push(vite); await waitHttp('http://localhost:5173/');
+  const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' }); procs.push(vite); await waitHttp('http://localhost:5173/');
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-e2e-')), { headless: false, args: [`--disable-extensions-except=${root}/extension`, `--load-extension=${root}/extension`] });
   let sw = ctx.serviceWorkers()[0] ?? await ctx.waitForEvent('serviceworker', { timeout: 15000 }); const id = new URL(sw.url()).host; out.extensionId = id;
   const helper = spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...process.env, SWIFT_DEV: '1', SWIFT_ALLOWED_ORIGINS: `chrome-extension://${id}`, SWIFT_PROJECT_ROOTS: `${root}`, SWIFT_CLAUDE_BIN: `${root}/tools/fake-claude.mjs`, FAKE_FIXTURE: `${root}/tools/fixtures/say-clock.json` }, stdio: 'ignore' }); procs.push(helper); await new Promise(r => setTimeout(r, 800));
@@ -43,6 +45,8 @@ try {
   await web.evaluate(() => window.__swift.fitAll()); await web.getByTestId('spark-button').click();
   await web.waitForFunction(() => /takes/.test(document.querySelector('[data-testid=spark-status]')?.textContent ?? ''), null, { timeout: 20000 }); cv.sparkStatus = (await web.textContent('[data-testid=spark-status]'))?.trim();
   cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
+  // ⌘K focuses the Say input from anywhere (even with a popover open)
+  await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); await web.keyboard.press('Meta+k'); await web.waitForTimeout(150); cv.cmdK = await web.evaluate(() => ({ focused: document.activeElement?.getAttribute('data-testid'), importOpen: !!document.querySelector('[data-testid=import]') }));
   // Import a project: scan an allowed folder (this repo's own app/), refuse a folder outside the allowed roots; Escape closes with focus back
   const im = {}; await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); await web.getByTestId('import-path').fill(`${root}/app`); await web.getByTestId('import-scan').click();
   await web.waitForFunction(() => /tokens/.test(document.querySelector('[data-testid=import-result]').textContent), null, { timeout: 8000 }); im.ok = (await web.textContent('[data-testid=import-result]')).replace(/\s+/g, ' ').trim().slice(0, 160);
@@ -67,6 +71,7 @@ try {
   const themeOk = cv0.theme.bgAfterPick.includes('fuji') && cv0.theme.modeClass.includes('m-light') && cv0.theme.blur.trim() === '48px' && cv0.theme.escClosed && cv0.theme.focusBack === 'appearance-button' && cv0.theme.scrimClosed && cv0.theme.persisted;
   const sparkOk = cv0.spark.ids.length === 4 && cv0.spark.sizes.every((x) => x === '300px') && /4 takes · 4 changed/.test(cv0.sparkStatus) && /first paint/.test(cv0.sparkStatus);
   const importOk = /tokens/.test(cv0.import.ok) && cv0.import.ok.includes('files') && cv0.import.refused && cv0.import.escClosed && cv0.import.focusBack === 'project-button';
+  const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
-  const ok = canvasOk && selOk && sayOk && sparkOk && importOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { canvasOk, selOk, sayOk, sparkOk, importOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
+  const ok = canvasOk && selOk && sayOk && sparkOk && importOk && cmdKOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { canvasOk, selOk, sayOk, sparkOk, importOk, cmdKOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
 } catch (e) { console.error(e); kill(); process.exit(1); }
