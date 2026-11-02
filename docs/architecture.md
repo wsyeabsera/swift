@@ -47,7 +47,7 @@ Spark first paint < 2 s (not measured); contrast >= 4.5 on every backdrop in bot
 - **Say latency, 30 varied requests (Haiku, one warm session):** first visible change p50 1.15-1.24 s, p95 2.0-3.1 s (creative `add` requests are the slow tail). Budget by route: token/property edits answered by the local tier first (instant preview), Claude for creative ones.
 - **Spark:** 12 parallel sessions: cold first paint 1.5-1.8 s, warm 0.85-1.4 s; ~250 MB per session (~3 GB for 12): pool with a cap and idle shutdown. ~5.3k input tokens per Say.
 - **Canvas:** 80 frames pan/zoom at the display refresh rate; memory = ~870 MB Chrome baseline + ~2.5 MB per extra frame; freeze offscreen frames with `display:none` (-12%); no bitmap LOD needed yet; unloading frames hurts.
-- **Language split:** TypeScript for UI, document, tokens, Claude calls, MCP; images via `sharp` (65 ms 1920 px preview, 148 ms pyramid for an 8K JPEG, 3x faster than the plain Rust path); Rust/WASM only for bulk scans (20k-node diff 18x, 42x with SIMD128) and helper-side work, when a project size makes it matter; MP4 via WebCodecs (2.7x real time).
+- **Language split:** TypeScript for UI, document, tokens, Claude calls, MCP; images via `sharp` (real 8K photo: 100 ms 1920 px preview, 250 ms pyramid; 2.2x faster than the plain Rust path); Rust/WASM only for bulk scans (20k-node diff 18x, 42x with SIMD128) and helper-side work, when a project size makes it matter; MP4 via WebCodecs (2.7x real time).
 - **Local tier:** MLX Qwen3-4B routing 97% / 199 ms; Apple's on-device model is not available on macOS 15.
 - **Liquid Glass:** KIT.md section I; contrast checker `qa/contrast.mjs` (16/16 >= 4.5); popovers close on Escape with focus on the trigger (H7 addendum).
 
