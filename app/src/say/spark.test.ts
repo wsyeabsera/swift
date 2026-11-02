@@ -25,3 +25,11 @@ test('spark is refused while too many takes are unreviewed', () => {
   const many = Array.from({ length: 5 }, (_, i) => ({ ...base, id: `tv-t${i + 1}` })); expect(canSpark([base], 4)).toEqual({ ok: true }); expect(canSpark(many, 3)).toEqual({ ok: true });
   const r = canSpark(many, 4); expect(r.ok).toBe(false); expect(r.ok === false && r.reason).toContain('5 takes waiting'); expect(canSpark(keepTake(many, 'tv-t1'), 4).ok).toBe(true);
 });
+test('cancelling one running take leaves the others finishing', async () => {
+  const added: FrameDef[] = []; const running = new Map<string, AbortController>(); const emitters: Record<number, (e: SayEvent) => void> = {}; let k = 0;
+  const api = { snapshot: async () => '<div id="tv"></div>', tree: async () => [{ id: 'tv', parent: null, depth: 0, tag: 'div', text: '' }], edit: async () => ({ ok: true, ms: 1, before: '' }), fitTo: () => {} } as unknown as CanvasApi; let n = 0;
+  const p = runSpark({ api, send: (_s, _r, on) => { emitters[k++] = on; }, base, n: 3, nextId: () => `tv-t${++n}`, addFrames: (f) => added.push(...f), running });
+  await new Promise((r) => setTimeout(r, 120)); expect([...running.keys()].sort()).toEqual(['tv-t1', 'tv-t2', 'tv-t3']);
+  running.get('tv-t2')!.abort(); for (const i of [0, 1, 2]) { emitters[i]!({ kind: 'delta', text: '{"op":"set","id":"tv","prop":"opacity","value":"0.9"}\n' }); emitters[i]!({ kind: 'done' }); }
+  const r = await p; expect(r.takes.map((t) => [t.id, t.result.applied.length, t.result.error])).toEqual([['tv-t1', 1, undefined], ['tv-t2', 0, 'cancelled'], ['tv-t3', 1, undefined]]); expect(running.size).toBe(0);
+});
