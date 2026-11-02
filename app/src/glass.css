@@ -44,3 +44,7 @@ button:disabled{opacity:.45;cursor:default}
 .m-light .mark{color:#fff}
 
 .tools{white-space:nowrap;max-width:calc(100vw - 32px)}.btn{white-space:nowrap}.tools [data-testid=spark-status]{max-width:340px;overflow:hidden;text-overflow:ellipsis}
+
+.pjbtn{text-align:left}.import{width:420px}.importform{display:flex;gap:8px;margin:6px}.importform input{flex:1;height:34px;border-radius:12px;border:1px solid var(--bd);background:var(--field);color:var(--tx);padding:0 10px;font:12px 'JetBrains Mono',monospace}
+.importres{margin:6px;min-height:20px}.swatches{display:flex;gap:6px;margin:8px 0}.sw{width:28px;height:28px;border-radius:9px;box-shadow:0 0 0 1px var(--bd)}.sw.sm{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+.toks{list-style:none;margin:6px 0 0;padding:0;max-height:240px;overflow:auto;font-size:12px}.toks li{padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

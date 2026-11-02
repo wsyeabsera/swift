@@ -2,6 +2,9 @@ use helper::{claude_status, config_from, serve};
 use std::{env, fs, net::TcpListener};
 fn random_token() -> String { let mut b = [0u8; 16]; if let Ok(mut f) = fs::File::open("/dev/urandom") { use std::io::Read; let _ = f.read_exact(&mut b); } b.iter().map(|x| format!("{x:02x}")).collect() }
 fn main() -> std::io::Result<()> {
+    // `swift-canvas-helper scan <folder>`: print the brand tokens found in a project folder (the user runs this themselves, so no allow-list is needed)
+    let args: Vec<String> = env::args().collect();
+    if args.get(1).map(String::as_str) == Some("scan") { let Some(dir) = args.get(2) else { eprintln!("usage: swift-canvas-helper scan <folder>"); std::process::exit(2) }; let root = fs::canonicalize(dir)?; println!("{}", serde_json::to_string_pretty(&helper::scan::scan_dir(&root)?).expect("json")); return Ok(()); }
     let cfg = config_from(|k| env::var(k).ok(), random_token);
     let listener = TcpListener::bind(("127.0.0.1", cfg.port))?; // loopback only
     eprintln!("swift-canvas-helper 127.0.0.1:{} claude={} allowed_origins={}", cfg.port, claude_status(), cfg.allowed.len());

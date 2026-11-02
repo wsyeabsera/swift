@@ -2,6 +2,7 @@
 //! Security rules (task #1719): bind loopback only; accept a connection only when its Origin is on the exact allow-list AND the token matches;
 //! the allow-list is empty by default, so nothing connects until an extension id (or dev origin) is configured.
 pub mod say;
+pub mod scan;
 use say::Pool;
 use std::{io, net::TcpListener, process::Command, sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc}, thread, time::Duration};
 use tungstenite::{accept_hdr, handshake::server::{ErrorResponse, Request, Response}, http, Error as WsError, Message};
@@ -10,7 +11,7 @@ pub const DEFAULT_PORT: u16 = 7431;
 pub const DEV_ORIGIN: &str = "http://localhost:5173";
 
 #[derive(Clone, Debug)]
-pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String>, pub claude_bin: String, pub model: String }
+pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String>, pub claude_bin: String, pub model: String, pub project_roots: Vec<std::path::PathBuf> }
 
 /// Build the config from environment-like lookups (so it is testable without touching the process environment).
 pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn() -> String) -> Config {
@@ -19,7 +20,7 @@ pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn()
     if dev { allowed.push(DEV_ORIGIN.to_string()); }
     let token = get("SWIFT_HELPER_TOKEN").filter(|t| !t.is_empty()).unwrap_or_else(|| if dev { "dev-token".to_string() } else { random_token() });
     let port = get("SWIFT_HELPER_PORT").and_then(|p| p.parse().ok()).unwrap_or(DEFAULT_PORT);
-    Config { port, token, allowed, claude_bin: get("SWIFT_CLAUDE_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "claude".to_string()), model: get("SWIFT_CLAUDE_MODEL").filter(|m| !m.is_empty()).unwrap_or_else(|| "haiku".to_string()) }
+    Config { port, token, allowed, claude_bin: get("SWIFT_CLAUDE_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "claude".to_string()), model: get("SWIFT_CLAUDE_MODEL").filter(|m| !m.is_empty()).unwrap_or_else(|| "haiku".to_string()), project_roots: get("SWIFT_PROJECT_ROOTS").unwrap_or_default().split(':').filter(|s| !s.is_empty()).map(std::path::PathBuf::from).collect() }
 }
 
 /// Exact match only: "chrome-extension://abc" must not match "chrome-extension://abcd", and an empty Origin never matches.
@@ -76,7 +77,7 @@ pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
             loop {
                 while let Ok(m) = rx.try_recv() { if ws.send(Message::text(m)).is_err() { return; } }
                 match ws.read() {
-                    Ok(Message::Text(t)) => handle_text(t.as_str(), &tx, &busy, &pool),
+                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy, &pool),
                     Ok(Message::Close(_)) | Err(WsError::ConnectionClosed) | Err(WsError::AlreadyClosed) => break,
                     Err(WsError::Io(e)) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => continue,
                     Err(_) => break, Ok(_) => {}
@@ -88,10 +89,18 @@ pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
 }
 
 /// Messages from the app: ping, and say {id, system, request}. Everything is validated; unknown or malformed input is ignored, never executed.
-fn handle_text(text: &str, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>) {
+fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>) {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
     match v.get("type").and_then(|t| t.as_str()) {
         Some("ping") => { let _ = tx.send("{\"type\":\"pong\"}".to_string()); }
+        Some("project.scan") => {
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let path = v.get("path").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let (tx, roots) = (tx.clone(), cfg.project_roots.clone());
+            thread::spawn(move || { let reply = match scan::allowed_root(std::path::Path::new(&path), &roots) {
+                None => serde_json::json!({ "type": "project.scan", "id": id, "ok": false, "error": "folder not allowed (set SWIFT_PROJECT_ROOTS)" }),
+                Some(p) => match scan::scan_dir(&p) { Ok(s) => serde_json::json!({ "type": "project.scan", "id": id, "ok": true, "scan": s }), Err(e) => serde_json::json!({ "type": "project.scan", "id": id, "ok": false, "error": e.to_string() }) } };
+                let _ = tx.send(reply.to_string()); });
+        }
         Some("prewarm") => { let pool = pool.clone(); thread::spawn(move || pool.prewarm()); }
         Some("say") => {
             let (Some(id), Some(system), Some(request)) = (v.get("id").and_then(|x| x.as_str()), v.get("system").and_then(|x| x.as_str()), v.get("request").and_then(|x| x.as_str())) else { return };

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { Appearance } from './Appearance';
+import { ImportProject } from './ImportProject';
 import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type ThemeChoice } from './theme';
 import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
@@ -15,10 +16,12 @@ export function App() {
   const [sayText, setSayText] = useState(''); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
   const baseFrames = useMemo(() => makeFrames(20), []); const [extra, setExtra] = useState<FrameDef[]>([]); const frames = useMemo(() => [...baseFrames, ...extra], [baseFrames, extra]);
   const sparkN = useRef(0); const [sparkStatus, setSparkStatus] = useState(''); const [sparking, setSparking] = useState(false);
-  const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const swatchRef = useRef<HTMLButtonElement>(null);
+  const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
   useEffect(() => saveTheme(theme), [theme]);
   useEffect(() => { (window as Window & { __theme?: unknown }).__theme = { set: (p: Partial<ThemeChoice>) => setTheme((t) => sanitize({ ...t, ...p })), get: () => theme }; }, [theme]);
+  // Escape closes an open popover with focus ANYWHERE (a focused button that becomes disabled drops focus to <body>, outside any element handler); focus returns to its trigger.
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (importOpen) { setImportOpen(false); pjRef.current?.focus(); } else if (appearanceOpen) { setAppearanceOpen(false); swatchRef.current?.focus(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [importOpen, appearanceOpen]);
   const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
   const [tier0, setTier0] = useState<string>('');
   const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
@@ -49,13 +52,14 @@ export function App() {
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   const dot = helper.status === 'connected' ? 'ok' : helper.status === 'connecting' ? 'warn' : 'bad';
   return (
-    <div className={`kit-root m-${mode}`} style={vars as CSSProperties} onKeyDown={(e) => { if (e.key === 'Escape' && appearanceOpen) closeAppearance(); }}>
+    <div className={`kit-root m-${mode}`} style={vars as CSSProperties}>
       <header className="kit-top">
         <div className="gl isl" aria-label="Project">
           <span className="mark" aria-hidden>⚡</span>
-          <span className="pj"><b>tvdash</b><span className="mono mu">idle-refresh</span></span>
+          <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>tvdash</b><span className="mono mu">idle-refresh</span></button>
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
+        {importOpen && conn.current && <ImportProject scan={conn.current.scan} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
           {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => setLens(l)}>{l}</button>))}
