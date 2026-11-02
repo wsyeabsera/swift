@@ -1,0 +1,10 @@
+<!doctype html><meta charset=utf-8><style>
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#000}
+.root{position:relative;width:1920px;height:1080px;overflow:hidden;font-family:system-ui;color:#f5f5f7;background:linear-gradient(135deg,#0b1a3a,#1a0b3a 50%,#0b3a2a)}
+.aur{position:absolute;inset:-25%;background:radial-gradient(40% 40% at 30% 30%,#0a84ffaa,transparent),radial-gradient(40% 40% at 70% 60%,#30d158aa,transparent);animation:d 12s linear infinite}@keyframes d{to{transform:rotate(360deg)}}
+.clock{position:absolute;left:115px;top:86px;font-size:230px;font-weight:200;letter-spacing:-.03em}
+.date{position:absolute;left:120px;top:340px;font-size:34px;opacity:.7}
+.glass{position:absolute;right:115px;top:140px;width:560px;padding:32px;border-radius:28px;background:rgba(255,255,255,.12);backdrop-filter:blur(24px) saturate(1.5);border:1px solid rgba(255,255,255,.2);animation:slide 6s ease-in-out infinite alternate}@keyframes slide{to{transform:translateX(-120px)}}
+.row{padding:14px 0;font-size:24px;border-bottom:1px solid rgba(255,255,255,.1)}
+</style><div class=root><div class=aur></div><div class=clock>21:53</div><div class=date>Wednesday, 28 October</div><div class=glass><div style="letter-spacing:.1em;font-size:20px">RECENT</div>
+<div class=row>All checks passed</div><div class=row>cloudflare/workers-sdk #16551</div><div class=row>Nightly backup done</div><div class=row>Cleared the screen</div></div></div>
