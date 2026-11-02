@@ -10,6 +10,7 @@ import { duplicateFrame, duplicateId } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
+import { localEdits } from './say/local';
 import { discardTakes, isTake, keepTake, runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
 const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Diagram'] as const;
@@ -46,6 +47,10 @@ export function App() {
   }, [frames, selection, sparking]);
   const say = useCallback(async () => {
     const text = sayText.trim(); const c = conn.current; if (!text || !window.__swift || !c || saying) return;
+    if (selection && !pendingAsk && window.__swift) { // local tier: unambiguous requests on the selection never reach Claude
+      const t0 = performance.now(); const sel = selection; const edits = await localEdits(text, { get: (p) => window.__swift!.get(sel.frameId, sel.el, p) });
+      if (edits) { for (const e of edits) await edit(sel.frameId, sel.el, e.prop, e.value); setSayText(''); setSayStatus(`Local · ${edits.map((e) => `${e.prop}: ${e.value}`).join(', ')} · ${(performance.now() - t0).toFixed(0)} ms`); return; }
+    }
     const frameId = selection?.frameId ?? 'tv'; const root = frames.find((f) => f.id === frameId)?.root ?? 'tv'; setSaying(true); setSayStatus('Saying…');
     const base = pendingAsk ? `${pendingAsk.original}\n\nYou asked: "${pendingAsk.question}". My answer: ${text}` : text; setPendingAsk(null);
     const r = await runSayRepairing({ api: liveApi, send: c.say, frameId, root, request: selection ? `${base} (the selected element is #${selection.el})` : base });
@@ -53,7 +58,7 @@ export function App() {
     if (r.applied.length > 0) { history.current.push({ kind: 'say', frameId, snapshot: r.snapshot }); setEdits(history.current.length); }
     setSayStatus(r.error && r.applied.length === 0 ? `Say failed: ${r.error}` : `${r.applied.length} applied${r.repaired ? ` · ${r.repaired} repaired` : ''}${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''}${r.firstMs !== null ? ` · first change ${r.firstMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${r.asked[0] ? ` · Claude asks: ${r.asked[0]}` : ''}`);
     setRevision((n) => n + 1); setSaying(false);
-  }, [sayText, saying, selection, frames, pendingAsk]);
+  }, [sayText, saying, selection, frames, pendingAsk, edit]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void undo(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo]);
   // Autosave: after the document changes settle, snapshot every frame (current HTML) and store the design; a failure is shown, not swallowed.
   useEffect(() => {
