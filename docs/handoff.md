@@ -1,4 +1,13 @@
-# Handoff (2026-11-02, updated at the end of the third goal hour)
+# Handoff (2026-11-02, fourth goal hour in progress)
+
+## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (47), `npm run e2e` (pass)
+- Autosave/restore of the design (`doc.ts`, localStorage, 1 s debounce, all-or-nothing parse, save errors shown, Reset button); Spark ids continue after restore.
+- Spark: Keep take / Discard takes (`kept` flag on FrameDef), Cancel Spark (AbortSignal through runSpark/runSay; late ops dropped, no repair turn), cap of 8 unreviewed takes (`canSpark`).
+- ⌘D duplicate frame (`canvas/frames.ts`), Delete removes the selected element (one undo step via snapshot; frame root protected), ⌘0 fit, ⌘1 actual size, Escape deselects.
+- Local tier (`say/local.ts`): bigger/smaller/hide/show/opacity N%/color/background/size on the SELECTION apply instantly with no Claude; else Claude. MLX router (#1709) not wired yet.
+- Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
+Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
+
 
 ## Third hour: the app exists (read this first)
 Built in `~/Hobby/swift-canvas`, all verified (`npm run typecheck`, `npm test` 29, `npm run helper:test` 27, `npm run e2e`, `npm run e2e:contrast` 48/48): web app + MV3 extension + Rust helper; canvas (20 sandboxed frames, pan/zoom, freeze, bridge); select/layers/inspector/undo; **Say** through the real local Claude Code (29/30 valid, `docs/slice.md`); **Spark x4** (4 distinct real takes in 10-14 s); theme pipeline with Appearance popover; **Import** brand tokens from a repo folder (scanner run on hearth, research-radar, auto-label). Commands in CLAUDE.md. The owner said "start the tasks" so the recommended answers of #1669 were used and #1670 sign-off is NOT recorded: revisit on review.

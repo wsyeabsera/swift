@@ -6,6 +6,7 @@ import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type Theme
 import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { makeFrames, type FrameDef } from './canvas/fixtures';
+import { zoomAt } from './canvas/viewport';
 import { duplicateFrame, duplicateId } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
@@ -80,6 +81,16 @@ export function App() {
     setTimeout(() => window.__swift?.fitTo([copy.id]), 150);
   }, [frames, selection]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void duplicate(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [duplicate]);
+  // Canvas keys: ⌘0 fit all, ⌘1 actual size (around the centre), Escape clears the selection (popovers close first, see above).
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return; const api = window.__swift; if (!api) return;
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); api.fitAll(); }
+      else if ((e.metaKey || e.ctrlKey) && e.key === '1') { e.preventDefault(); const r = document.querySelector('[data-testid=canvas]')?.getBoundingClientRect(); const v = api.view(); if (r) api.setView(zoomAt(v, r.width / 2, r.height / 2, 1 / v.s)); }
+      else if (e.key === 'Escape' && !importOpen && !appearanceOpen && selection) setSelection(null);
+    };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  }, [selection, importOpen, appearanceOpen]);
   // Delete / Backspace removes the selected element (never a frame root); one snapshot makes it one undo step.
   const removeSelected = useCallback(async () => {
     if (!selection || !window.__swift) return; const f = frames.find((x) => x.id === selection.frameId); if (!f || f.root === selection.el) return;

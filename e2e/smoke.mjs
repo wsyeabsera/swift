@@ -45,6 +45,10 @@ try {
   await web.evaluate(() => window.__swift.fitAll()); await web.getByTestId('spark-button').click();
   await web.waitForFunction(() => /takes/.test(document.querySelector('[data-testid=spark-status]')?.textContent ?? ''), null, { timeout: 20000 }); cv.sparkStatus = (await web.textContent('[data-testid=spark-status]'))?.trim();
   cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
+  // Canvas keys: ⌘1 actual size, ⌘0 fit, Escape deselects
+  { await web.keyboard.press('Meta+1'); await web.waitForTimeout(150); const s1 = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Meta+0'); await web.waitForTimeout(150); const s0 = await web.evaluate(() => window.__swift.view().s);
+    await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(150); const p1 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(p1.x, p1.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 }); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
+    cv.keys = { s1, fitSmaller: s0 < 1, escDeselects: (await web.$('[data-testid=sel]')) === null }; }
   // Local tier: "bigger" on a selected element is answered without Claude (status says Local), undo restores
   { const q = await web.evaluate(() => { window.__swift.fitTo(['tv']); }); void q; await web.waitForTimeout(200); const p0 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(p0.x, p0.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 });
     const f0 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); await web.getByTestId('say-input').fill('bigger'); await web.getByTestId('say-button').click(); await web.waitForFunction(() => /^Local/.test(document.querySelector('[data-testid=say-status]').textContent), null, { timeout: 3000 });
@@ -96,7 +100,8 @@ try {
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
   const takesOk = cv0.takes.spark.length === 1 && cv0.takes.total === 22 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
-  const localOk = cv0.local.f1 !== cv0.local.f0 && cv0.local.f2 === cv0.local.f0 && /^Local/.test(cv0.local.status);
+  const keysOk = cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;
+  const localOk = keysOk &&  cv0.local.f1 !== cv0.local.f0 && cv0.local.f2 === cv0.local.f0 && /^Local/.test(cv0.local.status);
   const delOk = localOk &&  cv0.del.delGone && cv0.del.delBack && cv0.del.rootKept;
   const docOk = delOk &&  takesOk &&  cv0.docRestored.sameFrames && cv0.docRestored.more && cv0.docRestored.color;
   const ok = docOk && canvasOk && selOk && sayOk && sparkOk && importOk && cmdKOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { docOk, canvasOk, selOk, sayOk, sparkOk, importOk, cmdKOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
