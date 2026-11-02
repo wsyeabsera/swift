@@ -1,0 +1,8 @@
+same     freeze=0 glass=none n=40 | pan p50 8.3 p95 9 max 10.1 >20ms 0/301 | zoom p95 16.7 max 41.6 | tier0(visible 17) p50 8.3 p95 9.4 ms | RSS 902 MB
+same     freeze=0 glass=none n=80 | pan p50 8.3 p95 9.1 max 9.4 >20ms 0/301 | zoom p95 9.2 max 33.4 | tier0(visible 17) p50 8.3 p95 8.5 ms | RSS 999 MB
+same     freeze=1 glass=none n=40 | pan p50 8.3 p95 8.8 max 9.4 >20ms 0/301 | zoom p95 9.1 max 17.1 | tier0(visible 17) p50 8.3 p95 9 ms | RSS 849 MB
+same     freeze=1 glass=none n=80 | pan p50 8.3 p95 8.8 max 10.5 >20ms 0/301 | zoom p95 9.1 max 33.4 | tier0(visible 17) p50 8.3 p95 8.5 ms | RSS 943 MB
+same     freeze=2 glass=none n=40 | pan p50 8.3 p95 9 max 9.3 >20ms 0/300 | zoom p95 8.9 max 16.7 | tier0(visible 17) p50 8.3 p95 9.2 ms | RSS 789 MB
+same     freeze=2 glass=none n=80 | pan p50 8.3 p95 9.3 max 9.4 >20ms 0/300 | zoom p95 9.3 max 33.3 | tier0(visible 17) p50 8.3 p95 9 ms | RSS 911 MB
+same     freeze=3 glass=none n=40 | pan p50 8.3 p95 9.2 max 9.4 >20ms 0/301 | zoom p95 9.3 max 33.3 | tier0(visible 17) p50 8.3 p95 8.4 ms | RSS 926 MB
+same     freeze=3 glass=none n=80 | pan p50 8.3 p95 9.1 max 9.4 >20ms 0/300 | zoom p95 9.1 max 58.9 | tier0(visible 17) p50 8.3 p95 11.4 ms | RSS 1020 MB

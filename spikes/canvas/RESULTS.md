@@ -36,3 +36,14 @@ extension page itself (see #1714), a glass layer over the moving canvas (see liq
 | Liquid Glass + edge refraction (SVG displacement in backdrop-filter) | 9.3 ms / 1008 MB | 9.1 ms / 1067 MB |
 No dropped frames in any run (0 of 300). Glass and even refraction are free on this GPU at these sizes; 40 frames use about the same memory as 20
 (~1.06 GB), so memory is dominated by something other than frame count here (the animated, blurred content). Zoom settle spikes of 33-42 ms appear in all variants.
+
+## Pass 3: memory and freeze modes (same-origin iframes, 40 and 80 frames, `run-freeze.log`, 2026-11-02)
+| Freeze mode for offscreen frames | n=40 RSS / pan p95 | n=80 RSS / pan p95 | Notes |
+|---|---|---|---|
+| none | 902 MB / 9.0 ms | 999 MB / 9.1 ms | |
+| `visibility:hidden` | 849 MB / 8.8 ms | 943 MB / 8.8 ms | -6% |
+| `display:none` | **789 MB / 9.0 ms** | **911 MB / 9.3 ms** | -12% / -9%, no jank |
+| unload (`src=about:blank`, reload on view) | 926 MB / 9.2 ms | 1020 MB / 9.1 ms | no saving, Tier-0 p95 11.4 ms and a 59 ms zoom spike at n=80: worse |
+- **Baseline matters:** 2 frames already read 868 MB. That is mostly Chrome itself (browser, GPU and renderer processes, a headed window under Playwright). Going from 40 to 80 frames adds ~100 MB: **~2.5 MB per frame** for this content. The old "1 GB for 20 frames" worry and the 600 MB target were the wrong metric; budget **marginal MB per frame**, and re-measure with real UIs (images, fonts, video).
+- **Level-of-detail decision (provisional): freeze-only with `display:none` for offscreen frames.** No bitmap capture: frame time is already at the display rate at 80 frames, and bitmap capture adds an async step and blur-on-swap risk. Revisit if real content (8K images, video, heavy blur) pushes the frame time or memory.
+- Pan p95 stays 8.8-9.3 ms (display refresh) at 80 frames in every mode: 0 dropped frames out of 300.
