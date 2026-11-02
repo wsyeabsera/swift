@@ -42,8 +42,9 @@ try {
   // Tier-0 budget (task #1676): 30 edits through the bridge, p95 under 16 ms
   const times = await web.evaluate(async () => { const t = []; for (let i = 0; i < 30; i++) { const r = await window.__swift.edit('tv', 'clock', 'color', `hsl(${i * 12} 80% 70%)`); t.push(r.ms); } return t; }); times.sort((a, b) => a - b); cv.tier0p95 = +times[Math.floor(times.length * 0.95)].toFixed(2); cv.tier0max = +times.at(-1).toFixed(2);
   // Spark x4: four takes, each a clone of the TV frame with its own Say, in parallel (fake Claude: every take gets the same recorded answer)
-  await web.evaluate(() => window.__swift.fitAll()); await web.getByTestId('spark-button').click();
+  await web.evaluate(() => window.__swift.fitAll()); await web.evaluate(() => { window.__sawBusy = false; new MutationObserver(() => { if (document.querySelector('[data-testid=frame-busy]')) window.__sawBusy = true; }).observe(document.body, { childList: true, subtree: true }); }); await web.getByTestId('spark-button').click();
   await web.waitForFunction(() => /takes/.test(document.querySelector('[data-testid=spark-status]')?.textContent ?? ''), null, { timeout: 20000 }); cv.sparkStatus = (await web.textContent('[data-testid=spark-status]'))?.trim();
+  cv.busy = await web.evaluate(() => ({ saw: window.__sawBusy, left: document.querySelectorAll('[data-testid=frame-busy]').length }));
   cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
   // Rename a frame by double-clicking its label (Enter commits, Escape cancels)
   { await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const lab = web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).first(); await lab.dblclick(); await web.getByTestId('frame-name').fill('Hero TV'); await web.keyboard.press('Enter'); await web.waitForTimeout(300);
@@ -118,7 +119,8 @@ try {
   const importOk = projOk && brandOk && /tokens/.test(cv0.import.ok) && cv0.import.ok.includes('files') && cv0.import.refused && cv0.import.escClosed && cv0.import.focusBack === 'project-button';
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
-  const takesOk = cv0.takes.spark.length === 1 && cv0.takes.total === 22 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
+  const busyOk = cv0.busy.saw && cv0.busy.left === 0;
+  const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 22 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
   const renameOk = cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
   const histOk = ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
   const keysOk = histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;

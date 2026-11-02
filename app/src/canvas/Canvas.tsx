@@ -27,7 +27,7 @@ const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].
 /** Infinite canvas: one transformed world layer, one sandboxed iframe per frame, offscreen frames frozen (display:none, spike #1706).
  *  The viewport lives in a ref and is applied to the DOM directly: panning and zooming never re-render React; React re-renders only when
  *  the set of visible frames changes or the selection changes. Selection is found by hit-testing through the frame bridge. */
-export function Canvas({ frames, selection, onSelect, revision, onReady, onRename }: { frames: FrameDef[]; selection: Sel | null; onSelect: (s: Sel | null) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
+export function Canvas({ frames, selection, onSelect, revision, onReady, onRename, painting }: { painting?: Set<string>; frames: FrameDef[]; selection: Sel | null; onSelect: (s: Sel | null) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
   const [editing, setEditing] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null); const worldRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View>({ x: 0, y: 0, s: 1 }); const iframes = useRef(new Map<string, HTMLIFrameElement>());
@@ -94,6 +94,7 @@ export function Canvas({ frames, selection, onSelect, revision, onReady, onRenam
         {frames.map((f) => (
           <div key={f.id} className="fr" style={{ left: f.x, top: f.y, width: f.w, height: f.h, display: visible.has(f.id) ? 'block' : 'none' }}>
             <iframe ref={(el) => { if (el) iframes.current.set(f.id, el); else iframes.current.delete(f.id); }} title={f.title} sandbox="allow-scripts" {...(EXT_FRAME ? { src: EXT_FRAME, onLoad: () => { void bridges.get(f.id)?.request({ t: 'load', html: f.html }); } } : { srcDoc: frameDoc(f.html) })} width={f.w} height={f.h} style={{ border: 0, display: 'block', pointerEvents: 'none' }} />
+            {painting?.has(f.id) && <div className="fr-busy" data-testid="frame-busy" aria-label="Claude is painting this take" />}
             {editing === f.id
               ? <input className="fr-label fr-edit" aria-label="Frame name" data-testid="frame-name" autoFocus defaultValue={f.title} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') { onRename?.(f.id, e.currentTarget.value); setEditing(null); } else if (e.key === 'Escape') setEditing(null); }} onBlur={(e) => { if (editing === f.id) { onRename?.(f.id, e.currentTarget.value); setEditing(null); } }} />
               : <span className="fr-label" data-testid="frame-label" title="Double-click to rename" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={() => setEditing(f.id)}>{f.title}</span>}

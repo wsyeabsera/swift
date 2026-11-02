@@ -33,3 +33,8 @@ test('cancelling one running take leaves the others finishing', async () => {
   running.get('tv-t2')!.abort(); for (const i of [0, 1, 2]) { emitters[i]!({ kind: 'delta', text: '{"op":"set","id":"tv","prop":"opacity","value":"0.9"}\n' }); emitters[i]!({ kind: 'done' }); }
   const r = await p; expect(r.takes.map((t) => [t.id, t.result.applied.length, t.result.error])).toEqual([['tv-t1', 1, undefined], ['tv-t2', 0, 'cancelled'], ['tv-t3', 1, undefined]]); expect(running.size).toBe(0);
 });
+test('onTakeDone fires once per take, including cancelled ones', async () => {
+  const done: string[] = []; const ac = new AbortController(); ac.abort(); let n = 0;
+  const api = { snapshot: async () => '<div id="tv"></div>', tree: async () => [{ id: 'tv', parent: null, depth: 0, tag: 'div', text: '' }], fitTo: () => {} } as unknown as CanvasApi;
+  await runSpark({ api, send: () => {}, base, n: 2, nextId: () => `tv-t${++n}`, addFrames: () => {}, signal: ac.signal, onTakeDone: (id) => done.push(id) }); expect(done.sort()).toEqual(['tv-t1', 'tv-t2']);
+});
