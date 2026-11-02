@@ -52,3 +52,13 @@ test('no repair turn when nothing is repairable', async () => {
   const { api } = fakeApi(); let n = 0; const send = (_s: string, _r: string, on: (e: SayEvent) => void) => { n++; on({ kind: 'delta', text: '{"op":"set","id":"ghost","prop":"color","value":"red"}\n' }); on({ kind: 'done' }); };
   const r = await runSayRepairing({ api, send, frameId: 'tv', root: 'tv', request: 'x' }); expect(n).toBe(1); expect(r.repaired).toBe(0);
 });
+
+test('cancel: late ops are dropped, the result says cancelled, and no repair turn is started', async () => {
+  const ac = new AbortController(); const applied: string[] = []; let emit: (e: SayEvent) => void = () => {}; let sends = 0;
+  const api = { snapshot: async () => '<div id="tv"></div>', tree: async () => [{ id: 'tv', parent: null, depth: 0, tag: 'div', text: '' }], edit: async (_f: string, _i: string, p: string) => { applied.push(p); return { ok: true, ms: 1, before: '' }; } } as unknown as CanvasApi;
+  const p = runSayRepairing({ api, send: (_s, _r, on) => { sends++; emit = on; }, frameId: 'tv', root: 'tv', request: 'x', signal: ac.signal });
+  await new Promise((r) => setTimeout(r, 10)); emit({ kind: 'delta', text: '{"op":"set","id":"tv","prop":"opacity","value":"0.9"}\n' }); await new Promise((r) => setTimeout(r, 10));
+  ac.abort(); emit({ kind: 'delta', text: '{"op":"set","id":"tv","prop":"color","value":"red"}\n' }); emit({ kind: 'done' }); const r = await p;
+  expect(r.error).toBe('cancelled'); expect(applied).toEqual(['opacity']); expect(sends).toBe(1);
+});
+test('cancel before start sends nothing', async () => { const ac = new AbortController(); ac.abort(); let sends = 0; const api = { snapshot: async () => '<div id="tv"></div>', tree: async () => [{ id: 'tv', parent: null, depth: 0, tag: 'div', text: '' }] } as unknown as CanvasApi; const r = await runSay({ api, send: () => { sends++; }, frameId: 'tv', root: 'tv', request: 'x', signal: ac.signal }); expect(r.error).toBe('cancelled'); expect(sends).toBe(0); });

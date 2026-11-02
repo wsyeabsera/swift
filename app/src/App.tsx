@@ -16,7 +16,7 @@ export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc() ?? makeFrames(20)); const [saveStatus, setSaveStatus] = useState('');
-  const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const [sparking, setSparking] = useState(false);
+  const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const [sparking, setSparking] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
   useEffect(() => saveTheme(theme), [theme]);
@@ -39,8 +39,8 @@ export function App() {
   const undo = useCallback(async () => { const e = history.current.pop(); if (!e) return; setEdits(history.current.length); if (e.kind === 'say') { await window.__swift?.load(e.frameId, e.snapshot); setRevision((n) => n + 1); setSayStatus('Say undone'); } else await edit(e.frameId, e.el, e.prop, e.before, false); }, [edit]);
   const spark = useCallback(async () => {
     const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? 'tv')); if (!window.__swift || !c || !base || sparking) return;
-    setSparking(true); setSparkStatus('Sparking 4 directions…');
-    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => setFrames((e) => [...e, ...f]) });
+    setSparking(true); setSparkStatus('Sparking 4 directions…'); const ac = new AbortController(); sparkAbort.current = ac;
+    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => setFrames((e) => [...e, ...f]), signal: ac.signal }); sparkAbort.current = null;
     const ok = r.takes.filter((t) => t.result.applied.length > 0).length; const err = r.takes.find((t) => t.result.error)?.result.error; const rej = r.takes.reduce((n, t) => n + t.result.rejected.length, 0); setSparkStatus(`${r.takes.length} takes · ${ok} changed${r.firstPaintMs !== null ? ` · first paint ${r.firstPaintMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${rej ? ` · ${rej} rejected` : ''}${err ? ` · ${err}` : ''}`); setSparking(false);
   }, [frames, selection, sparking]);
   const say = useCallback(async () => {
@@ -97,7 +97,7 @@ export function App() {
       <footer className="gl isl tools" aria-label="Canvas tools">
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
         <button className="rb btn" onClick={() => void edit('tv', 'clock', 'font-size', '280px')}>Clock bigger</button>
-        <button className="rb btn" onClick={() => void spark()} disabled={sparking} data-testid="spark-button">Spark ×4</button>
+        {sparking ? <button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button> : <button className="rb btn" onClick={() => void spark()} data-testid="spark-button">Spark ×4</button>}
         <button className="rb btn" onClick={() => selection && setFrames((f) => keepTake(f, selection.frameId))} disabled={!selIsTake} data-testid="keep-take">Keep take</button>
         <button className="rb btn" onClick={discard} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
         <button className="rb btn" onClick={resetDesign} data-testid="reset">Reset</button>
