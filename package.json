@@ -9,6 +9,7 @@
     "typecheck": "tsc -p .",
     "test": "vitest run",
     "test:changed": "vitest --changed",
+    "e2e:contrast": "node e2e/contrast.mjs",
     "helper": "cargo run -q -p swift-canvas-helper",
     "helper:test": "cargo test -q -p swift-canvas-helper",
     "e2e": "cargo build -q -p swift-canvas-helper && npm run -s build && node e2e/smoke.mjs"

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, type CSSProperties } from 'react';
+import { Appearance } from './Appearance';
+import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type ThemeChoice } from './theme';
 import { Inspector, Layers } from './Panels';
 import { Canvas, type Sel } from './canvas/Canvas';
 import { makeFrames } from './canvas/fixtures';
@@ -11,6 +13,11 @@ export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
   const frames = useMemo(() => makeFrames(20), []);
+  const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const swatchRef = useRef<HTMLButtonElement>(null);
+  const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
+  useEffect(() => saveTheme(theme), [theme]);
+  useEffect(() => { (window as Window & { __theme?: unknown }).__theme = { set: (p: Partial<ThemeChoice>) => setTheme((t) => sanitize({ ...t, ...p })), get: () => theme }; }, [theme]);
+  const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
   const [tier0, setTier0] = useState<string>('');
   const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
   type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string };
@@ -34,12 +41,14 @@ export function App() {
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   const dot = helper.status === 'connected' ? 'ok' : helper.status === 'connecting' ? 'warn' : 'bad';
   return (
-    <div className="kit-root" style={{ backgroundImage: 'url(./bg/lake.jpg)' }}>
+    <div className={`kit-root m-${mode}`} style={vars as CSSProperties} onKeyDown={(e) => { if (e.key === 'Escape' && appearanceOpen) closeAppearance(); }}>
       <header className="kit-top">
         <div className="gl isl" aria-label="Project">
           <span className="mark" aria-hidden>⚡</span>
           <span className="pj"><b>tvdash</b><span className="mono mu">idle-refresh</span></span>
+          <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
+        {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
           {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => setLens(l)}>{l}</button>))}
         </nav>
