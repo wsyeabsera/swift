@@ -7,6 +7,7 @@ import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
+import { exportDoc, exportName } from './canvas/exportHtml';
 import { duplicateFrame, duplicateId, renameFrame } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
@@ -125,6 +126,11 @@ export function App() {
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, importOpen, appearanceOpen]);
+  // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
+  const exportFrame = useCallback(async () => {
+    const f = frames.find((x) => x.id === (selection?.frameId ?? 'tv')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
+    const url = URL.createObjectURL(new Blob([exportDoc(f.title, html)], { type: 'text/html' })); const link = document.createElement('a'); link.href = url; link.download = exportName(f.title); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
+  }, [frames, selection]);
   // Delete / Backspace removes the selected element (never a frame root); one snapshot makes it one undo step.
   const removeSelected = useCallback(async () => {
     if (!selection || !window.__swift) return; const f = frames.find((x) => x.id === selection.frameId); if (!f || f.root === selection.el) return;
@@ -167,6 +173,7 @@ export function App() {
         {sparking ? <>{selection && takesRunning.current.has(selection.frameId) && <button className="rb btn" onClick={() => takesRunning.current.get(selection.frameId)?.abort()} data-testid="cancel-take">Cancel this take</button>}<button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button></> : <button className="rb btn" onClick={() => void spark()} data-testid="spark-button">Spark ×4</button>}
         <button className="rb btn" onClick={() => selection && setFrames((f) => keepTake(f, selection.frameId))} disabled={!selIsTake} data-testid="keep-take">Keep take</button>
         <button className="rb btn" onClick={discard} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
+        <button className="rb btn" onClick={() => void exportFrame()} data-testid="export">Export</button>
         <button className="rb btn" onClick={resetDesign} data-testid="reset">Reset</button>
         <button className="rb btn" onClick={() => void undo()} disabled={edits === 0} data-testid="undo">Undo{edits ? ` (${edits})` : ''}</button>
         <button className="rb btn" onClick={() => void redo()} disabled={redos === 0} data-testid="redo">Redo{redos ? ` (${redos})` : ''}</button>

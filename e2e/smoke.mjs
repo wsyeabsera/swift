@@ -46,6 +46,8 @@ try {
   await web.waitForFunction(() => /takes/.test(document.querySelector('[data-testid=spark-status]')?.textContent ?? ''), null, { timeout: 20000 }); cv.sparkStatus = (await web.textContent('[data-testid=spark-status]'))?.trim();
   cv.busy = await web.evaluate(() => ({ saw: window.__sawBusy, left: document.querySelectorAll('[data-testid=frame-busy]').length }));
   cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
+  // Export: the selected frame downloads as a standalone HTML file with its current markup
+  { const dl = web.waitForEvent('download', { timeout: 5000 }); await web.getByTestId('export').click(); const d = await dl; const tmp = path.join(os.tmpdir(), `sc-export-${Date.now()}.html`); await d.saveAs(tmp); const body = fs.readFileSync(tmp, 'utf8'); cv.exported = { name: d.suggestedFilename(), doctype: body.startsWith('<!doctype html>'), hasClock: body.includes('id="clock"') }; }
   // Rename a frame by double-clicking its label (Enter commits, Escape cancels)
   { await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const lab = web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).first(); await lab.dblclick(); await web.getByTestId('frame-name').fill('Hero TV'); await web.keyboard.press('Enter'); await web.waitForTimeout(300);
     const renamed = (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1; await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).first().dblclick(); await web.getByTestId('frame-name').fill('Nope'); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
@@ -122,7 +124,8 @@ try {
   const extOk = out.extEdit.ok && out.extRead === '260px';
   const busyOk = cv0.busy.saw && cv0.busy.left === 0;
   const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 22 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
-  const renameOk = cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
+  const exportOk = /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
+  const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
   const histOk = ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
   const keysOk = histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;
   const localOk = keysOk &&  cv0.local.f1 !== cv0.local.f0 && cv0.local.f2 === cv0.local.f0 && cv0.local.f3 === cv0.local.f1 && cv0.local.f4 === cv0.local.f1 && cv0.local.f5 === cv0.local.f0 && /^Local/.test(cv0.local.status);
