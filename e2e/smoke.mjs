@@ -82,6 +82,8 @@ try {
       for (let i = 0; i < 90; i++) { const zoom = i % 3 === 2; host.dispatchEvent(new WheelEvent('wheel', { deltaX: zoom ? 0 : 25, deltaY: zoom ? (i % 6 === 2 ? -30 : 30) : 12, ctrlKey: zoom, clientX: 640, clientY: 360, bubbles: true, cancelable: true })); n++; await new Promise((r) => setTimeout(r, 11)); }
       stop = true; await new Promise((r) => setTimeout(r, 50)); gaps.shift(); gaps.sort((a, b) => a - b); const p95 = gaps[Math.floor(gaps.length * 0.95)] ?? 0; return { n, frames: gaps.length, p95: +p95.toFixed(1), max: +(gaps[gaps.length - 1] ?? 0).toFixed(1) }; });
     await web.evaluate(() => window.__swift.fitAll()); await web.waitForTimeout(200); }
+  // Zoom readout: shows the scale, clicking it goes to actual size
+  { await web.evaluate(() => window.__swift.fitAll()); await web.waitForTimeout(500); const fitTxt = (await web.textContent('[data-testid=zoom]'))?.trim(); await web.getByTestId('zoom').click(); await web.waitForTimeout(500); const headerH = await web.evaluate(() => document.querySelector('.kit-top').getBoundingClientRect().height); cv.zoomBtn = { headerH, fitTxt, after: (await web.textContent('[data-testid=zoom]'))?.trim(), s: await web.evaluate(() => window.__swift.view().s) }; await web.evaluate(() => window.__swift.fitAll()); await web.waitForTimeout(200); }
   // Canvas keys: ⌘1 actual size, ⌘0 fit, Escape deselects
   { await web.keyboard.press('Meta+1'); await web.waitForTimeout(150); const s1 = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Meta+0'); await web.waitForTimeout(150); const s0 = await web.evaluate(() => window.__swift.view().s);
     await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(150); const p1 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(p1.x, p1.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 }); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
@@ -223,7 +225,8 @@ try {
   const navOk = holdOk &&  dragOk &&  zoomSelOk &&  cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
   const nudgeOk = navOk &&  cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
   const histOk = nudgeOk &&  ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
-  const panOk = cv0.panFps.frames > 30 && cv0.panFps.p95 < B.panGapP95Ms;
+  const zoomBtnOk = cv0.zoomBtn.headerH < 90 && /^\d+%$/.test(cv0.zoomBtn.fitTxt) && cv0.zoomBtn.fitTxt !== '100%' && cv0.zoomBtn.after === '100%' && cv0.zoomBtn.s === 1;
+  const panOk = zoomBtnOk &&  cv0.panFps.frames > 30 && cv0.panFps.p95 < B.panGapP95Ms;
   const keysOk = panOk &&  histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;
   const localOk = keysOk &&  cv0.local.f1 !== cv0.local.f0 && cv0.local.f2 === cv0.local.f0 && cv0.local.f3 === cv0.local.f1 && cv0.local.f4 === cv0.local.f1 && cv0.local.f5 === cv0.local.f0 && /^Local/.test(cv0.local.status);
   const delOk = localOk &&  cv0.del.delGone && cv0.del.delBack && cv0.del.rootKept;

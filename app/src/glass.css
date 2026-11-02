@@ -60,3 +60,5 @@ button:disabled{opacity:.45;cursor:default}
 .layers .lrow{display:flex;align-items:center;gap:2px}.layers .lrow .row{flex:1;min-width:0}.eye{flex:none;width:26px;height:26px;padding:0;font-size:11px;opacity:.55}.eye[aria-pressed=true]{opacity:1}.eye:hover{opacity:1}
 .framemenu{max-height:calc(100vh - 180px);overflow-y:auto}.liblist{list-style:none;margin:6px;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 .libitem{display:flex;gap:2px}.libx{padding:0 8px;opacity:.6}.libx:hover{opacity:1}
+.zoombtn{min-width:52px;padding:0 8px;font-variant-numeric:tabular-nums}
+.speed .helpertxt{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kit-top{flex-wrap:nowrap}

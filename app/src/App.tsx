@@ -233,6 +233,10 @@ export function App() {
   const [selProps, setSelProps] = useState<SuggestProps | null>(null);
   useEffect(() => { let alive = true; setSelProps(null); if (!selection) return; void window.__swift?.props(selection.frameId, selection.el, ['font-size', 'font-weight', 'opacity']).then((p) => { if (alive && p) setSelProps(p as SuggestProps); }); return () => { alive = false; }; }, [selection, revision]);
   const chips = useMemo(() => (selProps ? suggestions(selProps, brand) : []), [selProps, brand]);
+  // Zoom readout (the viewport lives in a ref, not React state: poll it a few times a second); click = actual size.
+  const [zoomPct, setZoomPct] = useState(100);
+  useEffect(() => { const t = setInterval(() => { const v = window.__swift?.view(); if (v) setZoomPct((p) => { const n = Math.round(v.s * 100); return p === n ? p : n; }); }, 250); return () => clearInterval(t); }, []);
+  const actualSize = useCallback(() => { const r = document.querySelector('[data-testid=canvas]')?.getBoundingClientRect(); const v = window.__swift?.view(); if (r && v && window.__swift) window.__swift.setView(zoomAt(v, r.width / 2, r.height / 2, 1 / v.s)); }, []);
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   const dot = helper.status === 'connected' ? 'ok' : helper.status === 'connecting' ? 'warn' : 'bad';
@@ -272,8 +276,9 @@ export function App() {
         </nav>
         <div className="gl isl speed" role="status" aria-live="polite" data-testid="helper-status">
           <span className={`dot ${dot}`} aria-hidden />
+          <button className="rb btn zoombtn" aria-label={`Zoom ${zoomPct} percent: click for actual size`} title="Click for actual size (⌘1)" data-testid="zoom" onClick={actualSize}>{zoomPct}%</button>
           <button ref={kbRef} className="rb btn kbbtn" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-expanded={shortcutsOpen} data-testid="shortcuts-button" onClick={() => setShortcutsOpen((o) => !o)}>?</button>
-          <span className="mono">{helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}</span>
+          <span className="mono helpertxt" title={helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}>{helper.status === 'connected' ? `helper · claude ${(helper.claude ?? '?').split(' (')[0]}` : `helper · ${helper.status}`}</span>
         </div>
       </header>
       <Canvas onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => { const next = renameFrame(frames, id, t); if (next === frames) return; const before = frames.find((f) => f.id === id)?.title ?? ''; const after = next.find((f) => f.id === id)?.title ?? ''; history.current.push({ kind: 'rename', frameId: id, before, after }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setFrames(next); }} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
