@@ -1,0 +1,5 @@
+{"r":"make the clock bigger","firstToolStartMs":1090,"firstHandlerMs":1347,"handlerCalls":1,"totalMs":1988}
+{"r":"make the Recent panel more t","firstToolStartMs":1991,"firstHandlerMs":2329,"handlerCalls":2,"totalMs":4264}
+{"r":"dim the date and move it rig","firstToolStartMs":2306,"firstHandlerMs":2610,"handlerCalls":2,"totalMs":3576}
+{"r":"tighten the rows and make th","firstToolStartMs":2352,"firstHandlerMs":2722,"handlerCalls":12,"totalMs":9484}
+{"r":"hide the row meta text","firstToolStartMs":1897,"firstHandlerMs":2223,"handlerCalls":6,"totalMs":5166}

@@ -70,3 +70,14 @@ real parallel Spark (memory, usage drop per Spark) still not measured. Subscript
   - property: n=10 first visible p50 985 ms, max 1290 ms, valid 8/10
   - full: n=9 first visible p50 1322 ms, max 1855 ms, valid 3/9
 - Implication: send **token and property edits through the local tier first** (instant preview, #1713) and use Claude for the creative ones; budget Say by route (first visible change p50: property 0.99 s, token 1.27 s, full 1.32 s; the 2.6 s maximum was a token request) instead of one number; with the local tier answering token/property edits instantly, Claude's p95 matters mostly for the creative ones.
+
+## Pass 7: Say through an in-process MCP tool (`mcp.mjs`, Agent SDK cold `query()` per request, Haiku, `apply_op` tool, 5 requests)
+| Request | tool_use starts | first handler call (op applied) | handler calls | total |
+|---|---|---|---|---|
+| make the clock bigger | 1.09 s | 1.35 s | 1 | 1.99 s |
+| Recent panel more transparent + heading blue | 1.99 s | 2.33 s | 2 | 4.26 s |
+| dim the date and move it right | 2.31 s | 2.61 s | 2 | 3.58 s |
+| tighten the rows, titles 26px | 2.35 s | 2.72 s | 12 | 9.48 s |
+| hide the row meta text | 1.90 s | 2.22 s | 6 | 5.17 s |
+- The first op is applied **1.3-2.7 s** after the request (vs 0.7-1.3 s for streamed JSON text on a warm session, 0.9-1.4 s to first token cold). The tool call only fires when its whole `tool_use` block is complete, the SDK runs the handler, then the model gets a result turn: totals are 2-9.5 s, growing with the number of ops.
+- **Decision: the Say/Spark hot path streams JSON ops as text and applies line by line (task #1731); the in-app MCP server (#1712) serves heavy multi-step work and Claude Code sessions that drive the canvas.**
