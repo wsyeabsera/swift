@@ -2,6 +2,7 @@
 //! Security rules (task #1719): bind loopback only; accept a connection only when its Origin is on the exact allow-list AND the token matches;
 //! the allow-list is empty by default, so nothing connects until an extension id (or dev origin) is configured.
 pub mod say;
+use say::Pool;
 use std::{io, net::TcpListener, process::Command, sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc}, thread, time::Duration};
 use tungstenite::{accept_hdr, handshake::server::{ErrorResponse, Request, Response}, http, Error as WsError, Message};
 
@@ -56,9 +57,10 @@ fn forbidden() -> ErrorResponse { http::Response::builder().status(403).body(Som
 
 /// Accept loop: one thread per connection. Returns only on listener error.
 pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
-    let busy = Arc::new(AtomicUsize::new(0));
+    let busy = Arc::new(AtomicUsize::new(0)); let pool = Arc::new(Pool::new(&cfg.claude_bin, &cfg.model));
+    { let pool = pool.clone(); thread::spawn(move || loop { thread::sleep(Duration::from_secs(10)); pool.reap(std::time::Instant::now(), say::SPARE_IDLE); }); }
     for stream in listener.incoming() {
-        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone();
+        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone(); let pool = pool.clone();
         thread::spawn(move || {
             let check = |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
                 let origin = req.headers().get("origin").and_then(|v| v.to_str().ok()).unwrap_or("");
@@ -68,12 +70,13 @@ pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
             let Ok(mut ws) = accept_hdr(stream, check) else { return };
             let hello = serde_json::json!({ "type": "hello", "version": env!("CARGO_PKG_VERSION"), "claude": claude_status() });
             if ws.send(Message::text(hello.to_string())).is_err() { return; }
+            { let pool = pool.clone(); thread::spawn(move || pool.prewarm()); } // a client is here: have a spare ready for its first Say
             // Writes from Say worker threads go through a channel; the read loop uses a short timeout so it can flush them.
             let (tx, rx) = mpsc::channel::<String>(); let _ = ws.get_mut().set_read_timeout(Some(Duration::from_millis(30)));
             loop {
                 while let Ok(m) = rx.try_recv() { if ws.send(Message::text(m)).is_err() { return; } }
                 match ws.read() {
-                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy),
+                    Ok(Message::Text(t)) => handle_text(t.as_str(), &tx, &busy, &pool),
                     Ok(Message::Close(_)) | Err(WsError::ConnectionClosed) | Err(WsError::AlreadyClosed) => break,
                     Err(WsError::Io(e)) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => continue,
                     Err(_) => break, Ok(_) => {}
@@ -85,16 +88,17 @@ pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
 }
 
 /// Messages from the app: ping, and say {id, system, request}. Everything is validated; unknown or malformed input is ignored, never executed.
-fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>) {
+fn handle_text(text: &str, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>) {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
     match v.get("type").and_then(|t| t.as_str()) {
         Some("ping") => { let _ = tx.send("{\"type\":\"pong\"}".to_string()); }
+        Some("prewarm") => { let pool = pool.clone(); thread::spawn(move || pool.prewarm()); }
         Some("say") => {
             let (Some(id), Some(system), Some(request)) = (v.get("id").and_then(|x| x.as_str()), v.get("system").and_then(|x| x.as_str()), v.get("request").and_then(|x| x.as_str())) else { return };
             let id = id.chars().take(64).collect::<String>(); let ev = move |kind: &str, text: &str| serde_json::json!({ "type": "say.event", "id": id, "kind": kind, "text": text }).to_string();
             if busy.fetch_add(1, Ordering::SeqCst) >= say::MAX_CONCURRENT { busy.fetch_sub(1, Ordering::SeqCst); let _ = tx.send(ev("error", "too many Says at once")); return; }
-            let (tx, busy, bin, model, system, request) = (tx.clone(), busy.clone(), cfg.claude_bin.clone(), cfg.model.clone(), system.to_string(), request.to_string());
-            thread::spawn(move || { say::run_say(&bin, &model, &system, &request, |o| { let _ = tx.send(match o { say::Out::Delta(t) => ev("delta", &t), say::Out::Done => ev("done", ""), say::Out::Error(e) => ev("error", &e) }); }); busy.fetch_sub(1, Ordering::SeqCst); });
+            let (tx, busy, pool, system, request) = (tx.clone(), busy.clone(), pool.clone(), system.to_string(), request.to_string());
+            thread::spawn(move || { say::run_say(&pool, &system, &request, |o| { let _ = tx.send(match o { say::Out::Delta(t) => ev("delta", &t), say::Out::Done => ev("done", ""), say::Out::Error(e) => ev("error", &e) }); }); busy.fetch_sub(1, Ordering::SeqCst); pool.prewarm(); });
         }
         _ => {}
     }

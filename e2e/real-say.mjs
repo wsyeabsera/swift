@@ -9,6 +9,7 @@ try {
   await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]').textContent), null, { timeout: 10000 }); await p.waitForTimeout(500);
   const g = (el, prop) => p.evaluate(([e, q]) => window.__swift.get('tv', e, q), [el, prop]);
   const before = { clock: await g('clock', 'font-size'), date: await g('date', 'opacity') };
+  await p.getByTestId('say-input').focus(); await p.waitForTimeout(2500); // a spare is ready (prewarmed on connect and on focus)
   const t0 = Date.now(); await p.getByTestId('say-input').fill(request); await p.getByTestId('say-button').click();
   await p.waitForFunction(() => /applied|failed|asks/.test(document.querySelector('[data-testid=say-status]').textContent), null, { timeout: 60000 }); const wall = Date.now() - t0;
   await p.waitForTimeout(500); const after = { clock: await g('clock', 'font-size'), date: await g('date', 'opacity') };

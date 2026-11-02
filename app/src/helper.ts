@@ -2,7 +2,7 @@
 import type { SayEvent, SayTransport } from './say/say';
 export const HELPER_PORT = 7431;
 export type HelperState = { status: 'connecting' | 'connected' | 'offline'; claude?: string; version?: string };
-export type HelperConnection = { close: () => void; say: SayTransport };
+export type HelperConnection = { close: () => void; say: SayTransport; prewarm: () => void };
 export function helperUrl(token: string, port = HELPER_PORT): string { return `ws://127.0.0.1:${port}/?token=${encodeURIComponent(token)}`; }
 export function parseHello(data: string): HelperState | null {
   try { const m = JSON.parse(data) as { type?: string; claude?: string; version?: string }; return m.type === 'hello' ? { status: 'connected', ...(m.claude !== undefined ? { claude: m.claude } : {}), ...(m.version !== undefined ? { version: m.version } : {}) } : null; } catch { return null; }
@@ -27,6 +27,7 @@ export function connectHelper(token: string, onState: (s: HelperState) => void):
   open();
   return {
     close: () => { stop = true; if (timer) clearTimeout(timer); ws?.close(); },
+    prewarm: () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'prewarm' })); },
     say: (system, request, onEvent) => { if (!ws || ws.readyState !== WebSocket.OPEN) return onEvent({ kind: 'error', text: 'helper offline' }); const id = `s${++n}`; pending.set(id, onEvent); ws.send(JSON.stringify({ type: 'say', id, system, request })); },
   };
 }
