@@ -1,0 +1,1095 @@
+  error: subprocess-exited-with-error
+  
+  × Building wheel for sentencepiece (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [1081 lines of output]
+      running bdist_wheel
+      running build
+      running build_py
+      creating build/lib.macosx-15.0-arm64-cpython-315/sentencepiece
+      copying src/sentencepiece/__init__.py -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece
+      copying src/sentencepiece/_version.py -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece
+      copying src/sentencepiece/sentencepiece_model_pb2.py -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece
+      copying src/sentencepiece/sentencepiece_pb2.py -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece
+      running egg_info
+      writing src/sentencepiece.egg-info/PKG-INFO
+      writing dependency_links to src/sentencepiece.egg-info/dependency_links.txt
+      writing requirements to src/sentencepiece.egg-info/requires.txt
+      writing top-level names to src/sentencepiece.egg-info/top_level.txt
+      reading manifest file 'src/sentencepiece.egg-info/SOURCES.txt'
+      reading manifest template 'MANIFEST.in'
+      writing manifest file 'src/sentencepiece.egg-info/SOURCES.txt'
+      copying src/sentencepiece/__init__.pyi -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece
+      copying src/sentencepiece/py.typed -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece
+      copying src/sentencepiece/sentencepiece_pybind.cc -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece
+      creating build/lib.macosx-15.0-arm64-cpython-315/sentencepiece/package_data
+      copying src/sentencepiece/package_data/nfkc.bin -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece/package_data
+      copying src/sentencepiece/package_data/nfkc_cf.bin -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece/package_data
+      copying src/sentencepiece/package_data/nmt_nfkc.bin -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece/package_data
+      copying src/sentencepiece/package_data/nmt_nfkc_cf.bin -> build/lib.macosx-15.0-arm64-cpython-315/sentencepiece/package_data
+      running build_ext
+      -- VERSION: 0.2.2
+      -- The C compiler identification is AppleClang 17.0.0.17000013
+      -- The CXX compiler identification is AppleClang 17.0.0.17000013
+      -- Detecting C compiler ABI info
+      -- Detecting C compiler ABI info - done
+      -- Check for working C compiler: /Library/Developer/CommandLineTools/usr/bin/cc - skipped
+      -- Detecting C compile features
+      -- Detecting C compile features - done
+      -- Detecting CXX compiler ABI info
+      -- Detecting CXX compiler ABI info - done
+      -- Check for working CXX compiler: /Library/Developer/CommandLineTools/usr/bin/c++ - skipped
+      -- Detecting CXX compile features
+      -- Detecting CXX compile features - done
+      -- Populating abseil-cpp
+      -- Configuring done (0.0s)
+      -- Generating done (0.0s)
+      -- Build files have been written to: /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/build/abseil-cpp-subbuild
+      [ 11%] Creating directories for 'abseil-cpp-populate'
+      [ 22%] Performing download step (git clone) for 'abseil-cpp-populate'
+      Cloning into 'abseil-cpp'...
+      remote: Enumerating objects: 41706, done.
+      remote: Counting objects:   0% (1/485)
+      remote: Counting objects:   1% (5/485)
+      remote: Counting objects:   2% (10/485)
+      remote: Counting objects:   3% (15/485)
+      remote: Counting objects:   4% (20/485)
+      remote: Counting objects:   5% (25/485)
+      remote: Counting objects:   6% (30/485)
+      remote: Counting objects:   7% (34/485)
+      remote: Counting objects:   8% (39/485)
+      remote: Counting objects:   9% (44/485)
+      remote: Counting objects:  10% (49/485)
+      remote: Counting objects:  11% (54/485)
+      remote: Counting objects:  12% (59/485)
+      remote: Counting objects:  13% (64/485)
+      remote: Counting objects:  14% (68/485)
+      remote: Counting objects:  15% (73/485)
+      remote: Counting objects:  16% (78/485)
+      remote: Counting objects:  17% (83/485)
+      remote: Counting objects:  18% (88/485)
+      remote: Counting objects:  19% (93/485)
+      remote: Counting objects:  20% (97/485)
+      remote: Counting objects:  21% (102/485)
+      remote: Counting objects:  22% (107/485)
+      remote: Counting objects:  23% (112/485)
+      remote: Counting objects:  24% (117/485)
+      remote: Counting objects:  25% (122/485)
+      remote: Counting objects:  26% (127/485)
+      remote: Counting objects:  27% (131/485)
+      remote: Counting objects:  28% (136/485)
+      remote: Counting objects:  29% (141/485)
+      remote: Counting objects:  30% (146/485)
+      remote: Counting objects:  31% (151/485)
+      remote: Counting objects:  32% (156/485)
+      remote: Counting objects:  33% (161/485)
+      remote: Counting objects:  34% (165/485)
+      remote: Counting objects:  35% (170/485)
+      remote: Counting objects:  36% (175/485)
+      remote: Counting objects:  37% (180/485)
+      remote: Counting objects:  38% (185/485)
+      remote: Counting objects:  39% (190/485)
+      remote: Counting objects:  40% (194/485)
+      remote: Counting objects:  41% (199/485)
+      remote: Counting objects:  42% (204/485)
+      remote: Counting objects:  43% (209/485)
+      remote: Counting objects:  44% (214/485)
+      remote: Counting objects:  45% (219/485)
+      remote: Counting objects:  46% (224/485)
+      remote: Counting objects:  47% (228/485)
+      remote: Counting objects:  48% (233/485)
+      remote: Counting objects:  49% (238/485)
+      remote: Counting objects:  50% (243/485)
+      remote: Counting objects:  51% (248/485)
+      remote: Counting objects:  52% (253/485)
+      remote: Counting objects:  53% (258/485)
+      remote: Counting objects:  54% (262/485)
+      remote: Counting objects:  55% (267/485)
+      remote: Counting objects:  56% (272/485)
+      remote: Counting objects:  57% (277/485)
+      remote: Counting objects:  58% (282/485)
+      remote: Counting objects:  59% (287/485)
+      remote: Counting objects:  60% (291/485)
+      remote: Counting objects:  61% (296/485)
+      remote: Counting objects:  62% (301/485)
+      remote: Counting objects:  63% (306/485)
+      remote: Counting objects:  64% (311/485)
+      remote: Counting objects:  65% (316/485)
+      remote: Counting objects:  66% (321/485)
+      remote: Counting objects:  67% (325/485)
+      remote: Counting objects:  68% (330/485)
+      remote: Counting objects:  69% (335/485)
+      remote: Counting objects:  70% (340/485)
+      remote: Counting objects:  71% (345/485)
+      remote: Counting objects:  72% (350/485)
+      remote: Counting objects:  73% (355/485)
+      remote: Counting objects:  74% (359/485)
+      remote: Counting objects:  75% (364/485)
+      remote: Counting objects:  76% (369/485)
+      remote: Counting objects:  77% (374/485)
+      remote: Counting objects:  78% (379/485)
+      remote: Counting objects:  79% (384/485)
+      remote: Counting objects:  80% (388/485)
+      remote: Counting objects:  81% (393/485)
+      remote: Counting objects:  82% (398/485)
+      remote: Counting objects:  83% (403/485)
+      remote: Counting objects:  84% (408/485)
+      remote: Counting objects:  85% (413/485)
+      remote: Counting objects:  86% (418/485)
+      remote: Counting objects:  87% (422/485)
+      remote: Counting objects:  88% (427/485)
+      remote: Counting objects:  89% (432/485)
+      remote: Counting objects:  90% (437/485)
+      remote: Counting objects:  91% (442/485)
+      remote: Counting objects:  92% (447/485)
+      remote: Counting objects:  93% (452/485)
+      remote: Counting objects:  94% (456/485)
+      remote: Counting objects:  95% (461/485)
+      remote: Counting objects:  96% (466/485)
+      remote: Counting objects:  97% (471/485)
+      remote: Counting objects:  98% (476/485)
+      remote: Counting objects:  99% (481/485)
+      remote: Counting objects: 100% (485/485)
+      remote: Counting objects: 100% (485/485), done.
+      remote: Compressing objects:   0% (1/182)
+      remote: Compressing objects:   1% (2/182)
+      remote: Compressing objects:   2% (4/182)
+      remote: Compressing objects:   3% (6/182)
+      remote: Compressing objects:   4% (8/182)
+      remote: Compressing objects:   5% (10/182)
+      remote: Compressing objects:   6% (11/182)
+      remote: Compressing objects:   7% (13/182)
+      remote: Compressing objects:   8% (15/182)
+      remote: Compressing objects:   9% (17/182)
+      remote: Compressing objects:  10% (19/182)
+      remote: Compressing objects:  11% (21/182)
+      remote: Compressing objects:  12% (22/182)
+      remote: Compressing objects:  13% (24/182)
+      remote: Compressing objects:  14% (26/182)
+      remote: Compressing objects:  15% (28/182)
+      remote: Compressing objects:  16% (30/182)
+      remote: Compressing objects:  17% (31/182)
+      remote: Compressing objects:  18% (33/182)
+      remote: Compressing objects:  19% (35/182)
+      remote: Compressing objects:  20% (37/182)
+      remote: Compressing objects:  21% (39/182)
+      remote: Compressing objects:  22% (41/182)
+      remote: Compressing objects:  23% (42/182)
+      remote: Compressing objects:  24% (44/182)
+      remote: Compressing objects:  25% (46/182)
+      remote: Compressing objects:  26% (48/182)
+      remote: Compressing objects:  27% (50/182)
+      remote: Compressing objects:  28% (51/182)
+      remote: Compressing objects:  29% (53/182)
+      remote: Compressing objects:  30% (55/182)
+      remote: Compressing objects:  31% (57/182)
+      remote: Compressing objects:  32% (59/182)
+      remote: Compressing objects:  33% (61/182)
+      remote: Compressing objects:  34% (62/182)
+      remote: Compressing objects:  35% (64/182)
+      remote: Compressing objects:  36% (66/182)
+      remote: Compressing objects:  37% (68/182)
+      remote: Compressing objects:  38% (70/182)
+      remote: Compressing objects:  39% (71/182)
+      remote: Compressing objects:  40% (73/182)
+      remote: Compressing objects:  41% (75/182)
+      remote: Compressing objects:  42% (77/182)
+      remote: Compressing objects:  43% (79/182)
+      remote: Compressing objects:  44% (81/182)
+      remote: Compressing objects:  45% (82/182)
+      remote: Compressing objects:  46% (84/182)
+      remote: Compressing objects:  47% (86/182)
+      remote: Compressing objects:  48% (88/182)
+      remote: Compressing objects:  49% (90/182)
+      remote: Compressing objects:  50% (91/182)
+      remote: Compressing objects:  51% (93/182)
+      remote: Compressing objects:  52% (95/182)
+      remote: Compressing objects:  53% (97/182)
+      remote: Compressing objects:  54% (99/182)
+      remote: Compressing objects:  55% (101/182)
+      remote: Compressing objects:  56% (102/182)
+      remote: Compressing objects:  57% (104/182)
+      remote: Compressing objects:  58% (106/182)
+      remote: Compressing objects:  59% (108/182)
+      remote: Compressing objects:  60% (110/182)
+      remote: Compressing objects:  61% (112/182)
+      remote: Compressing objects:  62% (113/182)
+      remote: Compressing objects:  63% (115/182)
+      remote: Compressing objects:  64% (117/182)
+      remote: Compressing objects:  65% (119/182)
+      remote: Compressing objects:  66% (121/182)
+      remote: Compressing objects:  67% (122/182)
+      remote: Compressing objects:  68% (124/182)
+      remote: Compressing objects:  69% (126/182)
+      remote: Compressing objects:  70% (128/182)
+      remote: Compressing objects:  71% (130/182)
+      remote: Compressing objects:  72% (132/182)
+      remote: Compressing objects:  73% (133/182)
+      remote: Compressing objects:  74% (135/182)
+      remote: Compressing objects:  75% (137/182)
+      remote: Compressing objects:  76% (139/182)
+      remote: Compressing objects:  77% (141/182)
+      remote: Compressing objects:  78% (142/182)
+      remote: Compressing objects:  79% (144/182)
+      remote: Compressing objects:  80% (146/182)
+      remote: Compressing objects:  81% (148/182)
+      remote: Compressing objects:  82% (150/182)
+      remote: Compressing objects:  83% (152/182)
+      remote: Compressing objects:  84% (153/182)
+      remote: Compressing objects:  85% (155/182)
+      remote: Compressing objects:  86% (157/182)
+      remote: Compressing objects:  87% (159/182)
+      remote: Compressing objects:  88% (161/182)
+      remote: Compressing objects:  89% (162/182)
+      remote: Compressing objects:  90% (164/182)
+      remote: Compressing objects:  91% (166/182)
+      remote: Compressing objects:  92% (168/182)
+      remote: Compressing objects:  93% (170/182)
+      remote: Compressing objects:  94% (172/182)
+      remote: Compressing objects:  95% (173/182)
+      remote: Compressing objects:  96% (175/182)
+      remote: Compressing objects:  97% (177/182)
+      remote: Compressing objects:  98% (179/182)
+      remote: Compressing objects:  99% (181/182)
+      remote: Compressing objects: 100% (182/182)
+      remote: Compressing objects: 100% (182/182), done.
+      Receiving objects:   0% (1/41706)
+      Receiving objects:   1% (418/41706)
+      Receiving objects:   2% (835/41706)
+      Receiving objects:   3% (1252/41706)
+      Receiving objects:   4% (1669/41706)
+      Receiving objects:   5% (2086/41706)
+      Receiving objects:   6% (2503/41706)
+      Receiving objects:   7% (2920/41706)
+      Receiving objects:   8% (3337/41706)
+      Receiving objects:   9% (3754/41706)
+      Receiving objects:  10% (4171/41706)
+      Receiving objects:  11% (4588/41706)
+      Receiving objects:  12% (5005/41706)
+      Receiving objects:  13% (5422/41706)
+      Receiving objects:  14% (5839/41706)
+      Receiving objects:  15% (6256/41706)
+      Receiving objects:  16% (6673/41706)
+      Receiving objects:  17% (7091/41706)
+      Receiving objects:  18% (7508/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  19% (7925/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  20% (8342/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  21% (8759/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  22% (9176/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  23% (9593/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  24% (10010/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  25% (10427/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  26% (10844/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  27% (11261/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  28% (11678/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  29% (12095/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  30% (12512/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  31% (12929/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  32% (13346/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  33% (13763/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  34% (14181/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  35% (14598/41706), 5.51 MiB | 11.00 MiB/s
+      Receiving objects:  35% (14634/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  36% (15015/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  37% (15432/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  38% (15849/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  39% (16266/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  40% (16683/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  41% (17100/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  42% (17517/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  43% (17934/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  44% (18351/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  45% (18768/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  46% (19185/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  47% (19602/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  48% (20019/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  49% (20436/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  50% (20853/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  51% (21271/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  52% (21688/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  53% (22105/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  54% (22522/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  55% (22939/41706), 11.46 MiB | 11.46 MiB/s
+      Receiving objects:  56% (23356/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  57% (23773/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  58% (24190/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  59% (24607/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  60% (25024/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  61% (25441/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  62% (25858/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  63% (26275/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  64% (26692/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  65% (27109/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  66% (27526/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  67% (27944/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  68% (28361/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  69% (28778/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  70% (29195/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  71% (29612/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  72% (30029/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  73% (30446/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  74% (30863/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  75% (31280/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  76% (31697/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  77% (32114/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  78% (32531/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  79% (32948/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  80% (33365/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  81% (33782/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  82% (34199/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  83% (34616/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  84% (35034/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  85% (35451/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  86% (35868/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  87% (36285/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  88% (36702/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  89% (37119/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  90% (37536/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  91% (37953/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  92% (38370/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  93% (38787/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  94% (39204/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  95% (39621/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  96% (40038/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  97% (40455/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  98% (40872/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  98% (41173/41706), 17.29 MiB | 11.52 MiB/s
+      Receiving objects:  99% (41289/41706), 22.99 MiB | 11.48 MiB/s
+      remote: Total 41706 (delta 388), reused 317 (delta 303), pack-reused 41221 (from 3)
+      Receiving objects: 100% (41706/41706), 22.99 MiB | 11.48 MiB/s
+      Receiving objects: 100% (41706/41706), 23.65 MiB | 11.48 MiB/s, done.
+      Resolving deltas:   0% (0/33089)
+      Resolving deltas:   1% (332/33089)
+      Resolving deltas:   2% (663/33089)
+      Resolving deltas:   3% (993/33089)
+      Resolving deltas:   4% (1325/33089)
+      Resolving deltas:   5% (1658/33089)
+      Resolving deltas:   6% (1987/33089)
+      Resolving deltas:   7% (2318/33089)
+      Resolving deltas:   8% (2648/33089)
+      Resolving deltas:   9% (2979/33089)
+      Resolving deltas:  10% (3309/33089)
+      Resolving deltas:  11% (3640/33089)
+      Resolving deltas:  12% (3971/33089)
+      Resolving deltas:  13% (4302/33089)
+      Resolving deltas:  14% (4634/33089)
+      Resolving deltas:  15% (4964/33089)
+      Resolving deltas:  16% (5295/33089)
+      Resolving deltas:  17% (5627/33089)
+      Resolving deltas:  18% (5957/33089)
+      Resolving deltas:  19% (6291/33089)
+      Resolving deltas:  20% (6619/33089)
+      Resolving deltas:  21% (6950/33089)
+      Resolving deltas:  22% (7280/33089)
+      Resolving deltas:  23% (7611/33089)
+      Resolving deltas:  24% (7942/33089)
+      Resolving deltas:  25% (8273/33089)
+      Resolving deltas:  26% (8607/33089)
+      Resolving deltas:  27% (8935/33089)
+      Resolving deltas:  28% (9265/33089)
+      Resolving deltas:  29% (9596/33089)
+      Resolving deltas:  30% (9927/33089)
+      Resolving deltas:  31% (10258/33089)
+      Resolving deltas:  32% (10589/33089)
+      Resolving deltas:  33% (10920/33089)
+      Resolving deltas:  34% (11252/33089)
+      Resolving deltas:  35% (11582/33089)
+      Resolving deltas:  36% (11913/33089)
+      Resolving deltas:  37% (12243/33089)
+      Resolving deltas:  38% (12575/33089)
+      Resolving deltas:  39% (12905/33089)
+      Resolving deltas:  40% (13236/33089)
+      Resolving deltas:  41% (13567/33089)
+      Resolving deltas:  42% (13901/33089)
+      Resolving deltas:  43% (14230/33089)
+      Resolving deltas:  44% (14561/33089)
+      Resolving deltas:  45% (14891/33089)
+      Resolving deltas:  46% (15223/33089)
+      Resolving deltas:  47% (15553/33089)
+      Resolving deltas:  48% (15883/33089)
+      Resolving deltas:  49% (16214/33089)
+      Resolving deltas:  50% (16546/33089)
+      Resolving deltas:  51% (16876/33089)
+      Resolving deltas:  52% (17209/33089)
+      Resolving deltas:  53% (17542/33089)
+      Resolving deltas:  54% (17869/33089)
+      Resolving deltas:  55% (18199/33089)
+      Resolving deltas:  56% (18530/33089)
+      Resolving deltas:  57% (18861/33089)
+      Resolving deltas:  58% (19194/33089)
+      Resolving deltas:  59% (19523/33089)
+      Resolving deltas:  60% (19854/33089)
+      Resolving deltas:  61% (20185/33089)
+      Resolving deltas:  62% (20517/33089)
+      Resolving deltas:  63% (20847/33089)
+      Resolving deltas:  64% (21177/33089)
+      Resolving deltas:  65% (21508/33089)
+      Resolving deltas:  66% (21839/33089)
+      Resolving deltas:  67% (22172/33089)
+      Resolving deltas:  68% (22502/33089)
+      Resolving deltas:  69% (22832/33089)
+      Resolving deltas:  70% (23163/33089)
+      Resolving deltas:  71% (23495/33089)
+      Resolving deltas:  72% (23825/33089)
+      Resolving deltas:  73% (24155/33089)
+      Resolving deltas:  74% (24486/33089)
+      Resolving deltas:  75% (24817/33089)
+      Resolving deltas:  76% (25148/33089)
+      Resolving deltas:  77% (25479/33089)
+      Resolving deltas:  78% (25812/33089)
+      Resolving deltas:  79% (26141/33089)
+      Resolving deltas:  80% (26472/33089)
+      Resolving deltas:  81% (26803/33089)
+      Resolving deltas:  82% (27133/33089)
+      Resolving deltas:  83% (27465/33089)
+      Resolving deltas:  84% (27795/33089)
+      Resolving deltas:  85% (28126/33089)
+      Resolving deltas:  86% (28457/33089)
+      Resolving deltas:  87% (28788/33089)
+      Resolving deltas:  88% (29119/33089)
+      Resolving deltas:  89% (29450/33089)
+      Resolving deltas:  90% (29781/33089)
+      Resolving deltas:  91% (30111/33089)
+      Resolving deltas:  92% (30442/33089)
+      Resolving deltas:  93% (30773/33089)
+      Resolving deltas:  94% (31105/33089)
+      Resolving deltas:  95% (31435/33089)
+      Resolving deltas:  96% (31768/33089)
+      Resolving deltas:  97% (32099/33089)
+      Resolving deltas:  98% (32428/33089)
+      Resolving deltas:  99% (32759/33089)
+      Resolving deltas: 100% (33089/33089)
+      Resolving deltas: 100% (33089/33089), done.
+      HEAD is now at 5650e9cf Remove an obsolete //visibility:private tag (#2070)
+      [ 33%] Performing update step for 'abseil-cpp-populate'
+      -- Already at requested tag: 20260526.0
+      [ 44%] No patch step for 'abseil-cpp-populate'
+      [ 55%] No configure step for 'abseil-cpp-populate'
+      [ 66%] No build step for 'abseil-cpp-populate'
+      [ 77%] No install step for 'abseil-cpp-populate'
+      [ 88%] No test step for 'abseil-cpp-populate'
+      [100%] Completed 'abseil-cpp-populate'
+      [100%] Built target abseil-cpp-populate
+      -- Performing Test ABSL_INTERNAL_AT_LEAST_CXX17
+      -- Performing Test ABSL_INTERNAL_AT_LEAST_CXX17 - Success
+      -- Performing Test ABSL_INTERNAL_AT_LEAST_CXX20
+      -- Performing Test ABSL_INTERNAL_AT_LEAST_CXX20 - Failed
+      -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+      -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+      -- Found Threads: TRUE
+      -- Not Found TCMalloc: TCMALLOC_LIB-NOTFOUND
+      -- Configuring done (5.3s)
+      -- Generating done (0.6s)
+      -- Build files have been written to: /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/build
+      ./build_bundled.sh: line 27: nproc: command not found
+      [  1%] Building CXX object third_party/abseil-cpp/absl/base/CMakeFiles/absl_log_severity.dir/log_severity.cc.o
+      [  1%] Building CXX object third_party/abseil-cpp/absl/types/CMakeFiles/absl_source_location.dir/source_location.cc.o
+      [  1%] Building CXX object third_party/abseil-cpp/absl/debugging/CMakeFiles/absl_leak_check.dir/leak_check.cc.o
+      [  2%] Building CXX object third_party/abseil-cpp/absl/base/CMakeFiles/absl_spinlock_wait.dir/internal/spinlock_wait.cc.o
+      [  3%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_civil_time.dir/internal/cctz/src/civil_time_detail.cc.o
+      [  4%] Building CXX object third_party/abseil-cpp/absl/log/CMakeFiles/absl_log_internal_nullguard.dir/internal/nullguard.cc.o
+      [  4%] Building CXX object third_party/abseil-cpp/absl/debugging/CMakeFiles/absl_utf8_for_code_point.dir/internal/utf8_for_code_point.cc.o
+      [  4%] Building CXX object third_party/abseil-cpp/absl/flags/CMakeFiles/absl_flags_commandlineflag_internal.dir/internal/commandlineflag.cc.o
+      [  5%] Generating modified sentencepiece_processor.h for installation
+      [  5%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_libc.cc.o
+      [  6%] Building CXX object third_party/abseil-cpp/absl/base/CMakeFiles/absl_strerror.dir/internal/strerror.cc.o
+      [  7%] Generating modified sentencepiece_trainer.h for installation
+      [  7%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_if.cc.o
+      [  7%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_fixed.cc.o
+      [  8%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_impl.cc.o
+      [  8%] Building CXX object third_party/abseil-cpp/absl/profiling/CMakeFiles/absl_exponential_biased.dir/internal/exponential_biased.cc.o
+      [  9%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/arenastring.cc.o
+      [  9%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_info.cc.o
+      [  9%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_format.cc.o
+      [ 10%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_enum_util.cc.o
+      [ 10%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/zone_info_source.cc.o
+      [ 10%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/common.cc.o
+      [ 10%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_posix.cc.o
+      [ 10%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/extension_set.cc.o
+      [ 10%] Building CXX object third_party/abseil-cpp/absl/random/CMakeFiles/absl_random_internal_platform.dir/internal/randen_round_keys.cc.o
+      [ 10%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/coded_stream.cc.o
+      [ 11%] Building CXX object third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_lookup.cc.o
+      [ 11%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/bytestream.cc.o
+      [ 11%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/arena.cc.o
+      [ 12%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/int128.cc.o
+      [ 12%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/repeated_field.cc.o
+      [ 12%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/implicit_weak_message.cc.o
+      [ 12%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/message_lite.cc.o
+      [ 12%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_message_util.cc.o
+      [ 12%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/status.cc.o
+      [ 12%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/io_win32.cc.o
+      [ 13%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_message_table_driven_lite.cc.o
+      [ 14%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/parse_context.cc.o
+      [ 14%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/structurally_valid.cc.o
+      [ 14%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/statusor.cc.o
+      [ 15%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/stringpiece.cc.o
+      [ 15%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/stringprintf.cc.o
+      [ 16%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/strutil.cc.o
+      [ 17%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/trainer_factory.cc.o
+      [ 17%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/trainer_interface.cc.o
+      [ 17%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/wire_format_lite.cc.o
+      [ 18%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/time.cc.o
+      [ 18%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/bpe_model_trainer.cc.o
+      [ 18%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/sentencepiece_trainer.cc.o
+      [ 19%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/word_model_trainer.cc.o
+      [ 20%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream.cc.o
+      [ 20%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/builder.cc.o
+      [ 20%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/char_model_trainer.cc.o
+      [ 20%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/pretokenizer_for_training.cc.o
+      [ 20%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/builtin_pb/sentencepiece_model.pb.cc.o
+      [ 20%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream_impl.cc.o
+      [ 20%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/unicode_script.cc.o
+      [ 21%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/builtin_pb/sentencepiece.pb.cc.o
+      [ 21%] Building CXX object src/CMakeFiles/sentencepiece_train-static.dir/unigram_model_trainer.cc.o
+      [ 21%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream_impl_lite.cc.o
+      [ 21%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/filesystem.cc.o
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/internal/strerror.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/internal/strerror.h:18:10: fatal error: 'string' file not found
+         18 | #include <string>
+            |          ^~~~~~~~
+      [ 22%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/char_model.cc.o
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/arenastring.cc:31:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/arenastring.h:34:10: fatal error: 'string' file not found
+         34 | #include <string>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/random/internal/randen_round_keys.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/random/internal/randen_traits.h:23:10: fatal error: 'cstddef' file not found
+         23 | #include <cstddef>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_libc.cc:19:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_libc.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      [ 22%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/init.cc.o
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/arena.cc:31:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/arena.h:37:10: fatal error: 'limits' file not found
+         37 | #include <limits[ 22%] Built target generate_installed_headers
+      1>
+            |          ^~~~~~~~
+       error generated.
+      [ 22%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/model_interface.cc.o
+      [ 23%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/bpe_model.cc.o
+      [ 23%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/model_factory.cc.o
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/int128.cc:31:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/int128.h:33:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/common.h:38:10: fatal error: 'algorithm' file not found
+         38 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      [ 24%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/sentencepiece_processor.cc.o
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/types/source_location.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/types/source_location.h:45:10: fatal error: 'cstdint' file not found
+         45 | #include <cstdint>
+            |          ^~~~~~~~~
+      [ 24%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/unigram_model.cc.o
+      [ 24%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/util.cc.o
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/log/internal/nullguard.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/log/internal/nullguard.h:27:10: fatal error: 'array' file not found
+         27 | #include <array>
+            |          ^~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/repeated_field.cc:35:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:49:10: fatal error: 'utility' file not found
+         49 | #include <utility>
+            |          ^~~~~~~~~
+      [ 24%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/word_model.cc.o
+      [ 24%] Building CXX object src/CMakeFiles/sentencepiece-static.dir/normalizer.cc.o
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_posix.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_posix.h:55:10: fatal error: 'cstdint' file not found
+         55 | #include <cstdint>
+            |          ^~~~~~~~~
+      gmake[2]: *** [third_party/abseil-cpp/absl/random/CMakeFiles/absl_random_internal_platform.dir/build.make:79: third_party/abseil-cpp/absl/random/CMakeFiles/absl_random_internal_platform.dir/internal/randen_round_keys.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:4931: third_party/abseil-cpp/absl/random/CMakeFiles/absl_random_internal_platform.dir/all] Error 2
+      gmake[1]: *** Waiting for unfinished jobs....
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/pretokenizer_for_training.cc:14:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/pretokenizer_for_training.h:18:10: gmake[2]: *** [third_party/abseil-cpp/absl/base/CMakeFiles/absl_strerror.dir/build.make:79: third_party/abseil-cpp/absl/base/CMakeFiles/absl_strerror.dir/internal/strerror.cc.o] Error 1
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/extension_set.cc:35:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/extension_set.h:41:10: fatal error: 'algorithm' file not found
+         41 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_if.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_if.h:18:10: fatal error: 'chrono' file not found
+         18 | #include <chrono>
+            |          ^~~~~~~~
+      fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_format.cc:29:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/config.h:56:10: fatal error: 'cstddef' file not found
+         56 | #include <cstddef>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/structurally_valid.cc:33:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/common.h:38:10: fatal error: 'algorithm' file not found
+         38 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      gmake[1]: *** [CMakeFiles/Makefile2:2060: third_party/abseil-cpp/absl/base/CMakeFiles/absl_strerror.dir/all] Error 2
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/implicit_weak_message.cc:31:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/implicit_weak_message.h:34:10: fatal error: 'string' file not found
+         34 | #include <string>
+            |          ^~~~~~~~
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/internal/spinlock_wait.cc:19:10: fatal error: 'atomic' file not found
+         19 | #include <atomic>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/debugging/leak_check.cc:21:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/debugging/leak_check.h:50:10: fatal error: 'cstddef' file not found
+         50 | #include <cstddef>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/status.cc:30:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/status.h:33:10: fatal error: 'iosfwd' file not found
+         33 | #include <iosfwd>
+            |          ^~~~~~~~
+      1 error generated.
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:177: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_posix.cc.o] Error 1
+      gmake[2]: *** Waiting for unfinished jobs....
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/profiling/internal/exponential_biased.cc:15:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/profiling/internal/exponential_biased.h:20:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/config.h:56:10: fatal error: 'cstddef' file not found
+         56 | #include <cstddef>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/builtin_pb/sentencepiece_model.pb.cc:4:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/builtin_pb/sentencepiece_model.pb.h:7:10: fatal error: 'limits' file not found
+          7 | #include <limits>
+            |          ^~~~~~~~
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/civil_time_detail.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/include/cctz/civil_time_detail.h:18:10: fatal error: 'cstdint' file not found
+         18 | #include <cstdint>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/flags/internal/commandlineflag.cc:16:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/flags/internal/commandlineflag.h:19:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/config.h:56:10: fatal error: 'cstddef' file not found
+         56 | #include <cstddef>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_lookup.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/config.h:56:10: fatal error: 'cstddef' file not found
+         56 | #include <cstddef>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/coded_stream.cc:41:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/io/coded_stream.h:115:10: fatal error: 'atomic' file not found
+        115 | #include <atomic>
+            |          ^~~~~~~~
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_impl.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_impl.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/wire_format_lite.cc:35:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/wire_format_lite.h:43:10: fatal error: 'string' file not found
+         43 | #include <string>
+            |          ^~~~~~~~
+      gmake[2]: *** [third_party/abseil-cpp/absl/types/CMakeFiles/absl_source_location.dir/build.make:79: third_party/abseil-cpp/absl/types/CMakeFiles/absl_source_location.dir/source_location.cc.o] Error 1
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_fixed.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_fixed.h:18:10: fatal error: 'string' file not found
+         18 | #include <string>
+            |          ^~~~~~~~
+      gmake[1]: *** [CMakeFiles/Makefile2:6135: third_party/abseil-cpp/absl/types/CMakeFiles/absl_source_location.dir/all] Error 2
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/bytestream.cc:31:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/bytestream.h:54:10: fatal error: 'string' file not found
+         54 | #include <string>
+            |          ^~~~~~~~
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/common.cc:33:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/common.h:38:10: fatal error: 'algorithm' file not found
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/statusor.cc:31:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/statusor.h:86:10: fatal error: 'new' file not found
+         86 | #include <new>
+            |          ^~~~~
+         38 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/debugging/internal/utf8_for_code_point.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/debugging/internal/utf8_for_code_point.h:18:10: fatal error: 'cstdint' file not found
+         18 | #include <cstdint>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/log_severity.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/base/log_severity.h:18:10: fatal error: 'array' file not found
+         18 | #include <array>
+            |          ^~~~~~~
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [third_party/abseil-cpp/absl/flags/CMakeFiles/absl_flags_commandlineflag_internal.dir/build.make:79: third_party/abseil-cpp/absl/flags/CMakeFiles/absl_flags_commandlineflag_internal.dir/internal/commandlineflag.cc.o] Error 1
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/parse_context.cc:31:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/parse_context.h:34:10: fatal error: 'cstdint' file not found
+         34 | #include <cstdint>
+            |          ^~~~~~~~~
+      gmake[1]: *** [CMakeFiles/Makefile2:2986: third_party/abseil-cpp/absl/flags/CMakeFiles/absl_flags_commandlineflag_internal.dir/all] Error 2
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/trainer_interface.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/trainer_interface.h:18:10: fatal error: 'algorithm' file not found
+         18 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      1 error generated.
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/generated_message_table_driven_lite.cc:31:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/generated_message_table_driven_lite.h:34:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/io/zero_copy_stream_impl_lite.h:48:10: fatal error: 'iosfwd' file not found
+         48 | #include <iosfwd>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/zone_info_source.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/include/cctz/zone_info_source.h:18:10: fatal error: 'cstddef' file not found
+         18 | #include <cstddef>
+            |          ^~~~~~~~~
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:219: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/int128.cc.o] Error 1
+      gmake[2]: *** Waiting for unfinished jobs....
+      11 error generated.
+       error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/bpe_model_trainer.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/bpe_model_trainer.h:18:10: fatal error: 'cstdint' file not found
+         18 | #include <cstdint>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/unicode_script.cc:15:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/unicode_script.h:18:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/common.h:18:10: fatal error: 'cstdint' file not found
+         18 | #include <cstdint>
+            |          ^~~~~~~~~
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:79: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_fixed.cc.o] Error 1
+      gmake[2]: *** [third_party/abseil-cpp/absl/debugging/CMakeFiles/absl_utf8_for_code_point.dir/build.make:79: third_party/abseil-cpp/absl/debugging/CMakeFiles/absl_utf8_for_code_point.dir/internal/utf8_for_code_point.cc.o] Error 1
+      1 error generated.
+      1 error generated.
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/message_lite.cc:36:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/message_lite.h:42:10: fatal error: 'climits' file not found
+         42 | #include <climits>
+            |          ^~~~~~~~~
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/generated_message_util.cc:35:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/generated_message_util.h:43:10: fatal error: 'atomic' file not found
+         43 | #include <atomic>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/generated_enum_util.cc:31:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/generated_enum_util.h:34:10: fatal error: 'type_traits' file not found
+         34 | #include <type_traits>
+            |          ^~~~~~~~~~~~~
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/char_model.cc:15:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/char_model.h:18:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/model_interface.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:93: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_format.cc.o] Error 1
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_info.cc:33:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/abseil-cpp/absl/time/internal/cctz/src/time_zone_info.h:18:10: fatal error: 'atomic' file not found
+         18 | #include <atomic>
+            |          ^~~~~~~~
+      gmake[2]: *** [third_party/abseil-cpp/absl/log/CMakeFiles/absl_log_internal_nullguard.dir/build.make:79: third_party/abseil-cpp/absl/log/CMakeFiles/absl_log_internal_nullguard.dir/internal/nullguard.cc.o] Error 1
+      gmake[2]: *** [third_party/abseil-cpp/absl/profiling/CMakeFiles/absl_exponential_biased.dir/build.make:79: third_party/abseil-cpp/absl/profiling/CMakeFiles/absl_exponential_biased.dir/internal/exponential_biased.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:2770: third_party/abseil-cpp/absl/debugging/CMakeFiles/absl_utf8_for_code_point.dir/all] Error 2
+      gmake[1]: *** [CMakeFiles/Makefile2:4488: third_party/abseil-cpp/absl/profiling/CMakeFiles/absl_exponential_biased.dir/all] Error 2
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:149: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_libc.cc.o] Error 1
+      1 error generated.
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:289: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/status.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [third_party/abseil-cpp/absl/base/CMakeFiles/absl_spinlock_wait.dir/build.make:79: third_party/abseil-cpp/absl/base/CMakeFiles/absl_spinlock_wait.dir/internal/spinlock_wait.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:1893: third_party/abseil-cpp/absl/base/CMakeFiles/absl_spinlock_wait.dir/all] Error 2
+      gmake[2]: *** [third_party/abseil-cpp/absl/debugging/CMakeFiles/absl_leak_check.dir/build.make:79: third_party/abseil-cpp/absl/debugging/CMakeFiles/absl_leak_check.dir/leak_check.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:2802: third_party/abseil-cpp/absl/debugging/CMakeFiles/absl_leak_check.dir/all] Error 2
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:303: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/statusor.cc.o] Error 1
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:107: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_if.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:3921: third_party/abseil-cpp/absl/log/CMakeFiles/absl_log_internal_nullguard.dir/all] Error 2
+      gmake[2]: *** [third_party/abseil-cpp/absl/base/CMakeFiles/absl_log_severity.dir/build.make:79: third_party/abseil-cpp/absl/base/CMakeFiles/absl_log_severity.dir/log_severity.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:1829: third_party/abseil-cpp/absl/base/CMakeFiles/absl_log_severity.dir/all] Error 2
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:107: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/bytestream.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:121: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_impl.cc.o] Error 1
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:191: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/zone_info_source.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:93: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/arenastring.cc.o] Error 1
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/word_model_trainer.cc:15:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/word_model_trainer.h:18:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/builtin_pb/sentencepiece_model.pb.h:7:10: fatal error: 'limits' file not found
+          7 | #include <limits>
+            |          ^~~~~~~~
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:163: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_lookup.cc.o] Error 1
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/word_model.cc:15:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/word_model.h:18:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/model_interface.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/stringprintf.cc:33:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/stringprintf.h:44:10: fatal error: 'string' file not found
+         44 | #include <string>
+            |          ^~~~~~~~
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:275: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/repeated_field.cc.o] Error 1
+      In file included from In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/strutil.cc:33:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/strutil.h:36:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/common.h:38:10: fatal error: 'algorithm' file not found
+         38 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/normalizer.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/normalizer.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/unigram_model.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/unigram_model.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/time.cc:1:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/time.h:33:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/common.h:38:10: fatal error: 'algorithm' file not found
+         38 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/util.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/util.h:21:10: fatal error: 'algorithm' file not found
+         21 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/bpe_model.cc:15:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/bpe_model.h:18:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/model_interface.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/zero_copy_stream.cc:35:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/io/zero_copy_stream.h:111:10: fatal error: 'string' file not found
+        111 | #include <string>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/sentencepiece_trainer.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/sentencepiece_trainer.h:18:10: fatal error: 'string' file not found
+         18 | #include <string>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/init.cc:15:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/init.h:18:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/common.h:18:10: fatal error: 'cstdint' file not found
+         18 | #include <cstdint>
+            |          ^~~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/trainer_factory.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/trainer_factory.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:345: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/structurally_valid.cc.o] Error 1
+      11 error generated.
+       error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/unigram_model_trainer.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/unigram_model_trainer.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:373: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/time.cc.o] Error 1
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/char_model_trainer.cc:15:
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/char_model_trainer.h:18:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/builtin_pb/sentencepiece_model.pb.h:7:10: fatal error: 'limits' file not found
+          7 | #include <limits>
+            |          ^~~~~~~~
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/filesystem.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/filesystem.h:20:10: fatal error: 'fstream' file not found
+         20 | #include <fstream>
+            |          ^~~~~~~~~
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/stringpiece.cc:30:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/stringpiece.h:147:10: fatal error: 'iosfwd' file not found
+        147 | #include <iosfwd>
+            |          ^~~~~~~~
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/zero_copy_stream_impl.cc:43:10: fatal error: 'algorithm' file not found
+         43 | #include <algorithm>
+            |          ^~~~~~~~~~~
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:359: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/strutil.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:331: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/stringprintf.cc.o] Error 1
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/model_factory.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/model_factory.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_civil_time.dir/build.make:79: third_party/abseil-cpp/absl/time/CMakeFiles/absl_civil_time.dir/internal/cctz/src/civil_time_detail.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:6016: third_party/abseil-cpp/absl/time/CMakeFiles/absl_civil_time.dir/all] Error 2
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/builder.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/builder.h:18:10: fatal error: 'map' file not found
+         18 | #include <map>
+            |          ^~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/sentencepiece_processor.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/sentencepiece_processor.h:18:10: fatal error: 'cstdint' file not found
+         18 | #include <cstdint>
+            |          ^~~~~~~~~
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:401: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream.cc.o] Error 1
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/builtin_pb/sentencepiece.pb.cc:4:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/builtin_pb/sentencepiece.pb.h:7:10: fatal error: 'limits' file not found
+          7 | #include <limits>
+            |          ^~~~~~~~
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/third_party/protobuf-lite/zero_copy_stream_impl_lite.cc:35:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/io/zero_copy_stream_impl_lite.h:48:10: fatal error: 'iosfwd' file not found
+         48 | #include <iosfwd>
+            |          ^~~~~~~~
+      gmake[2]: *** [third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/build.make:135: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/internal/cctz/src/time_zone_info.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:79: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/arena.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:6048: third_party/abseil-cpp/absl/time/CMakeFiles/absl_time_zone.dir/all] Error 2
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:135: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/common.cc.o] Error 1
+      1 error generated.
+      In file included from /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/model_interface.cc:15:
+      /private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-install-kmjdczg9/sentencepiece_9a3163c30be54a1d96e91c10d3b03c87/sentencepiece/src/model_interface.h:18:10: fatal error: 'memory' file not found
+         18 | #include <memory>
+            |          ^~~~~~~~
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:429: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream_impl_lite.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:317: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/stringpiece.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:415: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream_impl.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:387: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/wire_format_lite.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:121: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/coded_stream.cc.o] Error 1
+      1 error generated.
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:149: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/extension_set.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:205: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/implicit_weak_message.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:261: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/parse_context.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:247: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/message_lite.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:163: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_enum_util.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:191: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_message_util.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:177: src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_message_table_driven_lite.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:443: src/CMakeFiles/sentencepiece-static.dir/builtin_pb/sentencepiece.pb.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:457: src/CMakeFiles/sentencepiece-static.dir/builtin_pb/sentencepiece_model.pb.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:499: src/CMakeFiles/sentencepiece-static.dir/filesystem.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:597: src/CMakeFiles/sentencepiece-static.dir/util.cc.o] Error 1
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:93: src/CMakeFiles/sentencepiece_train-static.dir/unicode_script.cc.o] Error 1
+      gmake[2]: *** Waiting for unfinished jobs....
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:513: src/CMakeFiles/sentencepiece-static.dir/init.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:205: src/CMakeFiles/sentencepiece_train-static.dir/pretokenizer_for_training.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:555: src/CMakeFiles/sentencepiece-static.dir/normalizer.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:177: src/CMakeFiles/sentencepiece_train-static.dir/bpe_model_trainer.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:541: src/CMakeFiles/sentencepiece-static.dir/model_interface.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:527: src/CMakeFiles/sentencepiece-static.dir/model_factory.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:163: src/CMakeFiles/sentencepiece_train-static.dir/char_model_trainer.cc.o] Error 1
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:611: src/CMakeFiles/sentencepiece-static.dir/word_model.cc.o] Error 1
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:107: src/CMakeFiles/sentencepiece_train-static.dir/trainer_factory.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:485: src/CMakeFiles/sentencepiece-static.dir/char_model.cc.o] Error 1
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:583: src/CMakeFiles/sentencepiece-static.dir/unigram_model.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:149: src/CMakeFiles/sentencepiece_train-static.dir/word_model_trainer.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:191: src/CMakeFiles/sentencepiece_train-static.dir/sentencepiece_trainer.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:79: src/CMakeFiles/sentencepiece_train-static.dir/builder.cc.o] Error 1
+      1 error generated.
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:569: src/CMakeFiles/sentencepiece-static.dir/sentencepiece_processor.cc.o] Error 1
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:135: src/CMakeFiles/sentencepiece_train-static.dir/unigram_model_trainer.cc.o] Error 1
+      gmake[2]: *** [src/CMakeFiles/sentencepiece-static.dir/build.make:471: src/CMakeFiles/sentencepiece-static.dir/bpe_model.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:6167: src/CMakeFiles/sentencepiece-static.dir/all] Error 2
+      1 error generated.
+      gmake[2]: *** [src/CMakeFiles/sentencepiece_train-static.dir/build.make:121: src/CMakeFiles/sentencepiece_train-static.dir/trainer_interface.cc.o] Error 1
+      gmake[1]: *** [CMakeFiles/Makefile2:6199: src/CMakeFiles/sentencepiece_train-static.dir/all] Error 2
+      gmake: *** [Makefile:156: all] Error 2
+      ## searching abseil ../build/third_party
+      ## absl_libs=
+      Traceback (most recent call last):
+        File "/Users/yab/Hobby/swift-canvas/spikes/localmodel/.venv/lib/python3.15/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 389, in <module>
+          main()
+          ~~~~^^
+        File "/Users/yab/Hobby/swift-canvas/spikes/localmodel/.venv/lib/python3.15/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 373, in main
+          json_out["return_val"] = hook(**hook_input["kwargs"])
+                                   ~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+        File "/Users/yab/Hobby/swift-canvas/spikes/localmodel/.venv/lib/python3.15/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 280, in build_wheel
+          return _build_backend().build_wheel(
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+              wheel_directory, config_settings, metadata_directory
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          )
+          ^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/build_meta.py", line 441, in build_wheel
+          return _build(['bdist_wheel', '--dist-info-dir', str(metadata_directory)])
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/build_meta.py", line 429, in _build
+          return self._build_with_temp_dir(
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~^
+              cmd,
+              ^^^^
+          ...<3 lines>...
+              self._arbitrary_args(config_settings),
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          )
+          ^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/build_meta.py", line 410, in _build_with_temp_dir
+          self.run_setup()
+          ~~~~~~~~~~~~~~^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/build_meta.py", line 317, in run_setup
+          exec(code, locals())  # noqa: S102 # exec is intentional here
+          ~~~~^^^^^^^^^^^^^^^^
+        File "<string>", line 301, in <module>
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/__init__.py", line 117, in setup
+          return distutils.core.setup(**attrs)  # type: ignore[return-value]
+                 ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/core.py", line 168, in setup
+          return run_commands(dist)
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/core.py", line 184, in run_commands
+          dist.run_commands()
+          ~~~~~~~~~~~~~~~~~^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/dist.py", line 1028, in run_commands
+          self.run_command(cmd)
+          ~~~~~~~~~~~~~~~~^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/dist.py", line 1106, in run_command
+          super().run_command(command)
+          ~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/dist.py", line 1047, in run_command
+          cmd_obj.run()
+          ~~~~~~~~~~~^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/command/bdist_wheel.py", line 454, in run
+          self.run_command("build")
+          ~~~~~~~~~~~~~~~~^^^^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/cmd.py", line 342, in run_command
+          self.distribution.run_command(command)
+          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/dist.py", line 1106, in run_command
+          super().run_command(command)
+          ~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/dist.py", line 1047, in run_command
+          cmd_obj.run()
+          ~~~~~~~~~~~^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/command/build.py", line 137, in run
+          self.run_command(cmd_name)
+          ~~~~~~~~~~~~~~~~^^^^^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/cmd.py", line 342, in run_command
+          self.distribution.run_command(command)
+          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/dist.py", line 1106, in run_command
+          super().run_command(command)
+          ~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/dist.py", line 1047, in run_command
+          cmd_obj.run()
+          ~~~~~~~~~~~^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/command/build_ext.py", line 108, in run
+          _build_ext.run(self)
+          ~~~~~~~~~~~~~~^^^^^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/command/build_ext.py", line 382, in run
+          self.build_extensions()
+          ~~~~~~~~~~~~~~~~~~~~~^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/command/build_ext.py", line 498, in build_extensions
+          self._build_extensions_serial()
+          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+        File "/private/var/folders/fc/21d_wc913f505q9ws264lyk00000gn/T/pip-build-env-0no1cgwz/overlay/lib/python3.15/site-packages/setuptools/_distutils/command/build_ext.py", line 524, in _build_extensions_serial
+          self.build_extension(ext)
+          ~~~~~~~~~~~~~~~~~~~~^^^^^
+        File "<string>", line 112, in build_extension
+        File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 534, in check_call
+          raise CalledProcessError(retcode, cmd)
+      subprocess.CalledProcessError: Command ['./build_bundled.sh', '0.2.2'] returned non-zero exit status 2.
+      [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+  ERROR: Failed building wheel for sentencepiece
+error: failed-wheel-build-for-install
+
+× Failed to build installable wheels for some pyproject.toml based projects
+╰─> sentencepiece
+done

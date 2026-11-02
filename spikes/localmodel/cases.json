@@ -1,0 +1,10 @@
+[
+["make the clock bigger","property"],["use the brand blue for the title","token"],["swap to the research-radar palette","token"],["make this card feel calmer and more premium","full"],
+["round the corners more","property"],["change the accent to green","token"],["add a QR code on the left that links to the remote","full"],["move the Recent panel to the right","property"],
+["use Barlow instead of Inter","token"],["redesign the idle screen for a couch 3 meters away","full"],["increase padding to 32","property"],["make the glass thicker","token"],
+["turn this into a dark theme","token"],["add a second row with the next three links and a progress bar","full"],["nudge the title up 8 px","property"],["make the button text bigger","property"],
+["use the warning colour for the border","token"],["write a friendlier empty state","full"],["hide the date","property"],["make the whole thing feel like Apple TV","full"],
+["set the background to the lake photo","token"],["align everything to the left","property"],["add a settings sheet with three toggles","full"],["make the text white","token"],
+["shrink the thumbnail to 120 px","property"],["generate four more directions for this card","full"],["use the success green for confidence above 0.9","token"],["reduce the blur","property"],
+["make the digest email shorter and punchier","full"],["swap the font weight to 300","property"]
+]
