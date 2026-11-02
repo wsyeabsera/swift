@@ -7,3 +7,5 @@ test('negative and fractional positions work', () => { expect(nudge({ position: 
 import { movedPos, startPos } from './nudge';
 test('drag start needs a positioned element with pixel offsets', () => { expect(startPos({ position: 'absolute', left: '115px', top: '86px' })).toEqual({ left: 115, top: 86 }); expect(startPos({ position: 'static', left: '1px', top: '1px' })).toBeNull(); expect(startPos({ position: 'absolute', left: 'auto', top: '1px' })).toBeNull(); expect(startPos({})).toBeNull(); });
 test('moved positions are whole pixels and follow the drag', () => { expect(movedPos({ left: 10, top: 20 }, 5.4, -3.6)).toEqual({ left: '15px', top: '16px' }); expect(movedPos({ left: 0, top: 0 }, -10, 0)).toEqual({ left: '-10px', top: '0px' }); });
+import { resizedSize } from './nudge';
+test('resize follows the drag, in whole pixels, with a 4 px floor', () => { expect(resizedSize({ w: 100, h: 50 }, 20.4, -10.2)).toEqual({ width: '120px', height: '40px' }); expect(resizedSize({ w: 20, h: 20 }, -100, -100)).toEqual({ width: '4px', height: '4px' }); });

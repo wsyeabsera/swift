@@ -12,3 +12,5 @@ export function startPos(p: NudgeProps): { left: number; top: number } | null {
 }
 /** Where the element goes after a drag of (dx, dy) world pixels: whole pixels. */
 export const movedPos = (s: { left: number; top: number }, dx: number, dy: number): { left: string; top: string } => ({ left: `${Math.round(s.left + dx)}px`, top: `${Math.round(s.top + dy)}px` });
+/** Resize by dragging the bottom-right handle: whole pixels, never below 4 px. */
+export const resizedSize = (s: { w: number; h: number }, dw: number, dh: number): { width: string; height: string } => ({ width: `${Math.max(4, Math.round(s.w + dw))}px`, height: `${Math.max(4, Math.round(s.h + dh))}px` });

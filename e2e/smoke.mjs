@@ -93,6 +93,10 @@ try {
     const cx = box.x + box.width / 2, cy = box.y + box.height / 2; await web.mouse.move(cx, cy); await web.mouse.down(); await web.mouse.move(cx + 30, cy + 20, { steps: 4 }); await web.mouse.move(cx + 60, cy + 40, { steps: 4 }); await web.mouse.up(); await web.waitForTimeout(400);
     const dl1 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'left'))); const dt1 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'top'))); const stillSel = (await web.textContent('[data-testid=inspector-id]'))?.trim();
     await web.getByTestId('undo').click(); await web.waitForTimeout(400); const dl2 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'left'))); const dt2 = parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'top')));
+    // resize with the bottom-right handle, one undo
+    await web.waitForSelector('[data-testid=resize-handle]', { timeout: 3000 }); const hb = await (await web.$('[data-testid=resize-handle]')).boundingBox(); const gw = async () => parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'width'))); const gh = async () => parseFloat(await web.evaluate(() => window.__swift.get('tv', 'clock', 'height')));
+    const w0 = await gw(), h0 = await gh(); const hx = hb.x + hb.width / 2, hy = hb.y + hb.height / 2; await web.mouse.move(hx, hy); await web.mouse.down(); await web.mouse.move(hx + 20, hy + 10, { steps: 3 }); await web.mouse.move(hx + 40, hy + 30, { steps: 3 }); await web.mouse.up(); await web.waitForTimeout(400);
+    const w1 = await gw(), h1 = await gh(); await web.getByTestId('undo').click(); await web.waitForTimeout(400); const w2 = await gw(), h2 = await gh(); cv.resize = { sc, dw: w1 - w0, dh: h1 - h0, expW: 40 / sc, expH: 30 / sc, backW: w2 - w0, backH: h2 - h0 };
     cv.drag = { sc, moveX: dl1 - dl0, moveY: dt1 - dt0, expX: 60 / sc, expY: 40 / sc, stillSel, backX: dl2 - dl0, backY: dt2 - dt0 };
   // Delete removes the selected element, Undo brings it back (the frame root is protected)
   await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); { const q = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 40 * v.s, y: v.y + 40 * v.s }; }); await web.mouse.click(q.x, q.y); await web.waitForTimeout(300); } await web.getByRole('button', { name: /^date/ }).click(); await web.waitForTimeout(300);
@@ -178,7 +182,8 @@ try {
   const exportOk = flushOk &&  addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
   const zoomSelOk = cv0.zoomSel.sAfter > cv0.zoomSel.sBefore;
-  const dragOk = Math.abs(cv0.drag.moveX - cv0.drag.expX) <= 2 && Math.abs(cv0.drag.moveY - cv0.drag.expY) <= 2 && cv0.drag.stillSel === 'clock' && cv0.drag.backX === 0 && cv0.drag.backY === 0;
+  const resizeOk = Math.abs(cv0.resize.dw - cv0.resize.expW) <= 2 && Math.abs(cv0.resize.dh - cv0.resize.expH) <= 2 && Math.abs(cv0.resize.backW) < 0.5 && Math.abs(cv0.resize.backH) < 0.5;
+  const dragOk = resizeOk &&  Math.abs(cv0.drag.moveX - cv0.drag.expX) <= 2 && Math.abs(cv0.drag.moveY - cv0.drag.expY) <= 2 && cv0.drag.stillSel === 'clock' && cv0.drag.backX === 0 && cv0.drag.backY === 0;
   const navOk = dragOk &&  zoomSelOk &&  cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
   const nudgeOk = navOk &&  cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
   const histOk = nudgeOk &&  ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';

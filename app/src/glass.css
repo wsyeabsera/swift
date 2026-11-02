@@ -55,3 +55,4 @@ button:disabled{opacity:.45;cursor:default}
 .tools{overflow-x:auto;scrollbar-width:none}.tools::-webkit-scrollbar{display:none}.tools>*{flex:none}
 .kbs{margin:6px;display:grid;gap:4px}.kbs>div{display:flex;gap:14px;justify-content:space-between}.kbs dt{min-width:170px}.kbs dd{margin:0;opacity:.8}.kbbtn{min-width:28px;padding:0 8px}
 .framemenu{left:calc(50% - 180px);top:auto;bottom:84px;width:360px;transform-origin:50% 100%}
+.sel-h{position:absolute;width:calc(14px*var(--inv,1));height:calc(14px*var(--inv,1));margin:calc(-7px*var(--inv,1)) 0 0 calc(-7px*var(--inv,1));border-radius:50%;background:var(--ac);box-shadow:0 0 0 calc(2px*var(--inv,1)) #fff,0 2px 8px #0008;cursor:nwse-resize;pointer-events:auto;z-index:3}

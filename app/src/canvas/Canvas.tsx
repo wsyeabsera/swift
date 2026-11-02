@@ -28,14 +28,14 @@ const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].
 /** Infinite canvas: one transformed world layer, one sandboxed iframe per frame, offscreen frames frozen (display:none, spike #1706).
  *  The viewport lives in a ref and is applied to the DOM directly: panning and zooming never re-render React; React re-renders only when
  *  the set of visible frames changes or the selection changes. Selection is found by hit-testing through the frame bridge. */
-export function Canvas({ frames, selection, onSelect, revision, onReady, onRename, painting, onMove }: { painting?: Set<string>; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; onSelect: (s: Sel | null) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
+export function Canvas({ frames, selection, onSelect, revision, onReady, onRename, painting, onMove, onResize }: { painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; onSelect: (s: Sel | null) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
   const [editing, setEditing] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null); const worldRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View>({ x: 0, y: 0, s: 1 }); const iframes = useRef(new Map<string, HTMLIFrameElement>());
   const bridges = useMemo(() => new Map(frames.map((f) => [f.id, new FrameBridge(() => iframes.current.get(f.id)?.contentWindow)])), [frames]);
   const [visible, setVisible] = useState<Set<string>>(() => new Set(frames.map((f) => f.id))); const visRef = useRef(visible);
   const [selRect, setSelRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const selBoxRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null); const selectionRef = useRef(selection); selectionRef.current = selection; const onMoveRef = useRef(onMove); onMoveRef.current = onMove;
+  const selBoxRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null); const selectionRef = useRef(selection); selectionRef.current = selection; const onMoveRef = useRef(onMove); onMoveRef.current = onMove; const onResizeRef = useRef(onResize); onResizeRef.current = onResize;
   const fitted = useRef(false); const onSelectRef = useRef(onSelect); onSelectRef.current = onSelect; const onReadyRef = useRef(onReady); onReadyRef.current = onReady;
   const sync = useCallback(() => {
     const host = hostRef.current; const world = worldRef.current; if (!host || !world) return;
@@ -48,14 +48,14 @@ export function Canvas({ frames, selection, onSelect, revision, onReady, onRenam
     const { width, height } = host.getBoundingClientRect(); if (!fitted.current) { viewRef.current = fit(frames, width, height, 90); fitted.current = true; } sync();
     const rect = () => host.getBoundingClientRect();
     const onWheel = (e: WheelEvent) => { e.preventDefault(); const r = rect(); viewRef.current = e.ctrlKey || e.metaKey ? zoomAt(viewRef.current, e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.01)) : panBy(viewRef.current, -e.deltaX, -e.deltaY); sync(); };
-    let drag: { x: number; y: number; sx: number; sy: number; moved: boolean } | null = null; let elDrag = false; // elDrag: the press started inside the selection, so dragging moves the element instead of panning
+    let drag: { x: number; y: number; sx: number; sy: number; moved: boolean } | null = null; let elDrag: 'move' | 'resize' | null = null; // elDrag: the press started inside the selection, so dragging moves the element instead of panning
     const down = (e: PointerEvent) => { if ((e.target as Element | null)?.closest?.('.fr-label')) return; /* labels are editable: no pan/capture */ drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false };
-      { const r0 = host.getBoundingClientRect(); const w0 = screenToWorld(viewRef.current, e.clientX - r0.left, e.clientY - r0.top); const b = selBoxRef.current; elDrag = !!(b && onMoveRef.current && w0.x >= b.x && w0.x <= b.x + b.w && w0.y >= b.y && w0.y <= b.y + b.h); }
+      { const r0 = host.getBoundingClientRect(); const w0 = screenToWorld(viewRef.current, e.clientX - r0.left, e.clientY - r0.top); const b = selBoxRef.current; elDrag = (e.target as Element | null)?.closest?.('.sel-h') ? (onResizeRef.current ? 'resize' : null) : b && onMoveRef.current && w0.x >= b.x && w0.x <= b.x + b.w && w0.y >= b.y && w0.y <= b.y + b.h ? 'move' : null; }
       host.setPointerCapture(e.pointerId); };
-    const move = (e: PointerEvent) => { if (!drag) return; if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return; const sel = selectionRef.current; if (!drag.moved) { drag.moved = true; if (elDrag && sel) onMoveRef.current?.(sel.frameId, sel.el, 0, 0, 'start'); else host.classList.add('grab'); }
-      if (elDrag && sel) { const v = viewRef.current; onMoveRef.current?.(sel.frameId, sel.el, (e.clientX - drag.sx) / v.s, (e.clientY - drag.sy) / v.s, 'move'); return; } viewRef.current = panBy(viewRef.current, e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; sync(); };
+    const move = (e: PointerEvent) => { if (!drag) return; if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return; const sel = selectionRef.current; if (!drag.moved) { drag.moved = true; if (elDrag && sel) (elDrag === 'resize' ? onResizeRef : onMoveRef).current?.(sel.frameId, sel.el, 0, 0, 'start'); else host.classList.add('grab'); }
+      if (elDrag && sel) { const v = viewRef.current; (elDrag === 'resize' ? onResizeRef : onMoveRef).current?.(sel.frameId, sel.el, (e.clientX - drag.sx) / v.s, (e.clientY - drag.sy) / v.s, 'move'); return; } viewRef.current = panBy(viewRef.current, e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; sync(); };
     const up = async (e: PointerEvent) => {
-      const d = drag; const wasEl = elDrag; drag = null; elDrag = false; host.classList.remove('grab'); if (d?.moved && wasEl) { const s = selectionRef.current; if (s) onMoveRef.current?.(s.frameId, s.el, 0, 0, 'end'); } if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+      const d = drag; const wasEl = elDrag; drag = null; elDrag = null; host.classList.remove('grab'); if (d?.moved && wasEl) { const s = selectionRef.current; if (s) (wasEl === 'resize' ? onResizeRef : onMoveRef).current?.(s.frameId, s.el, 0, 0, 'end'); } if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
       if (!d || d.moved) return; // a click, not a pan: hit-test the frame under the pointer, top-most first
       const r = rect(); const w = screenToWorld(viewRef.current, e.clientX - r.left, e.clientY - r.top);
       for (const f of [...frames].reverse()) {
@@ -107,6 +107,7 @@ export function Canvas({ frames, selection, onSelect, revision, onReady, onRenam
               : <span className="fr-label" data-testid="frame-label" title="Double-click to rename" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={() => setEditing(f.id)}>{f.title}</span>}
           </div>
         ))}
+        {selFrame && selRect && onResize && selection?.el !== selFrame.root && <div className="sel-h" data-testid="resize-handle" style={{ left: selFrame.x + selRect.x + selRect.w, top: selFrame.y + selRect.y + selRect.h }} />}
         {selFrame && selRect && <div className="sel" data-testid="sel" style={{ left: selFrame.x + selRect.x, top: selFrame.y + selRect.y, width: selRect.w, height: selRect.h }} />}
       </div>
     </div>
