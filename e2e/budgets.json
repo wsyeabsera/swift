@@ -1,0 +1,6 @@
+{
+  "_note": "Speed budgets asserted by `npm run e2e`. A regression past a limit fails the run and names the budget. Measured values are in docs/dev-speed.md and spikes/*/RESULTS.md.",
+  "tier0P95Ms": 16,
+  "panGapP95Ms": 34,
+  "tier0FirstEditMs": 50
+}

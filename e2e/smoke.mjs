@@ -1,6 +1,7 @@
 // End-to-end smoke: helper + dev server + the app as a plain web page AND as the real unpacked extension. Also: a wrong origin must be refused.
 // node e2e/smoke.mjs   (needs: cargo build, npm run build, Playwright's Chromium)
 import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path'; import http from 'node:http'; import net from 'node:net';
+const B = JSON.parse(fs.readFileSync(new URL('./budgets.json', import.meta.url), 'utf8')); // speed budgets, checked in
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const out = {}; const procs = [];
 const kill = () => procs.forEach(p => p.kill());
 const waitHttp = async (url) => { for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('timeout ' + url); };
@@ -165,7 +166,7 @@ try {
   await ext.waitForFunction(() => window.__swift && window.__swift.frames.length > 20, null, { timeout: 10000 }); out.extFrames = await ext.evaluate(() => window.__swift.frames.length); out.extEdit = await ext.evaluate(() => window.__swift.edit('tv', 'clock', 'font-size', '260px')); out.extRead = await ext.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
   const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.jpg': 'image/jpeg' }; const srv = http.createServer((q, r) => { const f = path.join(root, 'extension/app', q.url === '/' ? 'index.html' : q.url.split('?')[0]); fs.readFile(f, (e, d) => { if (e) { r.statusCode = 404; r.end(); } else { r.setHeader('content-type', mime[path.extname(f)] ?? 'application/octet-stream'); r.end(d); } }); }).listen(5199, '127.0.0.1'); procs.push({ kill: () => srv.close() });
   const bad = await ctx.newPage(); await bad.goto('http://127.0.0.1:5199/'); out.wrongOrigin = await status(bad);
-  const c = out.canvas; const cv0 = c; const canvasOk = c.frames === 20 && c.sandbox && c.zoomed && c.panned && c.frozenFar.visible === 0 && c.frozenFar.hidden === 20 && c.edit.ok && c.edit.ms < 50 && c.tier0p95 < 16 && c.editRead === '260px' && c.editMissing.ok === false && c.hit === 'clock' && c.parentCannotReadFrame;
+  const c = out.canvas; const cv0 = c; const canvasOk = c.frames === 20 && c.sandbox && c.zoomed && c.panned && c.frozenFar.visible === 0 && c.frozenFar.hidden === 20 && c.edit.ok && c.edit.ms < B.tier0FirstEditMs && c.tier0p95 < B.tier0P95Ms && c.editRead === '260px' && c.editMissing.ok === false && c.hit === 'clock' && c.parentCannotReadFrame;
   const selOk = cv0.selected === 'clock' && cv0.layers.includes('clock') && cv0.layers.includes('recent') && cv0.inspectorEdit === '300px' && cv0.afterUndo === cv0.startFs && cv0.pickedLayer === 'date' && cv0.cleared === 'nothing selected';
   const sayOk = cv0.sayStatus.includes('3 applied') && cv0.sayStatus.includes('1 rejected') && cv0.sayApplied.fontSize === '300px' && cv0.sayApplied.dateOpacity === '0.5' && cv0.sayApplied.token === '#30d158' && cv0.sayUndone.fontSize === cv0.sayUndone.before && cv0.sayUndone.dateOpacity === cv0.sayUndone.beforeOp && cv0.sayUndone.status === 'Say undone';
   const themeOk = cv0.theme.bgAfterPick.includes('fuji') && cv0.theme.modeClass.includes('m-light') && cv0.theme.blur.trim() === '48px' && cv0.theme.escClosed && cv0.theme.focusBack === 'appearance-button' && cv0.theme.scrimClosed && cv0.theme.persisted;
@@ -194,10 +195,12 @@ try {
   const navOk = dragOk &&  zoomSelOk &&  cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
   const nudgeOk = navOk &&  cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
   const histOk = nudgeOk &&  ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
-  const panOk = cv0.panFps.frames > 30 && cv0.panFps.p95 < 34;
+  const panOk = cv0.panFps.frames > 30 && cv0.panFps.p95 < B.panGapP95Ms;
   const keysOk = panOk &&  histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;
   const localOk = keysOk &&  cv0.local.f1 !== cv0.local.f0 && cv0.local.f2 === cv0.local.f0 && cv0.local.f3 === cv0.local.f1 && cv0.local.f4 === cv0.local.f1 && cv0.local.f5 === cv0.local.f0 && /^Local/.test(cv0.local.status);
   const delOk = localOk &&  cv0.del.delGone && cv0.del.delBack && cv0.del.rootKept;
   const docOk = delOk &&  takesOk &&  cv0.docRestored.sameFrames && cv0.docRestored.more && cv0.docRestored.color;
+  const budgetRows = [['tier0P95Ms', cv0.tier0p95, B.tier0P95Ms], ['tier0FirstEditMs', cv0.edit.ms, B.tier0FirstEditMs], ['panGapP95Ms', cv0.panFps.p95, B.panGapP95Ms]]; out.budgets = Object.fromEntries(budgetRows.map(([k, m, l]) => [k, { measured: +Number(m).toFixed(1), limit: l, ok: m < l }]));
+  for (const [k, m, l] of budgetRows) if (!(m < l)) console.error(`BUDGET FAILED: ${k} measured ${Number(m).toFixed(1)} >= limit ${l} (e2e/budgets.json)`);
   const ok = docOk && canvasOk && selOk && sayOk && sparkOk && importOk && cmdKOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { docOk, canvasOk, selOk, sayOk, sparkOk, importOk, cmdKOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
 } catch (e) { console.error(e); kill(); process.exit(1); }
