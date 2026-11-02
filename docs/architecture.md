@@ -1,6 +1,6 @@
-# Swift Canvas: architecture (draft 1, 2026-11-02)
+# Swift Canvas: architecture (draft 2, 2026-11-02)
 
-Status: **draft**. Decisions marked *measured* come from the spikes in `spikes/*/RESULTS.md`; *assumed* means not measured yet.
+Status: **draft 2: all Phase 1 spikes are done** (#1706, #1707, #1708, #1709, #1714, #1716). Decisions marked *measured* come from the spikes in `spikes/*/RESULTS.md`; *assumed* means not measured yet.
 Design source of truth: the mockups (https://claude.ai/artifact/9JQD7AcKDh7FgGxhPurcxh) and `~/Hobby/swift-canvas-design/project/KIT.md`.
 
 ## Hard rules (owner)
@@ -41,3 +41,16 @@ persistence (File System Access); side panel and DevTools surfaces; Prompt API i
 ## Budgets (targets; change only with a measurement)
 Tier-0 edit < 16 ms (measured 8-9 ms); Say first visible change <= 1.5 s (measured ~0.7-1.3 s on Haiku); pan/zoom 60 fps+ with 20 frames (measured);
 Spark first paint < 2 s (not measured); contrast >= 4.5 on every backdrop in both modes (`qa/contrast.mjs`, passes).
+
+## Draft 2 changes (after the spikes)
+- **Say hot path streams JSON ops as text and applies them line by line**; the in-app MCP server is for heavy multi-step work and Claude Code sessions (MCP tool path: first op 1.3-2.7 s, totals up to 9.5 s). Op language v3 (set, token, text, add, remove, ask), tested prompt in `spikes/latency/OPS-PROMPT.md`: 29/30 valid on 30 varied requests; task #1731.
+- **Say latency, 30 varied requests (Haiku, one warm session):** first visible change p50 1.15-1.24 s, p95 2.0-3.1 s (creative `add` requests are the slow tail). Budget by route: token/property edits answered by the local tier first (instant preview), Claude for creative ones.
+- **Spark:** 12 parallel sessions: cold first paint 1.5-1.8 s, warm 0.85-1.4 s; ~250 MB per session (~3 GB for 12): pool with a cap and idle shutdown. ~5.3k input tokens per Say.
+- **Canvas:** 80 frames pan/zoom at the display refresh rate; memory = ~870 MB Chrome baseline + ~2.5 MB per extra frame; freeze offscreen frames with `display:none` (-12%); no bitmap LOD needed yet; unloading frames hurts.
+- **Language split:** TypeScript for UI, document, tokens, Claude calls, MCP; images via `sharp` (65 ms 1920 px preview, 148 ms pyramid for an 8K JPEG, 3x faster than the plain Rust path); Rust/WASM only for bulk scans (20k-node diff 18x, 42x with SIMD128) and helper-side work, when a project size makes it matter; MP4 via WebCodecs (2.7x real time).
+- **Local tier:** MLX Qwen3-4B routing 97% / 199 ms; Apple's on-device model is not available on macOS 15.
+- **Liquid Glass:** KIT.md section I; contrast checker `qa/contrast.mjs` (16/16 >= 4.5); popovers close on Escape with focus on the trigger (H7 addendum).
+
+## Commands (until the scaffold exists)
+`node spikes/latency/say.mjs haiku 5` (Say), `MANY=1 V3=1 node spikes/latency/say.mjs haiku 30`, `node spikes/canvas/measure.mjs 20`, `node spikes/host/measure-host.mjs`,
+`spikes/localmodel/.venv/bin/python spikes/localmodel/route2.py`, `cd ~/Hobby/swift-canvas-design/qa && node smoke.mjs | contrast.mjs | h7.mjs`.
