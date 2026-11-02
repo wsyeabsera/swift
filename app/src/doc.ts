@@ -1,7 +1,9 @@
 import type { FrameDef } from './canvas/fixtures';
 
 /** The saved design: frame layout plus each frame's current HTML. Stored per browser profile (localStorage); the project file in the repo comes later (#1673). */
-const KEY = 'swift-canvas.doc.v1';
+import { DEFAULT_PROJECT } from './projects';
+/** The default project keeps the original key (designs saved before projects existed still load). */
+const key = (project: string): string => (project === DEFAULT_PROJECT.id ? 'swift-canvas.doc.v1' : `swift-canvas.doc.v1:${project}`);
 const MAX_FRAMES = 200;
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const str = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
@@ -20,12 +22,12 @@ export function parseDoc(raw: unknown): FrameDef[] | null {
 }
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 const safe = (): Store | undefined => { try { return typeof localStorage === 'undefined' ? undefined : localStorage; } catch { return undefined; } };
-export function loadDoc(storage: Pick<Store, 'getItem'> | undefined = safe()): FrameDef[] | null { try { const raw = storage?.getItem(KEY); return raw ? parseDoc(JSON.parse(raw)) : null; } catch { return null; } }
+export function loadDoc(storage: Pick<Store, 'getItem'> | undefined = safe(), project = DEFAULT_PROJECT.id): FrameDef[] | null { try { const raw = storage?.getItem(key(project)); return raw ? parseDoc(JSON.parse(raw)) : null; } catch { return null; } }
 /** Returns an error message when the design could not be saved (quota, blocked storage): the caller shows it, it is never swallowed. */
-export function saveDoc(frames: FrameDef[], storage: Pick<Store, 'setItem'> | undefined = safe()): string | null {
+export function saveDoc(frames: FrameDef[], storage: Pick<Store, 'setItem'> | undefined = safe(), project = DEFAULT_PROJECT.id): string | null {
   if (!storage) return 'storage unavailable';
-  try { storage.setItem(KEY, JSON.stringify({ frames })); return null; } catch (e) { return e instanceof Error ? e.message : 'save failed'; }
+  try { storage.setItem(key(project), JSON.stringify({ frames })); return null; } catch (e) { return e instanceof Error ? e.message : 'save failed'; }
 }
-export function clearDoc(storage: Pick<Store, 'removeItem'> | undefined = safe()): void { try { storage?.removeItem(KEY); } catch { /* nothing saved that we could remove */ } }
+export function clearDoc(storage: Pick<Store, 'removeItem'> | undefined = safe(), project = DEFAULT_PROJECT.id): void { try { storage?.removeItem(key(project)); } catch { /* nothing saved that we could remove */ } }
 /** Spark ids are `<base>-t<n>`: continue after the highest n so a restored design never collides with a new take. */
 export function nextSparkN(frames: FrameDef[]): number { return frames.reduce((m, f) => { const k = /-t(\d+)$/.exec(f.id); return k ? Math.max(m, Number(k[1])) : m; }, 0); }

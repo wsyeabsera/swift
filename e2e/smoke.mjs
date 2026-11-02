@@ -72,6 +72,12 @@ try {
   const im = {}; await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); await web.getByTestId('import-path').fill(`${root}/app`); await web.getByTestId('import-scan').click();
   await web.waitForFunction(() => /tokens/.test(document.querySelector('[data-testid=import-result]').textContent), null, { timeout: 8000 }); im.ok = (await web.textContent('[data-testid=import-result]')).replace(/\s+/g, ' ').trim().slice(0, 160);
   { const u0 = (await web.textContent('[data-testid=import-using]')).trim(); const useBtn = web.getByTestId('import-use'); const enabled = await useBtn.isEnabled(); if (enabled) { await useBtn.click(); await web.waitForTimeout(200); } im.brand = { u0, enabled, u1: (await web.textContent('[data-testid=import-using]')).trim() }; }
+  // Projects: create one from the scanned folder (reload into it: one blank screen, its own brand), then switch back to tvdash (its design is intact)
+  { const nTv = await web.evaluate(() => window.__swift.frames.length); await web.getByTestId('import-create').click(); await web.waitForFunction(() => window.__swift && window.__swift.frames.length === 1, null, { timeout: 8000 }); await web.waitForTimeout(300);
+    const name = (await web.textContent('[data-testid=project-button] b'))?.trim(); await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); const using = (await web.textContent('[data-testid=import-using]')).trim();
+    const listed = await web.$$eval('[data-testid=projects] button', (els) => els.map((e) => e.textContent)); await web.getByTestId('project-tvdash').click(); await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n, nTv, { timeout: 8000 }); await web.waitForTimeout(300);
+    im.project = { name, using, listed, backFrames: await web.evaluate(() => window.__swift.frames.length), nTv, backName: (await web.textContent('[data-testid=project-button] b'))?.trim() };
+    await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); await web.getByTestId('import-path').fill(`${root}/app`); await web.getByTestId('import-scan').click(); await web.waitForFunction(() => /tokens/.test(document.querySelector('[data-testid=import-result]').textContent), null, { timeout: 8000 }); }
   await web.getByTestId('import-path').fill('/etc'); await web.getByTestId('import-scan').click(); await web.waitForFunction(() => /not allowed/.test(document.querySelector('[data-testid=import-result]').textContent), null, { timeout: 8000 }); im.refused = true;
   await web.keyboard.press('Escape'); await web.waitForTimeout(150); im.escClosed = (await web.$('[data-testid=import]')) === null; im.focusBack = await web.evaluate(() => document.activeElement?.getAttribute('data-testid')); cv.import = im;
   // Appearance popover (rule H7) + theme persistence
@@ -98,7 +104,8 @@ try {
   const themeOk = cv0.theme.bgAfterPick.includes('fuji') && cv0.theme.modeClass.includes('m-light') && cv0.theme.blur.trim() === '48px' && cv0.theme.escClosed && cv0.theme.focusBack === 'appearance-button' && cv0.theme.scrimClosed && cv0.theme.persisted;
   const sparkOk = cv0.spark.ids.length === 4 && cv0.spark.sizes.every((x) => x === '300px') && /4 takes · 4 changed/.test(cv0.sparkStatus) && /first paint/.test(cv0.sparkStatus);
   const brandOk = cv0.import.brand.enabled ? cv0.import.brand.u1 !== cv0.import.brand.u0 || /Say uses \d+ brand tokens/.test(cv0.import.brand.u1) : /Say uses \d+ brand tokens/.test(cv0.import.brand.u1);
-  const importOk = brandOk && /tokens/.test(cv0.import.ok) && cv0.import.ok.includes('files') && cv0.import.refused && cv0.import.escClosed && cv0.import.focusBack === 'project-button';
+  const projOk = cv0.import.project.name === 'app' && /Say uses 12 brand tokens/.test(cv0.import.project.using) && cv0.import.project.listed.length === 2 && cv0.import.project.backFrames === cv0.import.project.nTv && cv0.import.project.backName === 'tvdash';
+  const importOk = projOk && brandOk && /tokens/.test(cv0.import.ok) && cv0.import.ok.includes('files') && cv0.import.refused && cv0.import.escClosed && cv0.import.focusBack === 'project-button';
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
   const takesOk = cv0.takes.spark.length === 1 && cv0.takes.total === 22 && cv0.dup.id === 'tv-d1' && cv0.dup.same;

@@ -22,3 +22,5 @@ export function makeFrames(n = 20): FrameDef[] {
   });
   return [...base, ...extra].slice(0, Math.max(n, 0));
 }
+/** A new project starts with one empty screen (not the tvdash fixtures). */
+export const blankFrames = (): FrameDef[] => [{ id: 'screen', root: 'screen', title: 'Screen 1280×800', x: 0, y: 0, w: 1280, h: 800, html: '<div id="screen" style="position:relative;width:1280px;height:800px;overflow:hidden;font-family:system-ui;color:#f5f5f7;background:#14151a"><div id="title" style="position:absolute;left:80px;top:80px;font-size:56px;font-weight:600">New screen</div><div id="subtitle" style="position:absolute;left:80px;top:170px;font-size:24px;opacity:.6">Say what you want here.</div></div>' }];

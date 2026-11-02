@@ -20,3 +20,7 @@ test('a failing save reports why instead of swallowing it', () => {
 test('clearDoc removes the saved design', () => { const { st } = mem(); saveDoc(makeFrames(3), st); clearDoc(st); expect(loadDoc(st)).toBeNull(); });
 test('spark ids continue after the highest saved take', () => { const f = makeFrames(3) as [FrameDef, FrameDef, FrameDef]; expect(nextSparkN(f)).toBe(0); expect(nextSparkN([...f, { ...f[0], id: 'tv-t2' }, { ...f[0], id: 'tv-t11' }])).toBe(11); });
 test('the kept flag survives a round trip', () => { const { st } = mem(); const f = makeFrames(3).map((x, i) => (i === 1 ? { ...x, id: 'tv-t1', kept: true } : x)); saveDoc(f, st); expect(loadDoc(st)).toEqual(f); });
+test('each project has its own saved design; the default keeps the original key', () => {
+  const { m, st } = mem(); const a = makeFrames(3); const b = makeFrames(5); saveDoc(a, st); saveDoc(b, st, 'radar'); expect(loadDoc(st)).toEqual(a); expect(loadDoc(st, 'radar')).toEqual(b); expect(loadDoc(st, 'other')).toBeNull();
+  expect(Object.keys(m).sort()).toEqual(['swift-canvas.doc.v1', 'swift-canvas.doc.v1:radar']); clearDoc(st, 'radar'); expect(loadDoc(st, 'radar')).toBeNull(); expect(loadDoc(st)).toEqual(a);
+});

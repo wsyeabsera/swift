@@ -1,11 +1,12 @@
 # Handoff (2026-11-02, fourth goal hour in progress)
 
-## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (49), `npm run e2e` (pass)
+## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (57), `npm run e2e` (pass)
 - Autosave/restore of the design (`doc.ts`, localStorage, 1 s debounce, all-or-nothing parse, save errors shown, Reset button); Spark ids continue after restore.
 - Spark: Keep take / Discard takes (`kept` flag on FrameDef), Cancel Spark (AbortSignal through runSpark/runSay; late ops dropped, no repair turn), cap of 8 unreviewed takes (`canSpark`).
 - ⌘D duplicate frame (`canvas/frames.ts`), Delete removes the selected element (one undo step via snapshot; frame root protected), ⌘0 fit, ⌘1 actual size, Escape deselects.
 - Local tier (`say/local.ts`): bigger/smaller/hide/show/opacity N%/color/background/size on the SELECTION apply instantly with no Claude; else Claude. MLX router (#1709) not wired yet.
 - Import → "Use this brand": scanned tokens (plain custom properties only, max 16, `brand.ts`) replace the hard-coded tvdash tokens in Say/Spark prompts; persisted.
+- Projects (`projects.ts`): registry in localStorage, per-project design + brand keys (default project keeps the old keys), Import popover lists projects and "Create project" from a scanned folder (starts with one blank screen); switching flushes the autosave, then reloads.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

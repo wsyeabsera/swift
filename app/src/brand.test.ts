@@ -11,3 +11,4 @@ test('round trip; missing, corrupt, empty-after-filter and throwing storage fall
   m['swift-canvas.brand.v1'] = '{bad'; expect(loadBrand(st)).toEqual(BRAND_TOKENS); m['swift-canvas.brand.v1'] = '{"x":"y"}'; expect(loadBrand(st)).toEqual(BRAND_TOKENS);
   expect(loadBrand({ getItem: () => { throw new Error('b'); } })).toEqual(BRAND_TOKENS); expect(saveBrand({}, { setItem: () => { throw new Error('quota'); } })).toBe('quota'); expect(saveBrand({}, undefined)).toBe('storage unavailable');
 });
+test('brand is per project', () => { const m: Record<string, string> = {}; const st = { getItem: (k: string) => m[k] ?? null, setItem: (k: string, v: string) => { m[k] = v; } }; saveBrand({ '--ac': '#111' }, st, 'radar'); expect(loadBrand(st, 'radar')).toEqual({ '--ac': '#111' }); expect(loadBrand(st)).toEqual(BRAND_TOKENS); expect(loadBrand(st, 'other')).toEqual(BRAND_TOKENS); });

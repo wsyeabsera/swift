@@ -5,13 +5,14 @@ import { ImportProject } from './ImportProject';
 import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type ThemeChoice } from './theme';
 import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
-import { makeFrames, type FrameDef } from './canvas/fixtures';
+import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
 import { duplicateFrame, duplicateId } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
 import { loadBrand, saveBrand } from './brand';
+import { activeProject, addProject, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
 import { localEdits } from './say/local';
 import { canSpark, discardTakes, isTake, keepTake, runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
@@ -19,8 +20,9 @@ const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'D
 export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
-  const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc() ?? makeFrames(20)); const [saveStatus, setSaveStatus] = useState('');
-  const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand());
+  const [reg] = useState<Registry>(() => loadRegistry()); const project = activeProject(reg);
+  const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
+  const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand(undefined, project.id));
   const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const [sparking, setSparking] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
@@ -65,16 +67,16 @@ export function App() {
   }, [sayText, saying, selection, frames, pendingAsk, edit, brand]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void undo(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo]);
   // Autosave: after the document changes settle, snapshot every frame (current HTML) and store the design; a failure is shown, not swallowed.
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      if (!window.__swift) return;
-      try { const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const err = saveDoc(snaps); setSaveStatus(err ? `not saved: ${err}` : 'saved'); } catch (e) { setSaveStatus(`not saved: ${e instanceof Error ? e.message : 'error'}`); }
-    }, 1000);
-    return () => clearTimeout(t);
-  }, [frames, revision]);
+  const persist = useCallback(async (): Promise<string | null> => {
+    if (!window.__swift) return null;
+    try { const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const err = saveDoc(snaps, undefined, project.id); setSaveStatus(err ? `not saved: ${err}` : 'saved'); return err; } catch (e) { const m = e instanceof Error ? e.message : 'error'; setSaveStatus(`not saved: ${m}`); return m; }
+  }, [frames, project.id]);
+  useEffect(() => { const t = setTimeout(() => void persist(), 1000); return () => clearTimeout(t); }, [persist, revision]);
+  // Switching: flush the current design first (a failed save stops the switch), then store the registry and reload into the other project.
+  const goTo = useCallback(async (next: Registry | null) => { if (!next) { setSayStatus('Could not create a project from that name'); return; } const err = await persist(); if (err) { setSayStatus(`Not switching: ${err}`); return; } const e2 = saveRegistry(next); if (e2) { setSayStatus(`Not switching: ${e2}`); return; } location.reload(); }, [persist]);
   const takeCount = useMemo(() => frames.filter(isTake).length, [frames]); const selIsTake = !!selection && frames.some((f) => f.id === selection.frameId && isTake(f));
   const discard = useCallback(() => { const gone = new Set(frames.filter(isTake).map((f) => f.id)); history.current = history.current.filter((e) => !gone.has(e.frameId)); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded`); }, [frames, selection]);
-  const resetDesign = useCallback(() => { clearDoc(); location.reload(); }, []);
+  const resetDesign = useCallback(() => { clearDoc(undefined, project.id); location.reload(); }, [project.id]);
   // ⌘D duplicates the selected frame (its current HTML), then selects nothing so the copy can be picked by clicking.
   const duplicate = useCallback(async () => {
     const base = frames.find((f) => f.id === (selection?.frameId ?? '')); if (!base || !window.__swift) return;
@@ -108,10 +110,10 @@ export function App() {
       <header className="kit-top">
         <div className="gl isl" aria-label="Project">
           <span className="mark" aria-hidden>⚡</span>
-          <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>tvdash</b><span className="mono mu">idle-refresh</span></button>
+          <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>{project.name}</b><span className="mono mu">{frames.length} frames</span></button>
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
-        {importOpen && conn.current && <ImportProject scan={conn.current.scan} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
+        {importOpen && conn.current && <ImportProject scan={conn.current.scan} projects={reg.list} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
           {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => setLens(l)}>{l}</button>))}
