@@ -1,0 +1,24 @@
+<!doctype html><meta charset=utf-8><script src="node_modules/mp4-muxer/build/mp4-muxer.js"></script><canvas id=c width=1920 height=1080></canvas>
+<script>
+window.run = async (frames, fps, hw) => {
+  const c = document.getElementById('c'), x = c.getContext('2d'); const W = 1920, H = 1080;
+  const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: 'avc', width: W, height: H }, fastStart: 'in-memory' });
+  let encErr = null; const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: e => encErr = e.message });
+  const cfg = { codec: 'avc1.640028', width: W, height: H, bitrate: 8e6, framerate: fps, hardwareAcceleration: hw };
+  const sup = await VideoEncoder.isConfigSupported(cfg); if (!sup.supported) return { unsupported: true, hw };
+  enc.configure(cfg); const t0 = performance.now(); let draw = 0;
+  for (let i = 0; i < frames; i++) {
+    const d0 = performance.now(); const t = i / fps;
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, `hsl(${(t * 40) % 360} 60% 20%)`); g.addColorStop(1, `hsl(${(t * 40 + 120) % 360} 60% 30%)`); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.fillStyle = 'rgba(255,255,255,.14)'; x.beginPath(); x.roundRect(400 + 300 * Math.sin(t * 2), 300, 1100, 480, 48); x.fill();
+    x.fillStyle = '#fff'; x.font = '200 220px Inter, system-ui'; x.fillText(String(21 + (i % 60)).padStart(2, '0') + ':53', 480 + 300 * Math.sin(t * 2), 640);
+    draw += performance.now() - d0;
+    const frame = new VideoFrame(c, { timestamp: Math.round(i * 1e6 / fps) }); enc.encode(frame, { keyFrame: i % 60 === 0 }); frame.close();
+    if (enc.encodeQueueSize > 8) await new Promise(r => enc.addEventListener('dequeue', r, { once: true }));
+  }
+  await enc.flush(); muxer.finalize(); const ms = performance.now() - t0; const buf = muxer.target.buffer;
+  const url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' })); const v = document.createElement('video'); v.src = url;
+  const meta = await new Promise(r => { v.onloadedmetadata = () => r({ duration: +v.duration.toFixed(2), w: v.videoWidth, h: v.videoHeight }); v.onerror = () => r({ error: 'video element could not load it' }); });
+  return { hw, frames, fps, encodeMs: Math.round(ms), drawMsTotal: Math.round(draw), realtimeX: +((frames / fps) / (ms / 1000)).toFixed(2), bytes: buf.byteLength, playable: meta, encErr };
+};
+</script>
