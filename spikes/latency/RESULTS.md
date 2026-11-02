@@ -41,3 +41,12 @@ real parallel Spark (memory, usage drop per Spark) still not measured. Subscript
 - **Memory is the cost: the 12 Claude Code processes peaked at ~3.0 GB RSS (~250 MB each)** on a 16 GB Mac that also runs Chrome (~1 GB for the canvas) and the local model (~2.5 GB). A Spark of 12 is fine; 12 held open permanently is not: pool size and idle shutdown matter.
 - Same prompt in all 12 (no per-take variation), tiny output. A real Spark asks for whole directions (more tokens), so expect longer totals.
 - Subscription usage burned per Spark: still NOT measured (no usage meter readable from here).
+
+## Pass 4: Agent SDK 0.3.316 (`sdk.mjs`, Haiku, `settingSources: []`, `tools: []`, no API key; n=3 each)
+| Path | First token | Total |
+|---|---|---|
+| `query()` cold, new process per request | 0.89 / 0.99 / 1.40 s | 1.15 / 1.19 / 1.67 s |
+| `prewarm()` a spare (returns in ~0.2 s, waited 2.5 s) then `claim()` | 1.72 / 1.24 / 0.70 s | 1.80 / 1.34 / 0.88 s |
+- A minimal SDK `query()` is as fast as or faster than the CLI's first turn (1.3-1.8 s), so the SDK is a fine driver; **`prewarm()` showed no consistent gain at n=3** (high variance, needs 30+ runs). A parked spare holds 230-260 MB (matches the ~250 MB per session measured).
+- `claim()` needs `options.cwd` (without it the process answers `not_claimed`).
+- Fastest remains a **persistent session**: 0.45-0.9 s to first token on warm turns (CLI stream-json; the SDK streaming-input mode should match, not tested).

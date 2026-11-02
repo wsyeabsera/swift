@@ -1,0 +1,2 @@
+cold [{"first":888,"total":1148,"ok":true},{"first":993,"total":1187,"ok":true},{"first":1395,"total":1671,"ok":true}]
+{"cold":[{"first":888,"total":1148,"ok":true},{"first":993,"total":1187,"ok":true},{"first":1395,"total":1671,"ok":true}],"prewarmed":[{"first":1722,"total":1804,"ok":true,"prewarmMs":198},{"first":1239,"total":1343,"ok":true,"prewarmMs":200},{"first":696,"total":878,"ok":true,"prewarmMs":185}]}
