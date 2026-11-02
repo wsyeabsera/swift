@@ -46,9 +46,10 @@ export function App() {
   const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
   type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string } | { kind: 'frameDel'; frameId: string; frame: FrameDef; index: number };
   const history = useRef<Entry[]>([]); const [edits, setEdits] = useState(0);
-  const edit = useCallback(async (frameId: string, el: string, prop: string, value: string, record = true) => {
+  const lastEditAt = useRef(0);
+  const edit = useCallback(async (frameId: string, el: string, prop: string, value: string, record = true, coalesce = false) => {
     const r = await window.__swift?.edit(frameId, el, prop, value); if (!r?.ok) return;
-    if (record) { history.current.push({ kind: 'edit', frameId, el, prop, before: r.before, after: value }); redoStack.current = []; setRedos(0); setEdits(history.current.length); }
+    if (record) { const last = history.current[history.current.length - 1]; const now = Date.now(); if (coalesce && last?.kind === 'edit' && last.frameId === frameId && last.el === el && last.prop === prop && now - lastEditAt.current < 800) last.after = value; else history.current.push({ kind: 'edit', frameId, el, prop, before: r.before, after: value }); lastEditAt.current = now; redoStack.current = []; setRedos(0); setEdits(history.current.length); }
     setTier0(`Tier 0 · ${r.ms.toFixed(1)} ms`); setRevision((n) => n + 1);
   }, []);
   const redoStack = useRef<Entry[]>([]); const [redos, setRedos] = useState(0);
@@ -171,7 +172,7 @@ export function App() {
   useEffect(() => {
     const k = async (e: KeyboardEvent) => {
       if (!selection || !e.key.startsWith('Arrow') || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
-      const props = await window.__swift?.props(selection.frameId, selection.el, ['position', 'left', 'top']); if (!props) return; const n = nudge(props, e.key, e.shiftKey); if (!n) return; e.preventDefault(); void edit(selection.frameId, selection.el, n.prop, n.value);
+      const props = await window.__swift?.props(selection.frameId, selection.el, ['position', 'left', 'top']); if (!props) return; const n = nudge(props, e.key, e.shiftKey); if (!n) return; e.preventDefault(); void edit(selection.frameId, selection.el, n.prop, n.value, true, true);
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, edit]);

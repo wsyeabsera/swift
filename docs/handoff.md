@@ -15,7 +15,7 @@
 - Export button: selected frame as a standalone HTML download (`canvas/exportHtml.ts`).
 - "+ phone/desktop/tv" add an empty preset frame (`newFrame`).
 - Delete frame button (history entry `frameDel`, undo restores at the same index with its edits; last frame protected).
-- Arrow keys nudge the selected positioned element (Shift 10 px; `canvas/nudge.ts`), each a separate undo step.
+- Arrow keys nudge the selected positioned element (Shift 10 px; `canvas/nudge.ts`); rapid nudges on the same property within 800 ms coalesce into ONE undo step.
 - Enter selects the first child, Shift+Enter the parent (`canvas/tree.ts`).
 - Autosave also flushes on visibilitychange→hidden (no 1 s wait).
 - Folder picker: Import → Choose… runs the native dialog in the helper (`project.pick`, osascript; `SWIFT_PICKER_BIN` overrides, tests use a fake script); a folder picked in the dialog becomes an allowed root for this helper run (consent by gesture; a folder the client merely names stays refused); empty folders show an empty state.
