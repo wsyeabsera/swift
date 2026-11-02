@@ -6,6 +6,7 @@ import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type Theme
 import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { makeFrames, type FrameDef } from './canvas/fixtures';
+import { duplicateFrame, duplicateId } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
@@ -65,6 +66,14 @@ export function App() {
   const takeCount = useMemo(() => frames.filter(isTake).length, [frames]); const selIsTake = !!selection && frames.some((f) => f.id === selection.frameId && isTake(f));
   const discard = useCallback(() => { const gone = new Set(frames.filter(isTake).map((f) => f.id)); history.current = history.current.filter((e) => !gone.has(e.frameId)); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded`); }, [frames, selection]);
   const resetDesign = useCallback(() => { clearDoc(); location.reload(); }, []);
+  // ⌘D duplicates the selected frame (its current HTML), then selects nothing so the copy can be picked by clicking.
+  const duplicate = useCallback(async () => {
+    const base = frames.find((f) => f.id === (selection?.frameId ?? '')); if (!base || !window.__swift) return;
+    const html = await window.__swift.snapshot(base.id); if (!html) { setSayStatus('Could not duplicate: frame not ready'); return; }
+    const copy = duplicateFrame(frames, base, duplicateId(frames, base.id), html); setFrames((f) => [...f, copy]); setSayStatus(`Duplicated ${base.title}`);
+    setTimeout(() => window.__swift?.fitTo([copy.id]), 150);
+  }, [frames, selection]);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void duplicate(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [duplicate]);
   // Delete / Backspace removes the selected element (never a frame root); one snapshot makes it one undo step.
   const removeSelected = useCallback(async () => {
     if (!selection || !window.__swift) return; const f = frames.find((x) => x.id === selection.frameId); if (!f || f.root === selection.el) return;

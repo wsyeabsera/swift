@@ -51,6 +51,9 @@ try {
   await web.getByTestId('undo').click(); await web.waitForTimeout(400); const delBack = await web.evaluate(async () => (await window.__swift.tree('tv')).some((n) => n.id === 'date'));
   const rp = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 40 * v.s, y: v.y + 40 * v.s }; }); await web.mouse.click(rp.x, rp.y); await web.waitForTimeout(300); await web.keyboard.press('Delete'); await web.waitForTimeout(300); const rootKept = await web.evaluate(async () => (await window.__swift.tree('tv')).some((n) => n.id === 'tv'));
   cv.del = { delGone, delBack, rootKept, status: (await web.textContent('[data-testid=say-status]'))?.trim() };
+  // ⌘D duplicates the selected frame with its edits
+  { const q = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 40 * v.s, y: v.y + 40 * v.s }; }); await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const q2 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 40 * v.s, y: v.y + 40 * v.s }; }); await web.mouse.click(q2.x, q2.y); await web.waitForTimeout(300); void q; }
+  await web.keyboard.press('Meta+d'); await web.waitForTimeout(700); cv.dup = await web.evaluate(async () => { const id = window.__swift.frames.find((f) => f === 'tv-d1'); return { id, same: id ? (await window.__swift.get(id, 'clock', 'font-size')) === (await window.__swift.get('tv', 'clock', 'font-size')) : false }; });
   // Keep one take, discard the rest: only the kept take stays (and the base frames are untouched)
   await web.evaluate(() => window.__swift.fitTo(['tv-t2'])); await web.waitForTimeout(200); const tp = await web.evaluate(() => { const v = window.__swift.view(); const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(tp.x, tp.y); await web.waitForFunction(() => !document.querySelector('[data-testid=keep-take]').disabled, null, { timeout: 4000 });
   await web.getByTestId('keep-take').click(); await web.getByTestId('discard-takes').click(); await web.waitForTimeout(500);
@@ -88,7 +91,7 @@ try {
   const importOk = /tokens/.test(cv0.import.ok) && cv0.import.ok.includes('files') && cv0.import.refused && cv0.import.escClosed && cv0.import.focusBack === 'project-button';
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
-  const takesOk = cv0.takes.spark.length === 1 && cv0.takes.total === 21;
+  const takesOk = cv0.takes.spark.length === 1 && cv0.takes.total === 22 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
   const delOk = cv0.del.delGone && cv0.del.delBack && cv0.del.rootKept;
   const docOk = delOk &&  takesOk &&  cv0.docRestored.sameFrames && cv0.docRestored.more && cv0.docRestored.color;
   const ok = docOk && canvasOk && selOk && sayOk && sparkOk && importOk && cmdKOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { docOk, canvasOk, selOk, sayOk, sparkOk, importOk, cmdKOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
