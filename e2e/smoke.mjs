@@ -100,6 +100,8 @@ try {
     const listed = await web.$$eval('[data-testid=projects] button', (els) => els.map((e) => e.textContent)); const swatches = await web.$$eval('[data-testid=projects] .sw', (n) => n.length); await web.getByTestId('project-tvdash').click(); await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n, nTv, { timeout: 8000 }); await web.waitForTimeout(300);
     im.project = { swatches, name, using, listed, backFrames: await web.evaluate(() => window.__swift.frames.length), nTv, backName: (await web.textContent('[data-testid=project-button] b'))?.trim() };
     await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); await web.getByTestId('import-path').fill(`${root}/app`); await web.getByTestId('import-scan').click(); await web.waitForFunction(() => /tokens/.test(document.querySelector('[data-testid=import-result]').textContent), null, { timeout: 8000 }); }
+  { const empty = path.join(root, 'e2e', `.empty-${process.pid}`); fs.mkdirSync(empty, { recursive: true }); const rootsOk = empty.startsWith(root);
+    await web.getByTestId('import-path').fill(rootsOk ? empty : `${root}/e2e/node_modules_missing`); await web.getByTestId('import-scan').click(); await web.waitForFunction(() => document.querySelector('[data-testid=import-result]').textContent.trim().length > 0, null, { timeout: 8000 }); im.emptyState = { rootsOk, shown: (await web.$('[data-testid=import-empty]')) !== null }; fs.rmSync(empty, { recursive: true, force: true }); }
   await web.getByTestId('import-path').fill('/etc'); await web.getByTestId('import-scan').click(); await web.waitForFunction(() => /not allowed/.test(document.querySelector('[data-testid=import-result]').textContent), null, { timeout: 8000 }); im.refused = true;
   await web.keyboard.press('Escape'); await web.waitForTimeout(150); im.escClosed = (await web.$('[data-testid=import]')) === null; im.focusBack = await web.evaluate(() => document.activeElement?.getAttribute('data-testid')); cv.import = im;
   // Appearance popover (rule H7) + theme persistence
@@ -131,7 +133,8 @@ try {
   const themeOk = cv0.theme.bgAfterPick.includes('fuji') && cv0.theme.modeClass.includes('m-light') && cv0.theme.blur.trim() === '48px' && cv0.theme.escClosed && cv0.theme.focusBack === 'appearance-button' && cv0.theme.scrimClosed && cv0.theme.persisted;
   const sparkOk = cv0.spark.ids.length === 4 && cv0.spark.sizes.every((x) => x === '300px') && /4 takes · 4 changed/.test(cv0.sparkStatus) && /first paint/.test(cv0.sparkStatus);
   const brandOk = cv0.import.brand.enabled ? cv0.import.brand.u1 !== cv0.import.brand.u0 || /Say uses \d+ brand tokens/.test(cv0.import.brand.u1) : /Say uses \d+ brand tokens/.test(cv0.import.brand.u1);
-  const pickOk = cv0.import.picked.path.endsWith('/app/');
+  const emptyOk = cv0.import.emptyState.rootsOk && cv0.import.emptyState.shown;
+  const pickOk = emptyOk &&  cv0.import.picked.path.endsWith('/app/');
   const projOk = pickOk &&  cv0.import.project.name === 'app' && cv0.import.project.swatches >= 4 && /Say uses 12 brand tokens/.test(cv0.import.project.using) && cv0.import.project.listed.length === 2 && cv0.import.project.backFrames === cv0.import.project.nTv && cv0.import.project.backName === 'tvdash';
   const importOk = projOk && brandOk && /tokens/.test(cv0.import.ok) && cv0.import.ok.includes('files') && cv0.import.refused && cv0.import.escClosed && cv0.import.focusBack === 'project-button';
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;

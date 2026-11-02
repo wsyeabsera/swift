@@ -14,3 +14,11 @@ fn script(name: &str, body: &str) -> String { let p = std::env::temp_dir().join(
     let empty = pick(&mut start(&script("pick-empty", "echo"))); assert_eq!(empty["ok"], false);
     let missing = pick(&mut start("/nonexistent/dialog")); assert_eq!(missing["ok"], false); assert!(missing["error"].as_str().unwrap().contains("no folder dialog"));
 }
+
+fn scan(ws: &mut Ws, path: &str) -> serde_json::Value { ws.send(Message::text(serde_json::json!({ "type": "project.scan", "id": "s1", "path": path }).to_string())).unwrap(); loop { let Message::Text(t) = ws.read().unwrap() else { continue }; let v: serde_json::Value = serde_json::from_str(t.as_str()).unwrap(); if v["type"] == "project.scan" { return v; } } }
+#[test] fn a_picked_folder_becomes_scannable_but_a_named_one_does_not() {
+    let dir = std::env::temp_dir().join(format!("sc-picked-{}", std::process::id())); let other = std::env::temp_dir().join(format!("sc-other-{}", std::process::id())); for d in [&dir, &other] { let _ = fs::remove_dir_all(d); fs::create_dir_all(d).unwrap(); fs::write(d.join("a.css"), ":root{--ink:#000}").unwrap(); }
+    let mut ws = start(&script("pick-dir", &format!("echo {}", dir.display())));
+    assert_eq!(scan(&mut ws, dir.to_str().unwrap())["ok"], false, "not allowed before the user picks it"); assert_eq!(pick(&mut ws)["ok"], true);
+    assert_eq!(scan(&mut ws, dir.to_str().unwrap())["ok"], true, "allowed after the dialog"); assert_eq!(scan(&mut ws, other.to_str().unwrap())["ok"], false, "a folder the client only names stays refused");
+}

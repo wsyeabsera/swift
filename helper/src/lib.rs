@@ -59,10 +59,10 @@ fn forbidden() -> ErrorResponse { http::Response::builder().status(403).body(Som
 
 /// Accept loop: one thread per connection. Returns only on listener error.
 pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
-    let busy = Arc::new(AtomicUsize::new(0)); let pool = Arc::new(Pool::new(&cfg.claude_bin, &cfg.model));
+    let busy = Arc::new(AtomicUsize::new(0)); let pool = Arc::new(Pool::new(&cfg.claude_bin, &cfg.model)); let picked: Picked = Arc::new(std::sync::Mutex::new(Vec::new()));
     { let pool = pool.clone(); thread::spawn(move || loop { thread::sleep(Duration::from_secs(10)); pool.reap(std::time::Instant::now(), say::SPARE_IDLE); }); }
     for stream in listener.incoming() {
-        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone(); let pool = pool.clone();
+        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone(); let pool = pool.clone(); let picked = picked.clone();
         thread::spawn(move || {
             let check = |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
                 let origin = req.headers().get("origin").and_then(|v| v.to_str().ok()).unwrap_or("");
@@ -78,7 +78,7 @@ pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
             loop {
                 while let Ok(m) = rx.try_recv() { if ws.send(Message::text(m)).is_err() { return; } }
                 match ws.read() {
-                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy, &pool),
+                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy, &pool, &picked),
                     Ok(Message::Close(_)) | Err(WsError::ConnectionClosed) | Err(WsError::AlreadyClosed) => break,
                     Err(WsError::Io(e)) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => continue,
                     Err(_) => break, Ok(_) => {}
@@ -97,15 +97,17 @@ fn pick_folder(bin: &str) -> Result<String, String> {
 }
 
 /// Messages from the app: ping, and say {id, system, request}. Everything is validated; unknown or malformed input is ignored, never executed.
-fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>) {
+/// Folders the user chose in the native dialog this run: choosing one is consent to read it, so they count as allowed roots (never anything the client merely names).
+type Picked = Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>;
+fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>, picked: &Picked) {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
     match v.get("type").and_then(|t| t.as_str()) {
         Some("ping") => { let _ = tx.send("{\"type\":\"pong\"}".to_string()); }
         Some("project.scan") => {
             let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let path = v.get("path").and_then(|x| x.as_str()).unwrap_or("").to_string();
-            let (tx, roots) = (tx.clone(), cfg.project_roots.clone());
+            let (tx, mut roots) = (tx.clone(), cfg.project_roots.clone()); roots.extend(picked.lock().map(|p| p.clone()).unwrap_or_default());
             thread::spawn(move || { let reply = match scan::allowed_root(std::path::Path::new(&path), &roots) {
-                None => serde_json::json!({ "type": "project.scan", "id": id, "ok": false, "error": "folder not allowed (set SWIFT_PROJECT_ROOTS)" }),
+                None => serde_json::json!({ "type": "project.scan", "id": id, "ok": false, "error": "folder not allowed: pick it with Choose… (or set SWIFT_PROJECT_ROOTS)" }),
                 Some(p) => match scan::scan_dir(&p) { Ok(s) => serde_json::json!({ "type": "project.scan", "id": id, "ok": true, "scan": s }), Err(e) => serde_json::json!({ "type": "project.scan", "id": id, "ok": false, "error": e.to_string() }) } };
                 let _ = tx.send(reply.to_string()); });
         }
@@ -116,8 +118,8 @@ fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<A
                 let reply = match r { Ok(d) => serde_json::json!({ "type": kind, "id": id, "ok": true, "data": d }), Err(e) => serde_json::json!({ "type": kind, "id": id, "ok": false, "error": e.to_string() }) }; let _ = tx.send(reply.to_string()); });
         }
         Some("project.pick") => {
-            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let (tx, bin) = (tx.clone(), cfg.picker_bin.clone());
-            thread::spawn(move || { let reply = match pick_folder(&bin) { Ok(p) => serde_json::json!({ "type": "project.pick", "id": id, "ok": true, "path": p }), Err(e) => serde_json::json!({ "type": "project.pick", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let (tx, bin, picked) = (tx.clone(), cfg.picker_bin.clone(), picked.clone());
+            thread::spawn(move || { let reply = match pick_folder(&bin) { Ok(p) => { if let Ok(c) = std::fs::canonicalize(&p) { if let Ok(mut g) = picked.lock() { if g.len() < 50 && !g.contains(&c) { g.push(c); } } } serde_json::json!({ "type": "project.pick", "id": id, "ok": true, "path": p }) }, Err(e) => serde_json::json!({ "type": "project.pick", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
         }
         Some("prewarm") => { let pool = pool.clone(); thread::spawn(move || pool.prewarm()); }
         Some("say") => {

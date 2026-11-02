@@ -25,6 +25,7 @@ export function ImportProject({ scan, pick, onUse, onCreate, onSwitch, projects,
           {res && !res.ok && <p className="mu">{res.error}</p>}
           {res?.ok && (<>
             <p className="mu mono">{res.scan.files} files · {res.scan.tokens.length} tokens</p>
+            {res.scan.tokens.length === 0 && res.scan.colors.length === 0 && <p className="mu" data-testid="import-empty">No brand tokens or colours found here. You can still create the project and set the look with Say.</p>}
             <div className="swatches">{res.scan.colors.slice(0, 8).map((c) => <span key={c.value} className="sw" title={`${c.value} · ${c.count}×`} style={{ background: c.value }} />)}</div>
             <ul className="toks">{res.scan.tokens.slice(0, 14).map((t) => (<li key={t.name}>{isColor(t.value) && <span className="sw sm" style={{ background: t.value }} />}<span className="mono">{t.name}</span><span className="mu mono"> {t.value}</span></li>))}</ul>
             <button type="button" className="rb btn" data-testid="import-use" disabled={Object.keys(toBrandTokens(res.scan.tokens)).length === 0} onClick={() => onUse(toBrandTokens(res.scan.tokens))}>Use this brand ({Object.keys(toBrandTokens(res.scan.tokens)).length} tokens)</button>
