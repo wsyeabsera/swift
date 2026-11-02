@@ -23,6 +23,7 @@
 - "?" opens the shortcuts sheet (`Shortcuts.tsx`; keep SHORTCUTS in sync when adding keys).
 - Frame ▾ menu in the tools bar holds + presets, Export HTML, Delete frame, Reset design (no overflow at 1280 px; the demo Clock bigger button is gone). Keys are unchanged.
 - Project files: Frame ▾ → Export project file / Open project file… (`projectFile.ts`, version 1 JSON with name, frames, brand; opens as a NEW project, never overwrites; junk refused with a reason).
+- Memory guard (helper `mem.rs`): a Say/Spark take is refused with a clear message when available memory (vm_stat free+inactive+speculative) is below `SWIFT_MIN_FREE_MB` (default 1200); macOS only, allows elsewhere.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

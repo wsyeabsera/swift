@@ -1,6 +1,7 @@
 //! Local helper for Swift Canvas: an authenticated WebSocket on 127.0.0.1.
 //! Security rules (task #1719): bind loopback only; accept a connection only when its Origin is on the exact allow-list AND the token matches;
 //! the allow-list is empty by default, so nothing connects until an extension id (or dev origin) is configured.
+pub mod mem;
 pub mod say;
 pub mod scan;
 pub mod store;
@@ -12,7 +13,7 @@ pub const DEFAULT_PORT: u16 = 7431;
 pub const DEV_ORIGIN: &str = "http://localhost:5173";
 
 #[derive(Clone, Debug)]
-pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String>, pub claude_bin: String, pub model: String, pub project_roots: Vec<std::path::PathBuf>, pub data_dir: std::path::PathBuf, pub picker_bin: String }
+pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String>, pub claude_bin: String, pub model: String, pub project_roots: Vec<std::path::PathBuf>, pub data_dir: std::path::PathBuf, pub picker_bin: String, pub min_free_mb: u64 }
 
 /// Build the config from environment-like lookups (so it is testable without touching the process environment).
 pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn() -> String) -> Config {
@@ -21,7 +22,7 @@ pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn()
     if dev { allowed.push(DEV_ORIGIN.to_string()); }
     let token = get("SWIFT_HELPER_TOKEN").filter(|t| !t.is_empty()).unwrap_or_else(|| if dev { "dev-token".to_string() } else { random_token() });
     let port = get("SWIFT_HELPER_PORT").and_then(|p| p.parse().ok()).unwrap_or(DEFAULT_PORT);
-    Config { port, token, allowed, claude_bin: get("SWIFT_CLAUDE_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "claude".to_string()), model: get("SWIFT_CLAUDE_MODEL").filter(|m| !m.is_empty()).unwrap_or_else(|| "haiku".to_string()), project_roots: get("SWIFT_PROJECT_ROOTS").unwrap_or_default().split(':').filter(|s| !s.is_empty()).map(std::path::PathBuf::from).collect(), picker_bin: get("SWIFT_PICKER_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "osascript".to_string()), data_dir: get("SWIFT_DATA_DIR").filter(|d| !d.is_empty()).map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(get("HOME").unwrap_or_else(|| ".".to_string())).join(".swift-canvas")) }
+    Config { port, token, allowed, claude_bin: get("SWIFT_CLAUDE_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "claude".to_string()), model: get("SWIFT_CLAUDE_MODEL").filter(|m| !m.is_empty()).unwrap_or_else(|| "haiku".to_string()), project_roots: get("SWIFT_PROJECT_ROOTS").unwrap_or_default().split(':').filter(|s| !s.is_empty()).map(std::path::PathBuf::from).collect(), min_free_mb: get("SWIFT_MIN_FREE_MB").and_then(|v| v.parse().ok()).unwrap_or(mem::DEFAULT_MIN_FREE_MB), picker_bin: get("SWIFT_PICKER_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "osascript".to_string()), data_dir: get("SWIFT_DATA_DIR").filter(|d| !d.is_empty()).map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(get("HOME").unwrap_or_else(|| ".".to_string())).join(".swift-canvas")) }
 }
 
 /// Exact match only: "chrome-extension://abc" must not match "chrome-extension://abcd", and an empty Origin never matches.
@@ -125,6 +126,7 @@ fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<A
         Some("say") => {
             let (Some(id), Some(system), Some(request)) = (v.get("id").and_then(|x| x.as_str()), v.get("system").and_then(|x| x.as_str()), v.get("request").and_then(|x| x.as_str())) else { return };
             let id = id.chars().take(64).collect::<String>(); let ev = move |kind: &str, text: &str| serde_json::json!({ "type": "say.event", "id": id, "kind": kind, "text": text }).to_string();
+            if let Err(e) = mem::check(cfg.min_free_mb, mem::available_mb()) { let _ = tx.send(ev("error", &e)); return; }
             if busy.fetch_add(1, Ordering::SeqCst) >= say::MAX_CONCURRENT { busy.fetch_sub(1, Ordering::SeqCst); let _ = tx.send(ev("error", "too many Says at once")); return; }
             let (tx, busy, pool, system, request) = (tx.clone(), busy.clone(), pool.clone(), system.to_string(), request.to_string());
             thread::spawn(move || { say::run_say(&pool, &system, &request, |o| { let _ = tx.send(match o { say::Out::Delta(t) => ev("delta", &t), say::Out::Done => ev("done", ""), say::Out::Error(e) => ev("error", &e) }); }); busy.fetch_sub(1, Ordering::SeqCst); pool.prewarm(); });
