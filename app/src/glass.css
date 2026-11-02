@@ -52,3 +52,4 @@ button:disabled{opacity:.45;cursor:default}
 .projs{list-style:none;margin:6px;padding:0;display:flex;flex-wrap:wrap;gap:6px}.projs .btn.on{opacity:.7}
 .fr-edit{pointer-events:auto;background:#000a;border:1px solid var(--ac);border-radius:8px;padding:0 8px;outline:none;min-width:220px;height:34px;top:-40px}.fr-label{pointer-events:auto;cursor:text}
 .fr-busy{position:absolute;inset:0;border-radius:12px;pointer-events:none;z-index:2;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%) 0 0/300% 100%,rgba(20,22,30,.35);animation:frbusy 1.2s linear infinite}@keyframes frbusy{to{background-position:-300% 0,0 0}}@media (prefers-reduced-motion:reduce){.fr-busy{animation:none}}
+.tools{overflow-x:auto;scrollbar-width:none}.tools::-webkit-scrollbar{display:none}.tools>*{flex:none}
