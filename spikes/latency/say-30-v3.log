@@ -1,0 +1,31 @@
+model=haiku
+turn 1: first token 904 ms, first complete op undefined ms, total 1098 ms, 1 ops, valid JSONL true ask false bad  usage {"in":2,"out":30,"cacheRead":2800,"cacheWrite":2985} apiEquivUSD 0.0006402
+turn 2: first token 1128 ms, first complete op undefined ms, total 1366 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":155,"cacheRead":5470,"cacheWrite":358} apiEquivUSD 0.0008443999999999999
+turn 3: first token 555 ms, first complete op undefined ms, total 856 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":77,"cacheRead":5828,"cacheWrite":172} apiEquivUSD 0.00097598
+turn 4: first token 1358 ms, first complete op 1450 ms, total 1857 ms, 4 ops, valid JSONL true ask false bad  usage {"in":4,"out":317,"cacheRead":6000,"cacheWrite":96} apiEquivUSD 0.00121408
+turn 5: first token 572 ms, first complete op undefined ms, total 772 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":31,"cacheRead":6096,"cacheWrite":329} apiEquivUSD 0.00135674
+turn 6: first token 1030 ms, first complete op undefined ms, total 1105 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":95,"cacheRead":6425,"cacheWrite":44} apiEquivUSD 0.00147769
+turn 7: first token 1526 ms, first complete op undefined ms, total 1629 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":158,"cacheRead":6469,"cacheWrite":116} apiEquivUSD 0.00164498
+turn 8: first token 902 ms, first complete op undefined ms, total 982 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":91,"cacheRead":6585,"cacheWrite":175} apiEquivUSD 0.00179173
+turn 9: first token 1133 ms, first complete op undefined ms, total 1238 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":140,"cacheRead":6760,"cacheWrite":109} apiEquivUSD 0.00195153
+turn 10: first token 1904 ms, first complete op 1977 ms, total 3787 ms, 23 ops, valid JSONL true ask false bad  usage {"in":4,"out":937,"cacheRead":6869,"cacheWrite":165} apiEquivUSD 0.00252212
+turn 11: first token 1868 ms, first complete op 1945 ms, total 2368 ms, 6 ops, valid JSONL true ask false bad  usage {"in":4,"out":387,"cacheRead":7034,"cacheWrite":951} apiEquivUSD 0.00297656
+turn 12: first token 1657 ms, first complete op 1742 ms, total 1875 ms, 2 ops, valid JSONL true ask false bad  usage {"in":4,"out":255,"cacheRead":7985,"cacheWrite":401} apiEquivUSD 0.00326451
+turn 13: first token 1488 ms, first complete op 1548 ms, total 1673 ms, 2 ops, valid JSONL true ask false bad  usage {"in":4,"out":245,"cacheRead":8386,"cacheWrite":271} apiEquivUSD 0.00352547
+turn 14: first token 3031 ms, first complete op undefined ms, total 3632 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":682,"cacheRead":8657,"cacheWrite":267} apiEquivUSD 0.00400684
+turn 15: first token 808 ms, first complete op undefined ms, total 1003 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":102,"cacheRead":8924,"cacheWrite":699} apiEquivUSD 0.00428728
+turn 16: first token 565 ms, first complete op undefined ms, total 865 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":64,"cacheRead":9623,"cacheWrite":116} apiEquivUSD 0.0044391100000000005
+turn 17: first token 913 ms, first complete op undefined ms, total 1010 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":100,"cacheRead":9739,"cacheWrite":80} apiEquivUSD 0.0046029
+turn 18: first token 2357 ms, first complete op 2415 ms, total 2805 ms, 7 ops, valid JSONL true ask false bad  usage {"in":4,"out":449,"cacheRead":9819,"cacheWrite":116} apiEquivUSD 0.00494919
+turn 19: first token 550 ms, first complete op undefined ms, total 733 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":26,"cacheRead":9935,"cacheWrite":460} apiEquivUSD 0.00515394
+turn 20: first token 1308 ms, first complete op 1390 ms, total 2125 ms, 6 ops, valid JSONL true ask false bad  usage {"in":4,"out":367,"cacheRead":10395,"cacheWrite":47} apiEquivUSD 0.00545119
+turn 21: first token 705 ms, first complete op undefined ms, total 1248 ms, 0 ops, valid JSONL false ask false bad json,json,json,json usage {"in":4,"out":113,"cacheRead":10442,"cacheWrite":383} apiEquivUSD 0.00568911
+turn 22: first token 1351 ms, first complete op 1398 ms, total 1556 ms, 3 ops, valid JSONL true ask false bad  usage {"in":4,"out":207,"cacheRead":10825,"cacheWrite":111} apiEquivUSD 0.00592346
+turn 23: first token 1360 ms, first complete op undefined ms, total 3054 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":702,"cacheRead":10936,"cacheWrite":226} apiEquivUSD 0.00642942
+turn 24: first token 781 ms, first complete op undefined ms, total 793 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":64,"cacheRead":11162,"cacheWrite":713} apiEquivUSD 0.0067160399999999995
+turn 25: first token 551 ms, first complete op undefined ms, total 799 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":53,"cacheRead":11875,"cacheWrite":85} apiEquivUSD 0.00687869
+turn 26: first token 1976 ms, first complete op undefined ms, total 2383 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":291,"cacheRead":11960,"cacheWrite":69} apiEquivUSD 0.0071579899999999995
+turn 27: first token 650 ms, first complete op undefined ms, total 868 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":55,"cacheRead":12029,"cacheWrite":311} apiEquivUSD 0.00736838
+turn 28: first token 832 ms, first complete op undefined ms, total 981 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":109,"cacheRead":12340,"cacheWrite":68} apiEquivUSD 0.00756028
+turn 29: first token 588 ms, first complete op undefined ms, total 884 ms, 1 ops, valid JSONL true ask true bad  usage {"in":4,"out":60,"cacheRead":12408,"cacheWrite":128} apiEquivUSD 0.00774036
+turn 30: first token 869 ms, first complete op undefined ms, total 950 ms, 1 ops, valid JSONL true ask false bad  usage {"in":4,"out":68,"cacheRead":12536,"cacheWrite":76} apiEquivUSD 0.00791532

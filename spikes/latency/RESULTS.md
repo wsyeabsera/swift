@@ -81,3 +81,13 @@ real parallel Spark (memory, usage drop per Spark) still not measured. Subscript
 | hide the row meta text | 1.90 s | 2.22 s | 6 | 5.17 s |
 - The first op is applied **1.3-2.7 s** after the request (vs 0.7-1.3 s for streamed JSON text on a warm session, 0.9-1.4 s to first token cold). The tool call only fires when its whole `tool_use` block is complete, the SDK runs the handler, then the model gets a result turn: totals are 2-9.5 s, growing with the number of ops.
 - **Decision: the Say/Spark hot path streams JSON ops as text and applies line by line (task #1731); the in-app MCP server (#1712) serves heavy multi-step work and Claude Code sessions that drive the canvas.**
+
+## Pass 8: Say op language v2/v3 on the same 30 requests (strict validation; `V2=1` / `V3=1 MANY=1 node say.mjs haiku 30`)
+| Prompt | Valid (strict) | `ask` answers | First visible change p50 / p95 / max |
+|---|---|---|---|
+| v1 (set + token only, JSONL check only) | 19/30 | n/a | 1.15 / 2.38 / 2.59 s |
+| v2: + text, add, remove, ask ops and a rule to ask when something is missing | 30/30 | 14 (some over-cautious) | 1.23 / 1.96 / 3.35 s |
+| v3: v2 + brand tokens in scope, the list of element ids, "prefer a sensible default over asking" | 29/30 | 9 (mostly legitimate: no title/button/thumbnail in the tree, another project's palette, a Spark-sized request) | 1.24 / 3.05 / 3.63 s |
+- The op language fixes validity (19 -> 29-30 of 30): the failures were a missing vocabulary, not the model. Giving it tokens and ids cuts needless asks from 14 to 9.
+- Latency: p50 stays ~1.2 s; p95 rises to 2-3 s because `add` answers carry HTML. That is the creative route; token/property edits go through the local tier first.
+- The tested prompt is in `OPS-PROMPT.md` (the contract for task #1731). One of 30 was still invalid (a malformed line on "lake photo"): keep the validate-and-repair loop.
