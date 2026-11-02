@@ -8,6 +8,7 @@ import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
 import { nudge } from './canvas/nudge';
+import { firstChild, parentOf } from './canvas/tree';
 import { exportDoc, exportName } from './canvas/exportHtml';
 import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
@@ -141,6 +142,14 @@ export function App() {
     const f = frames.find((x) => x.id === (selection?.frameId ?? 'tv')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
     const url = URL.createObjectURL(new Blob([exportDoc(f.title, html)], { type: 'text/html' })); const link = document.createElement('a'); link.href = url; link.download = exportName(f.title); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
   }, [frames, selection]);
+  // Enter selects the first child, Shift+Enter the parent (outside inputs and buttons, where Enter has its own meaning).
+  useEffect(() => {
+    const k = async (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || !selection || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLButtonElement) return;
+      const tree = await window.__swift?.tree(selection.frameId); if (!tree) return; const next = e.shiftKey ? parentOf(tree, selection.el) : firstChild(tree, selection.el); if (next) setSelection({ frameId: selection.frameId, el: next });
+    };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  }, [selection]);
   // Arrow keys nudge the selected element (Shift = 10 px) when it is positioned (static elements are left alone).
   useEffect(() => {
     const k = async (e: KeyboardEvent) => {

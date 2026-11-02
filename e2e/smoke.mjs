@@ -71,6 +71,7 @@ try {
     await web.getByTestId('say-input').focus(); await web.keyboard.press('ArrowUp'); const up = await web.getByTestId('say-input').inputValue(); await web.keyboard.press('ArrowDown'); const down = await web.getByTestId('say-input').inputValue(); cv.hist = { up, down };
     await web.evaluate(() => document.activeElement?.blur()); const l0 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')); await web.keyboard.press('ArrowRight'); await web.waitForTimeout(300); const l1 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')); await web.keyboard.press('Shift+ArrowDown'); await web.waitForTimeout(300);
     const t1 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'top')); await web.getByTestId('undo').click(); await web.getByTestId('undo').click(); await web.waitForTimeout(400); cv.nudge = { l0, l1, t1, back: await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')) }; }
+    await web.keyboard.press('Shift+Enter'); await web.waitForTimeout(300); const par = (await web.textContent('[data-testid=inspector-id]'))?.trim(); await web.keyboard.press('Enter'); await web.waitForTimeout(300); const child = (await web.textContent('[data-testid=inspector-id]'))?.trim(); cv.nav = { par, child };
   // Delete removes the selected element, Undo brings it back (the frame root is protected)
   await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); { const q = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 40 * v.s, y: v.y + 40 * v.s }; }); await web.mouse.click(q.x, q.y); await web.waitForTimeout(300); } await web.getByRole('button', { name: /^date/ }).click(); await web.waitForTimeout(300);
   const selBefore = (await web.textContent('[data-testid=inspector-id]'))?.trim(); await web.keyboard.press('Delete'); await web.waitForTimeout(400); const afterDel = (await web.textContent('[data-testid=say-status]'))?.trim(); const dg = await web.evaluate(async () => { const o = {}; for (const f of window.__swift.frames.filter((x) => x === 'tv' || x.startsWith('tv-t'))) o[f] = (await window.__swift.tree(f)).some((n) => n.id === 'date'); return o; }); const delGone = dg.tv === false;
@@ -137,7 +138,8 @@ try {
   const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
   const exportOk = addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
-  const nudgeOk = cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
+  const navOk = cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
+  const nudgeOk = navOk &&  cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
   const histOk = nudgeOk &&  ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
   const keysOk = histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;
   const localOk = keysOk &&  cv0.local.f1 !== cv0.local.f0 && cv0.local.f2 === cv0.local.f0 && cv0.local.f3 === cv0.local.f1 && cv0.local.f4 === cv0.local.f1 && cv0.local.f5 === cv0.local.f0 && /^Local/.test(cv0.local.status);

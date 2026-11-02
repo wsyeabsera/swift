@@ -1,6 +1,6 @@
 # Handoff (2026-11-02, fourth goal hour in progress)
 
-## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (70), `npm run e2e` (pass)
+## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (71), `npm run e2e` (pass)
 - Autosave/restore of the design (`doc.ts`, localStorage, 1 s debounce, all-or-nothing parse, save errors shown, Reset button); Spark ids continue after restore.
 - Spark: Keep take / Discard takes (`kept` flag on FrameDef), Cancel Spark (AbortSignal through runSpark/runSay; late ops dropped, no repair turn), cap of 8 unreviewed takes (`canSpark`).
 - ⌘D duplicate frame (`canvas/frames.ts`), Delete removes the selected element (one undo step via snapshot; frame root protected), ⌘0 fit, ⌘1 actual size, Escape deselects.
@@ -16,6 +16,7 @@
 - "+ phone/desktop/tv" add an empty preset frame (`newFrame`).
 - Delete frame button (history entry `frameDel`, undo restores at the same index with its edits; last frame protected).
 - Arrow keys nudge the selected positioned element (Shift 10 px; `canvas/nudge.ts`), each a separate undo step.
+- Enter selects the first child, Shift+Enter the parent (`canvas/tree.ts`).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 
