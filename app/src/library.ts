@@ -24,3 +24,7 @@ export function uniquifyIds(html: string, taken: Set<string>): string {
 type Store = Pick<Storage, 'getItem' | 'setItem'>; const safe = (): Store | undefined => { try { return typeof localStorage === 'undefined' ? undefined : localStorage; } catch { return undefined; } };
 export function loadLibrary(storage: Pick<Store, 'getItem'> | undefined = safe()): LibItem[] { try { const raw = storage?.getItem(KEY); return raw ? sanitizeLibrary(JSON.parse(raw)) : []; } catch { return []; } }
 export function saveLibrary(list: LibItem[], storage: Pick<Store, 'setItem'> | undefined = safe()): string | null { try { if (!storage) return 'storage unavailable'; storage.setItem(KEY, JSON.stringify(list)); return null; } catch (e) { return e instanceof Error ? e.message : 'save failed'; } }
+export const removeItem = (list: LibItem[], id: string): LibItem[] => list.filter((i) => i.id !== id);
+/** Distinct origin projects, in first-seen order (newest item first), for the filter chips. */
+export const origins = (list: LibItem[]): string[] => [...new Set(list.map((i) => i.origin))];
+export const filterItems = (list: LibItem[], origin: string | null): LibItem[] => (origin ? list.filter((i) => i.origin === origin) : list);

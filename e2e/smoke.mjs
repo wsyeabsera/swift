@@ -104,7 +104,8 @@ try {
     await web.getByTestId('frame-menu').click(); await web.getByTestId('lib-save').click(); await web.waitForTimeout(250); const saveStatus = (await web.textContent('[data-testid=say-status]'))?.trim();
     const libItems = await web.$$eval('[data-testid=lib-item]', (e) => e.map((x) => x.textContent)); await web.getByTestId('lib-item').first().click(); await web.waitForTimeout(500);
     const inserted = await web.evaluate(async () => (await window.__swift.tree('tv')).some((n) => n.id === 'clock-2')); await web.getByTestId('undo').click(); await web.waitForTimeout(400); const removed = await web.evaluate(async () => !(await window.__swift.tree('tv')).some((n) => n.id === 'clock-2'));
-    cv.library = { saveStatus, libItems, inserted, removed };
+    await web.getByTestId('frame-menu').click(); await web.getByTestId('lib-remove').first().click(); await web.waitForTimeout(250); const afterRemove = { items: await web.$$eval('[data-testid=lib-item]', (e) => e.length), status: (await web.textContent('[data-testid=say-status]'))?.trim() }; await web.keyboard.press('Escape'); await web.waitForTimeout(150);
+    cv.library = { saveStatus, libItems, inserted, removed, afterRemove };
     cv.chips = { chipLabels, c0, c1, back: await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')) };
     await web.evaluate(() => document.activeElement?.blur()); const l0 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')); await web.keyboard.press('ArrowRight'); await web.waitForTimeout(300); const l1 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')); await web.keyboard.press('Shift+ArrowDown'); await web.waitForTimeout(300);
     const t1 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'top')); await web.getByTestId('undo').click(); await web.getByTestId('undo').click(); await web.waitForTimeout(400); cv.nudge = { l0, l1, t1, back: await web.evaluate(() => window.__swift.get('tv', 'clock', 'left')) };
@@ -211,7 +212,7 @@ try {
   const zoomSelOk = cv0.zoomSel.sAfter > cv0.zoomSel.sBefore;
   const resizeOk = Math.abs(cv0.resize.dw - cv0.resize.expW) <= 2 && Math.abs(cv0.resize.dh - cv0.resize.expH) <= 2 && Math.abs(cv0.resize.backW) < 0.5 && Math.abs(cv0.resize.backH) < 0.5;
   const dragOk = resizeOk &&  Math.abs(cv0.drag.moveX - cv0.drag.expX) <= 2 && Math.abs(cv0.drag.moveY - cv0.drag.expY) <= 2 && cv0.drag.stillSel === 'clock' && cv0.drag.backX === 0 && cv0.drag.backY === 0;
-  const libOk = /Saved #clock/.test(cv0.library.saveStatus) && cv0.library.libItems.length >= 1 && cv0.library.inserted && cv0.library.removed;
+  const libOk = /Saved #clock/.test(cv0.library.saveStatus) && cv0.library.libItems.length >= 1 && cv0.library.inserted && cv0.library.removed && cv0.library.afterRemove.items === 0 && /Removed from the library/.test(cv0.library.afterRemove.status);
   const eyeOk = libOk &&  cv0.eye.pressed === 'true' && cv0.eye.computed === 'hidden' && cv0.eye.backPressed === 'false' && cv0.eye.backComputed === 'visible';
   const chipsOk = eyeOk &&  cv0.chips.chipLabels.includes('Bigger') && cv0.chips.chipLabels.includes('Hide') && cv0.chips.c1 !== cv0.chips.c0 && cv0.chips.back === cv0.chips.c0;
   const holdOk = chipsOk &&  cv0.nudgeHold.moved === 5 && cv0.nudgeHold.steps === 1 && cv0.nudgeHold.back === 0;

@@ -15,7 +15,7 @@ import { compareSet } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
 import { starterFrames } from './canvas/starter';
 import { retheme } from './retheme';
-import { addItem, loadLibrary, saveLibrary, uniquifyIds, type LibItem } from './library';
+import { filterItems, origins, removeItem, addItem, loadLibrary, saveLibrary, uniquifyIds, type LibItem } from './library';
 import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
@@ -34,7 +34,8 @@ export function App() {
   const [reg] = useState<Registry>(() => loadRegistry()); const project = activeProject(reg);
   const hadLocal = useRef(loadDoc(undefined, project.id) !== null); const [ready, setReady] = useState(hadLocal.current); const [epoch, setEpoch] = useState(0);
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
-  const [library, setLibrary] = useState<LibItem[]>(() => loadLibrary());
+  const [library, setLibrary] = useState<LibItem[]>(() => loadLibrary()); const [libFilter, setLibFilter] = useState<string | null>(null);
+  const dropFromLibrary = useCallback((id: string) => { const next = removeItem(library, id); setLibrary(next); const err = saveLibrary(next); setSayStatus(err ? `Removed for now, not stored: ${err}` : 'Removed from the library'); }, [library]);
   const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand(undefined, project.id));
   const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const takesRunning = useRef(new Map<string, AbortController>()); const [painting, setPainting] = useState<Set<string>>(new Set()); const [sparking, setSparking] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null); const [shortcutsOpen, setShortcutsOpen] = useState(false); const [frameMenuOpen, setFrameMenuOpen] = useState(false); const fmRef = useRef<HTMLButtonElement>(null); const fileRef = useRef<HTMLInputElement>(null); const kbRef = useRef<HTMLButtonElement>(null);
@@ -249,7 +250,8 @@ export function App() {
             </div>
             <h2>Library <span className="mono mu">shared across projects</span></h2>
             <div className="projs"><button className="rb btn" onClick={() => void saveToLibrary()} disabled={!selection} data-testid="lib-save">Save selection</button></div>
-            <ul className="liblist" data-testid="library">{library.slice(0, 12).map((it) => (<li key={it.id}><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void insertFromLibrary(it); }} data-testid="lib-item" title={`Insert into the selected frame`}>{it.name}<span className="mono mu"> · {it.origin}</span></button></li>))}{library.length === 0 && <li className="mu">Nothing saved yet.</li>}</ul>
+            {origins(library).length > 1 && <div className="projs" role="group" aria-label="Filter by project" data-testid="lib-filters"><button className={`rb btn${libFilter === null ? ' on' : ''}`} aria-pressed={libFilter === null} onClick={() => setLibFilter(null)}>All</button>{origins(library).map((o) => <button key={o} className={`rb btn${libFilter === o ? ' on' : ''}`} aria-pressed={libFilter === o} onClick={() => setLibFilter(o)} data-testid={`lib-filter-${o}`}>{o}</button>)}</div>}
+            <ul className="liblist" data-testid="library">{filterItems(library, libFilter).slice(0, 12).map((it) => (<li key={it.id} className="libitem"><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void insertFromLibrary(it); }} data-testid="lib-item" title={`Insert into the selected frame`}>{it.name}<span className="mono mu"> · {it.origin}</span></button><button className="rb btn libx" aria-label={`Remove ${it.name} from the library`} data-testid="lib-remove" onClick={() => dropFromLibrary(it.id)}>✕</button></li>))}{library.length === 0 && <li className="mu">Nothing saved yet.</li>}</ul>
             <h2>Project</h2>
             <div className="projs"><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportProject(); }} data-testid="export-project">Export project file</button><button className="rb btn" onClick={() => fileRef.current?.click()} data-testid="open-project">Open project file…</button><button className="rb btn" onClick={resetDesign} data-testid="reset">Reset design</button></div>
           </div>

@@ -20,3 +20,8 @@ test('the origin brand tokens travel with the item (validated), so another proje
   const r = addItem([], 'card', 'radar', '<div id="card">x</div>', { '--bg': '#fff', '--bad': 'red; x:y' }); expect(r.ok && r.list[0]!.tokens).toEqual({ '--bg': '#fff' }); expect(addItem([], 'a', 'p', '<b/>').ok).toBe(true);
   const m: Record<string, string> = {}; const st = { getItem: (k: string) => m[k] ?? null, setItem: (k: string, v: string) => { m[k] = v; } }; if (r.ok) { saveLibrary(r.list, st); expect(loadLibrary(st)[0]!.tokens).toEqual({ '--bg': '#fff' }); }
 });
+import { filterItems, origins, removeItem } from './library';
+test('remove, origins and filter', () => {
+  const l = [{ id: 'a:x', name: 'x', origin: 'a', html: '<b/>' }, { id: 'b:y', name: 'y', origin: 'b', html: '<b/>' }, { id: 'a:z', name: 'z', origin: 'a', html: '<b/>' }];
+  expect(origins(l)).toEqual(['a', 'b']); expect(filterItems(l, 'a').map((i) => i.name)).toEqual(['x', 'z']); expect(filterItems(l, null)).toBe(l); expect(filterItems(l, 'nope')).toEqual([]); expect(removeItem(l, 'b:y').map((i) => i.id)).toEqual(['a:x', 'a:z']); expect(removeItem(l, 'zzz')).toEqual(l);
+});
