@@ -36,3 +36,10 @@ Outputs match in all three. WASM wins big only on bulk compare scans (diff, auto
 Absolute times are tens to hundreds of microseconds at 20k nodes, so none of these is a bottleneck today and none saves the 1 ms gate in #1710.
 Read: keep the document in TS first; use Rust (native in the helper first) for bulk work that grows with project size (diff/merge of whole projects,
 image work), and re-measure when a real project exceeds ~100k nodes. `-C target-feature=+simd128` is worth turning on if WASM is used.
+
+## Pass 3: `cargo test` vs `cargo-nextest` 0.9.150 (200 tiny tests + 2 unit tests, warm, 2026-11-02)
+| | Run (built) | After editing the library (rebuild + run) |
+|---|---|---|
+| `cargo test -q` | 0.09 s | 0.65 s |
+| `cargo nextest run` | 0.30 s | 0.87 s |
+For many tiny tests plain `cargo test` (one process, threads) is faster: nextest starts a process per test (~1.5 ms each) and wins only when tests are slow, flaky or need isolation and per-test timing. **Start with `cargo test`; add nextest when the suite has slow tests.** The rebuild after an edit (0.65 s) dominates, so crate granularity matters more than the runner.
