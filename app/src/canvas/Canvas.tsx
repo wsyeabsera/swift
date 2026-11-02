@@ -12,6 +12,7 @@ export type CanvasApi = {
   tree: (frameId: string) => Promise<TreeNode[]>;
   hit: (frameId: string, x: number, y: number) => Promise<string | null | undefined>;
   snapshot: (frameId: string) => Promise<string>;
+  outer: (frameId: string, el: string) => Promise<string>;
   load: (frameId: string, html: string) => Promise<boolean>;
   text: (frameId: string, el: string, value: string) => Promise<boolean>;
   add: (frameId: string, parent: string, html: string) => Promise<boolean>;
@@ -72,6 +73,7 @@ export function Canvas({ frames, selection, onSelect, revision, onReady, onRenam
       props: async (id, el, props) => (await bridge(id)?.request({ t: 'props', el, props }))?.values,
       tree: async (id) => (await bridge(id)?.request({ t: 'tree' }))?.tree ?? [],
       hit: async (id, x, y) => (await bridge(id)?.request({ t: 'hit', x, y }))?.id,
+      outer: async (id, el) => (await bridge(id)?.request({ t: 'outer', el }))?.html ?? '',
       snapshot: async (id) => (await bridge(id)?.request({ t: 'snapshot' }))?.html ?? '',
       load: async (id, html) => !!(await bridge(id)?.request({ t: 'load', html }))?.ok,
       text: async (id, el, value) => !!(await bridge(id)?.request({ t: 'text', el, value }))?.ok,

@@ -7,6 +7,7 @@ addEventListener('message', (e) => {
     else if (m.t === 'edit') { const el = document.getElementById(m.el); if (!el) return reply({ ok: false }); const before = el.style.getPropertyValue(m.prop); el.style.setProperty(m.prop, m.value); reply({ ok: true, before }); }
     else if (m.t === 'get') { const el = document.getElementById(m.el); if (!el) return reply({ ok: false }); reply({ ok: true, value: getComputedStyle(el).getPropertyValue(m.prop) }); }
     else if (m.t === 'snapshot') { reply({ ok: true, html: document.body.innerHTML }); }
+    else if (m.t === 'outer') { const el = document.getElementById(m.el); if (!el) return reply({ ok: false }); reply({ ok: true, html: el.outerHTML }); }
     else if (m.t === 'text') { const el = document.getElementById(m.el); if (!el) return reply({ ok: false }); const before = el.textContent; el.textContent = String(m.value); reply({ ok: true, before }); }
     else if (m.t === 'add') { const el = document.getElementById(m.el); if (!el) return reply({ ok: false }); el.insertAdjacentHTML('beforeend', String(m.html)); reply({ ok: true }); }
     else if (m.t === 'remove') { const el = document.getElementById(m.el); if (!el) return reply({ ok: false }); el.remove(); reply({ ok: true }); }

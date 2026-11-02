@@ -1,6 +1,6 @@
 import type { CanvasApi } from '../canvas/Canvas';
 import { checkLine, LineSplitter, type Op } from './ops';
-import { buildSystemPrompt } from './prompt';
+import { buildSystemPrompt, MAX_TREE, treeContext } from './prompt';
 export type SayEvent = { kind: 'delta'; text: string } | { kind: 'done' } | { kind: 'error'; text: string };
 /** What the helper client offers Say: send a request, get streamed events (the real one is a WebSocket; tests pass a fake). */
 export type SayTransport = (system: string, request: string, onEvent: (e: SayEvent) => void) => void;
@@ -17,10 +17,11 @@ async function applyOp(api: CanvasApi, frameId: string, root: string, op: Op): P
   }
 }
 /** One Say: snapshot (for one-step undo), build the prompt from the frame, stream ops, validate each line as it completes and apply the good ones at once. */
-export async function runSay(a: { api: CanvasApi; send: SayTransport; frameId: string; root: string; request: string; now?: () => number; signal?: AbortSignal; tokens?: Record<string, string> }): Promise<SayResult> {
+export async function runSay(a: { api: CanvasApi; send: SayTransport; frameId: string; root: string; request: string; now?: () => number; signal?: AbortSignal; tokens?: Record<string, string>; selected?: string }): Promise<SayResult> {
   const now = a.now ?? (() => performance.now()); const t0 = now();
   const snapshot = await a.api.snapshot(a.frameId); const tree = await a.api.tree(a.frameId); const ids = new Set(tree.map((n) => n.id));
-  const system = buildSystemPrompt({ tokens: a.tokens ?? BRAND_TOKENS, ids: [...ids], tree: snapshot });
+  const selectedHtml = a.selected && ids.has(a.selected) && snapshot.length > MAX_TREE ? await a.api.outer(a.frameId, a.selected) : undefined;
+  const system = buildSystemPrompt({ tokens: a.tokens ?? BRAND_TOKENS, ids: [...ids], tree: treeContext({ html: snapshot, tree, selectedHtml }) });
   const res: SayResult = { applied: [], asked: [], rejected: [], firstMs: null, totalMs: 0, snapshot };
   const splitter = new LineSplitter(); let chain: Promise<void> = Promise.resolve();
   const handle = (line: string) => { chain = chain.then(async () => {

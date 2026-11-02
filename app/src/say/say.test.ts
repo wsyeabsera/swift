@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import type { CanvasApi } from '../canvas/Canvas';
 import { checkLine, LineSplitter } from './ops';
-import { buildSystemPrompt, MAX_TREE, trimTree } from './prompt';
+import { buildSystemPrompt, MAX_TREE, outline, treeContext, trimTree } from './prompt';
 import { isRepairable, runSay, runSayRepairing, type SayEvent } from './say';
 const ids = () => new Set(['tv', 'clock', 'recent']);
 test('valid ops pass, unknown ids and bad fields are rejected', () => {
@@ -62,3 +62,20 @@ test('cancel: late ops are dropped, the result says cancelled, and no repair tur
   expect(r.error).toBe('cancelled'); expect(applied).toEqual(['opacity']); expect(sends).toBe(1);
 });
 test('cancel before start sends nothing', async () => { const ac = new AbortController(); ac.abort(); let sends = 0; const api = { snapshot: async () => '<div id="tv"></div>', tree: async () => [{ id: 'tv', parent: null, depth: 0, tag: 'div', text: '' }] } as unknown as CanvasApi; const r = await runSay({ api, send: () => { sends++; }, frameId: 'tv', root: 'tv', request: 'x', signal: ac.signal }); expect(r.error).toBe('cancelled'); expect(sends).toBe(0); });
+
+const node = (id: string, depth: number, text = '') => ({ id, depth, tag: 'div', text });
+test('small frames keep the full markup (the validated default); big ones get an outline of ALL elements plus the selected markup', () => {
+  expect(treeContext({ html: '<div id="a"></div>', tree: [node('a', 0)] })).toBe('<div id="a"></div>');
+  const big = '<div id="root">' + 'x'.repeat(MAX_TREE) + '</div>'; const tree = [node('root', 0), ...Array.from({ length: 40 }, (_, i) => node(`item${i}`, 1, `Item ${i}`))];
+  const c = treeContext({ html: big, tree, selectedHtml: '<div id="item39" style="color:red">Item 39</div>' }); expect(c).toContain('too large'); expect(c).toContain('#item39 <div> "Item 39"'); expect(c).toContain('<div id="item39" style="color:red">Item 39</div>'); expect(c.length).toBeLessThan(MAX_TREE);
+  expect(treeContext({ html: big, tree })).not.toContain('Selected element');
+});
+test('outline is indented, capped, and says when it was cut; a huge selection is cut but the prompt never truncates it away', () => {
+  expect(outline([node('a', 0), node('b', 1, 'hi')])).toBe('#a <div>\n  #b <div> "hi"'); const o = outline(Array.from({ length: 500 }, (_, i) => node(`n${i}`, 0, 'text')), 200); expect(o.length).toBeLessThan(260); expect(o.endsWith('(outline truncated)')).toBe(true);
+  const c = treeContext({ html: 'x'.repeat(MAX_TREE + 1), tree: Array.from({ length: 400 }, (_, i) => node(`n${i}`, 0, 'text')), selectedHtml: '<b id="s">' + 'y'.repeat(9000) + '</b>' }); expect(c).toContain(', cut'); expect(trimTree(c)).toBe(c);
+});
+test('runSay sends the outline and the selected markup when the frame is too big', async () => {
+  const big = '<div id="root">' + 'x'.repeat(MAX_TREE) + '<span id="deep">Deep</span></div>'; let seen = '';
+  const api = { snapshot: async () => big, tree: async () => [node('root', 0), { id: 'deep', depth: 1, tag: 'span', text: 'Deep' }], outer: async (_f: string, el: string) => `<span id="${el}">Deep</span>` } as unknown as CanvasApi;
+  await runSay({ api, send: (system, _r, on) => { seen = system; on({ kind: 'done' }); }, frameId: 'f', root: 'root', request: 'x', selected: 'deep' }); expect(seen).toContain('#deep <span> "Deep"'); expect(seen).toContain('<span id="deep">Deep</span>'); expect(seen).not.toContain('x'.repeat(200));
+});
