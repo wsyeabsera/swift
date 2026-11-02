@@ -66,6 +66,9 @@ try {
   { await web.keyboard.press('Meta+1'); await web.waitForTimeout(150); const s1 = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Meta+0'); await web.waitForTimeout(150); const s0 = await web.evaluate(() => window.__swift.view().s);
     await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(150); const p1 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(p1.x, p1.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 }); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
     cv.keys = { s1, fitSmaller: s0 < 1, escDeselects: (await web.$('[data-testid=sel]')) === null }; }
+  // Shift+2 zooms to the selected frame
+  { await web.evaluate(() => window.__swift.fitAll()); await web.waitForTimeout(150); const pz = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 40 * v.s, y: v.y + 40 * v.s }; }); await web.mouse.click(pz.x, pz.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 });
+    const sBefore = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Shift+2'); await web.waitForTimeout(200); const sAfter = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Escape'); await web.waitForTimeout(150); cv.zoomSel = { sBefore, sAfter }; }
   // Local tier: "bigger" on a selected element is answered without Claude (status says Local), undo restores
   { const q = await web.evaluate(() => { window.__swift.fitTo(['tv']); }); void q; await web.waitForTimeout(200); const p0 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(p0.x, p0.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 });
     const f0 = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); await web.getByTestId('say-input').fill('bigger'); await web.getByTestId('say-button').click(); await web.waitForFunction(() => /^Local/.test(document.querySelector('[data-testid=say-status]').textContent), null, { timeout: 3000 });
@@ -146,7 +149,8 @@ try {
   const flushOk = cv0.flush === true;
   const exportOk = flushOk &&  addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
-  const navOk = cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
+  const zoomSelOk = cv0.zoomSel.sAfter > cv0.zoomSel.sBefore;
+  const navOk = zoomSelOk &&  cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
   const nudgeOk = navOk &&  cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
   const histOk = nudgeOk &&  ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
   const keysOk = histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;

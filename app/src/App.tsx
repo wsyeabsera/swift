@@ -127,6 +127,7 @@ export function App() {
       const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return; const api = window.__swift; if (!api) return;
       if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); api.fitAll(); }
       else if ((e.metaKey || e.ctrlKey) && e.key === '1') { e.preventDefault(); const r = document.querySelector('[data-testid=canvas]')?.getBoundingClientRect(); const v = api.view(); if (r) api.setView(zoomAt(v, r.width / 2, r.height / 2, 1 / v.s)); }
+      else if (e.code === 'Digit2' && e.shiftKey && !e.metaKey && !e.ctrlKey && selection) { e.preventDefault(); api.fitTo([selection.frameId]); }
       else if (e.key === 'Escape' && !importOpen && !appearanceOpen && selection) setSelection(null);
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);

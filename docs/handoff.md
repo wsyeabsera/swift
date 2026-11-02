@@ -19,6 +19,7 @@
 - Enter selects the first child, Shift+Enter the parent (`canvas/tree.ts`).
 - Autosave also flushes on visibilitychange→hidden (no 1 s wait).
 - Folder picker: Import → Choose… runs the native dialog in the helper (`project.pick`, osascript; `SWIFT_PICKER_BIN` overrides, tests use a fake script); a folder picked in the dialog becomes an allowed root for this helper run (consent by gesture; a folder the client merely names stays refused); empty folders show an empty state.
+- Shift+2 zooms to the selected frame.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 
