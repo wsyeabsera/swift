@@ -7,13 +7,13 @@ import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { makeFrames, type FrameDef } from './canvas/fixtures';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
-import { runSay } from './say/say';
+import { runSayRepairing } from './say/say';
 import { runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
 const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Diagram'] as const;
 export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
-  const [sayText, setSayText] = useState(''); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
+  const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
   const baseFrames = useMemo(() => makeFrames(20), []); const [extra, setExtra] = useState<FrameDef[]>([]); const frames = useMemo(() => [...baseFrames, ...extra], [baseFrames, extra]);
   const sparkN = useRef(0); const [sparkStatus, setSparkStatus] = useState(''); const [sparking, setSparking] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null);
@@ -42,11 +42,13 @@ export function App() {
   const say = useCallback(async () => {
     const text = sayText.trim(); const c = conn.current; if (!text || !window.__swift || !c || saying) return;
     const frameId = selection?.frameId ?? 'tv'; const root = frames.find((f) => f.id === frameId)?.root ?? 'tv'; setSaying(true); setSayStatus('Saying…');
-    const r = await runSay({ api: liveApi, send: c.say, frameId, root, request: selection ? `${text} (the selected element is #${selection.el})` : text });
+    const base = pendingAsk ? `${pendingAsk.original}\n\nYou asked: "${pendingAsk.question}". My answer: ${text}` : text; setPendingAsk(null);
+    const r = await runSayRepairing({ api: liveApi, send: c.say, frameId, root, request: selection ? `${base} (the selected element is #${selection.el})` : base });
+    if (r.asked[0] && r.applied.length === 0) setPendingAsk({ question: r.asked[0], original: pendingAsk ? pendingAsk.original : text }); setSayText('');
     if (r.applied.length > 0) { history.current.push({ kind: 'say', frameId, snapshot: r.snapshot }); setEdits(history.current.length); }
-    setSayStatus(r.error && r.applied.length === 0 ? `Say failed: ${r.error}` : `${r.applied.length} applied${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''}${r.firstMs !== null ? ` · first change ${r.firstMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${r.asked[0] ? ` · Claude asks: ${r.asked[0]}` : ''}`);
+    setSayStatus(r.error && r.applied.length === 0 ? `Say failed: ${r.error}` : `${r.applied.length} applied${r.repaired ? ` · ${r.repaired} repaired` : ''}${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''}${r.firstMs !== null ? ` · first change ${r.firstMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${r.asked[0] ? ` · Claude asks: ${r.asked[0]}` : ''}`);
     setRevision((n) => n + 1); setSaying(false);
-  }, [sayText, saying, selection, frames]);
+  }, [sayText, saying, selection, frames, pendingAsk]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void undo(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo]);
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
@@ -73,7 +75,7 @@ export function App() {
       <Layers frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       <form className="gl isl say" aria-label="Say" onSubmit={(e) => { e.preventDefault(); void say(); }}>
-        <input data-testid="say-input" aria-label="Say what to change" placeholder={selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => setSayText(e.target.value)} onFocus={() => conn.current?.prewarm()} disabled={saying} />
+        <input data-testid="say-input" aria-label="Say what to change" placeholder={pendingAsk ? `Claude asks: ${pendingAsk.question}` : selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => setSayText(e.target.value)} onFocus={() => conn.current?.prewarm()} disabled={saying} />
         <button type="submit" className="rb btn say-go" data-testid="say-button" disabled={saying || !sayText.trim()}>Say</button>
         <span className="mono mu say-status" data-testid="say-status" role="status">{sayStatus}</span>
       </form>

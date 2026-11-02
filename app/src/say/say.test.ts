@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 import type { CanvasApi } from '../canvas/Canvas';
 import { checkLine, LineSplitter } from './ops';
 import { buildSystemPrompt, MAX_TREE, trimTree } from './prompt';
-import { runSay, type SayEvent } from './say';
+import { isRepairable, runSay, runSayRepairing, type SayEvent } from './say';
 const ids = () => new Set(['tv', 'clock', 'recent']);
 test('valid ops pass, unknown ids and bad fields are rejected', () => {
   expect(checkLine('{"op":"set","id":"clock","prop":"font-size","value":"260px"}', ids()).ok).toBe(true);
@@ -39,4 +39,16 @@ test('runSay streams: applies good ops as lines complete, records rejects and as
 test('a transport error ends the Say cleanly and keeps what was applied', async () => {
   const { api } = fakeApi(); const send = (_s: string, _r: string, on: (e: SayEvent) => void) => { on({ kind: 'delta', text: '{"op":"set","id":"clock","prop":"opacity","value":"0.5"}\n' }); on({ kind: 'error', text: 'claude exited' }); };
   const r = await runSay({ api, send, frameId: 'tv', root: 'tv', request: 'x' }); expect(r.error).toBe('claude exited'); expect(r.applied.length).toBe(1);
+});
+
+test('one repair turn for malformed lines; unknown ids are not retried', async () => {
+  const { api, calls } = fakeApi(); const requests: string[] = []; let turn = 0;
+  const send = (_s: string, request: string, on: (e: SayEvent) => void) => { requests.push(request); const first = turn++ === 0; setTimeout(() => { on({ kind: 'delta', text: first ? '{"op":"set","id":"clock","prop":"font size","value":"300px"}\n{"op":"set","id":"ghost","prop":"color","value":"red"}\n' : '{"op":"set","id":"clock","prop":"font-size","value":"300px"}\n' }); on({ kind: 'done' }); }, 0); };
+  const r = await runSayRepairing({ api, send, frameId: 'tv', root: 'tv', request: 'bigger' });
+  expect(requests.length).toBe(2); expect(requests[1]).toContain('bad property'); expect(requests[1]).not.toContain('ghost'); expect(calls.filter((c) => c.startsWith('edit'))).toEqual(['edit clock font-size=300px']);
+  expect(r.repaired).toBe(1); expect(r.rejected.map((x) => x.error)).toEqual(['unknown id ghost']); expect(isRepairable('unknown id x')).toBe(false); expect(isRepairable('not JSON')).toBe(true);
+});
+test('no repair turn when nothing is repairable', async () => {
+  const { api } = fakeApi(); let n = 0; const send = (_s: string, _r: string, on: (e: SayEvent) => void) => { n++; on({ kind: 'delta', text: '{"op":"set","id":"ghost","prop":"color","value":"red"}\n' }); on({ kind: 'done' }); };
+  const r = await runSayRepairing({ api, send, frameId: 'tv', root: 'tv', request: 'x' }); expect(n).toBe(1); expect(r.repaired).toBe(0);
 });

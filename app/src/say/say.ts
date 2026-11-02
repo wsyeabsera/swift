@@ -34,3 +34,14 @@ export async function runSay(a: { api: CanvasApi; send: SayTransport; frameId: s
   }));
   await chain; res.totalMs = now() - t0; return res;
 }
+
+/** Errors worth one repair turn: malformed output. "unknown id" is a decision (the element is not there), not a typo, so it is not retried. */
+export const isRepairable = (error: string): boolean => !error.startsWith('unknown');
+/** Say, then ONE repair turn for repairable rejected lines (the repair sees the already-updated frame). Undo still restores the first snapshot. */
+export async function runSayRepairing(a: Parameters<typeof runSay>[0]): Promise<SayResult & { repaired: number }> {
+  const first = await runSay(a); const fixable = first.rejected.filter((x) => isRepairable(x.error));
+  if (first.error || fixable.length === 0) return { ...first, repaired: 0 };
+  const note = fixable.map((f) => `${f.error}: ${f.line}`).join('; ');
+  const second = await runSay({ ...a, request: `${a.request}\n\nSome of your operations were invalid (${note}). Reply with ONLY the corrected operations for those lines.` });
+  return { ...first, applied: [...first.applied, ...second.applied], asked: [...first.asked, ...second.asked], rejected: [...first.rejected.filter((x) => !isRepairable(x.error)), ...second.rejected], totalMs: first.totalMs + second.totalMs, error: second.error, repaired: second.applied.length };
+}
