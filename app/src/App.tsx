@@ -14,6 +14,7 @@ import { firstChild, parentOf } from './canvas/tree';
 import { compareSet } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
 import { starterFrames } from './canvas/starter';
+import { retheme } from './retheme';
 import { addItem, loadLibrary, saveLibrary, uniquifyIds, type LibItem } from './library';
 import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
@@ -161,15 +162,15 @@ export function App() {
   }, [reg, goTo]);
   // Shared library: save the selected element (markup + origin project), insert it into any frame later (ids de-duplicated, one undo step).
   const saveToLibrary = useCallback(async () => {
-    if (!selection || !window.__swift) return; const html = await window.__swift.outer(selection.frameId, selection.el); const r = addItem(library, selection.el, project.name, html);
+    if (!selection || !window.__swift) return; const html = await window.__swift.outer(selection.frameId, selection.el); const r = addItem(library, selection.el, project.name, html, brand);
     if (!r.ok) { setSayStatus(`Library: ${r.error}`); return; } const err = saveLibrary(r.list); setLibrary(r.list); setSayStatus(err ? `Saved for now, not stored: ${err}` : `Saved #${selection.el} to the library`);
-  }, [selection, library, project.name]);
+  }, [selection, library, project.name, brand]);
   const insertFromLibrary = useCallback(async (item: LibItem) => {
     const api = window.__swift; const f = frames.find((x) => x.id === (selection?.frameId ?? frames[0]?.id)); if (!api || !f) return;
-    const taken = new Set((await api.tree(f.id)).map((n) => n.id)); const html = uniquifyIds(item.html, taken); const snapshot = await api.snapshot(f.id);
+    const taken = new Set((await api.tree(f.id)).map((n) => n.id)); const unique = uniquifyIds(item.html, taken); const rt = item.origin !== project.name && item.tokens ? retheme(unique, item.tokens, brand) : { html: unique, mapped: 0 }; const html = rt.html; const snapshot = await api.snapshot(f.id);
     if (!(await api.add(f.id, f.root, html))) { setSayStatus(`Could not insert ${item.name}`); return; }
-    history.current.push({ kind: 'say', frameId: f.id, snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setRevision((n) => n + 1); setSayStatus(`Inserted ${item.name} (from ${item.origin}) into ${f.title}`);
-  }, [frames, selection]);
+    history.current.push({ kind: 'say', frameId: f.id, snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setRevision((n) => n + 1); setSayStatus(`Inserted ${item.name} (from ${item.origin}) into ${f.title}${rt.mapped ? ` · re-themed ${rt.mapped} colour${rt.mapped === 1 ? '' : 's'}` : ''}`);
+  }, [frames, selection, project.name, brand]);
   // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
   const exportFrame = useCallback(async () => {
     const f = frames.find((x) => x.id === (selection?.frameId ?? frames[0]?.id ?? '')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }

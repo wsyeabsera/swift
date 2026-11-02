@@ -16,3 +16,7 @@ test('storage: round trip; junk entries dropped; corrupt and throwing storage ar
   expect(saveLibrary(items, st)).toBeNull(); expect(loadLibrary(st)).toEqual(items); expect(sanitizeLibrary([...items, { id: 'a:b', name: 'dup', origin: 'a', html: 'x' }, { id: 5 }, null, { id: 'c', name: 'c', origin: 'a', html: '' }])).toEqual(items);
   m['swift-canvas.library.v1'] = '{bad'; expect(loadLibrary(st)).toEqual([]); expect(loadLibrary({ getItem: () => { throw new Error('b'); } })).toEqual([]); expect(saveLibrary(items, { setItem: () => { throw new Error('quota'); } })).toBe('quota');
 });
+test('the origin brand tokens travel with the item (validated), so another project can re-theme it', () => {
+  const r = addItem([], 'card', 'radar', '<div id="card">x</div>', { '--bg': '#fff', '--bad': 'red; x:y' }); expect(r.ok && r.list[0]!.tokens).toEqual({ '--bg': '#fff' }); expect(addItem([], 'a', 'p', '<b/>').ok).toBe(true);
+  const m: Record<string, string> = {}; const st = { getItem: (k: string) => m[k] ?? null, setItem: (k: string, v: string) => { m[k] = v; } }; if (r.ok) { saveLibrary(r.list, st); expect(loadLibrary(st)[0]!.tokens).toEqual({ '--bg': '#fff' }); }
+});
