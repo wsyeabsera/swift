@@ -47,23 +47,26 @@ try {
   cv.busy = await web.evaluate(() => ({ saw: window.__sawBusy, left: document.querySelectorAll('[data-testid=frame-busy]').length }));
   cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
   // Export: the selected frame downloads as a standalone HTML file with its current markup
-  { const dl = web.waitForEvent('download', { timeout: 5000 }); await web.getByTestId('export').click(); const d = await dl; const tmp = path.join(os.tmpdir(), `sc-export-${Date.now()}.html`); await d.saveAs(tmp); const body = fs.readFileSync(tmp, 'utf8'); cv.exported = { name: d.suggestedFilename(), doctype: body.startsWith('<!doctype html>'), hasClock: body.includes('id="clock"') }; }
+  { const dl = web.waitForEvent('download', { timeout: 5000 }); await web.getByTestId('frame-menu').click(); await web.getByTestId('export').click(); const d = await dl; const tmp = path.join(os.tmpdir(), `sc-export-${Date.now()}.html`); await d.saveAs(tmp); const body = fs.readFileSync(tmp, 'utf8'); cv.exported = { name: d.suggestedFilename(), doctype: body.startsWith('<!doctype html>'), hasClock: body.includes('id="clock"') }; }
   // Hiding the tab flushes the autosave at once (no 1 s wait): an edit made a moment ago is in storage
   { await web.evaluate(() => window.__swift.edit('tv', 'date', 'letter-spacing', '3.25px')); await web.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); }); await web.waitForTimeout(350);
     cv.flush = await web.evaluate(() => { const raw = localStorage.getItem('swift-canvas.doc.v1') ?? ''; return raw.includes('letter-spacing: 3.25px') || raw.includes('letter-spacing:3.25px'); }); await web.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' }); }); }
   // Shortcuts sheet: ? opens it, Esc closes it with focus back on its button
   { await web.mouse.click(5, 400); await web.keyboard.press('Shift+Slash'); await web.waitForSelector('[data-testid=shortcuts]', { timeout: 3000 }); const rows = await web.$$eval('[data-testid=shortcuts] dt', (e) => e.length); await web.keyboard.press('Escape'); await web.waitForTimeout(150);
     cv.shortcuts = { rows, closed: (await web.$('[data-testid=shortcuts]')) === null, focusBack: await web.evaluate(() => document.activeElement?.getAttribute('data-testid')) }; }
+  // Frame menu (rule H7): Esc closes with focus back; the tools bar no longer overflows
+  { await web.getByTestId('frame-menu').click(); await web.waitForSelector('[data-testid=frame-popover]'); await web.keyboard.press('Escape'); await web.waitForTimeout(150);
+    cv.frameMenu = { closed: (await web.$('[data-testid=frame-popover]')) === null, focusBack: await web.evaluate(() => document.activeElement?.getAttribute('data-testid')), overflow: await web.evaluate(() => { const t = document.querySelector('.tools'); return t.scrollWidth - t.clientWidth; }) }; }
   // Rename a frame by double-clicking its label (Enter commits, Escape cancels)
   { await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const lab = web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).first(); await lab.dblclick(); await web.getByTestId('frame-name').fill('Hero TV'); await web.keyboard.press('Enter'); await web.waitForTimeout(300);
     const renamed = (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1; await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).first().dblclick(); await web.getByTestId('frame-name').fill('Nope'); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
     cv.rename = { renamed, escKept: (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1, inputGone: (await web.$('[data-testid=frame-name]')) === null }; }
   // + phone adds an empty preset frame whose root id is addressable
-  { const n0 = await web.evaluate(() => window.__swift.frames.length); await web.getByTestId('add-phone').click(); await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n + 1, n0, { timeout: 4000 }); await web.waitForTimeout(400);
+  { const n0 = await web.evaluate(() => window.__swift.frames.length); await web.getByTestId('frame-menu').click(); await web.getByTestId('add-phone').click(); await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n + 1, n0, { timeout: 4000 }); await web.waitForTimeout(400);
     cv.added = await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), width: await window.__swift.get('phone-1', 'phone-1', 'width') }));
     // delete that frame, then undo brings it back (same place, with its markup)
     await web.evaluate(() => window.__swift.fitTo(['phone-1'])); await web.waitForTimeout(250); const c = await web.evaluate(() => { const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(c.x, c.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 });
-    await web.getByTestId('delete-frame').click(); await web.waitForTimeout(400); const gone = await web.evaluate(() => !window.__swift.frames.includes('phone-1')); await web.getByTestId('undo').click(); await web.waitForTimeout(600);
+    await web.getByTestId('frame-menu').click(); await web.getByTestId('delete-frame').click(); await web.waitForTimeout(400); const gone = await web.evaluate(() => !window.__swift.frames.includes('phone-1')); await web.getByTestId('undo').click(); await web.waitForTimeout(600);
     cv.frameDel = { gone, back: await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), n: window.__swift.frames.length, width: await window.__swift.get('phone-1', 'phone-1', 'width') })), n0: n0 + 1 }; }
   // Canvas keys: ⌘1 actual size, ⌘0 fit, Escape deselects
   { await web.keyboard.press('Meta+1'); await web.waitForTimeout(150); const s1 = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Meta+0'); await web.waitForTimeout(150); const s0 = await web.evaluate(() => window.__swift.view().s);
@@ -149,7 +152,8 @@ try {
   const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
   const frameDelOk = cv0.frameDel.gone && cv0.frameDel.back.has && cv0.frameDel.back.n === cv0.frameDel.n0 && cv0.frameDel.back.width === '390px';
   const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
-  const shortcutsOk = cv0.shortcuts.rows >= 10 && cv0.shortcuts.closed && cv0.shortcuts.focusBack === 'shortcuts-button';
+  const frameMenuOk = cv0.frameMenu.closed && cv0.frameMenu.focusBack === 'frame-menu' && cv0.frameMenu.overflow <= 1;
+  const shortcutsOk = frameMenuOk &&  cv0.shortcuts.rows >= 10 && cv0.shortcuts.closed && cv0.shortcuts.focusBack === 'shortcuts-button';
   const flushOk = shortcutsOk &&  cv0.flush === true;
   const exportOk = flushOk &&  addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;

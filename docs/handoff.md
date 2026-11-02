@@ -21,6 +21,7 @@
 - Folder picker: Import → Choose… runs the native dialog in the helper (`project.pick`, osascript; `SWIFT_PICKER_BIN` overrides, tests use a fake script); a folder picked in the dialog becomes an allowed root for this helper run (consent by gesture; a folder the client merely names stays refused); empty folders show an empty state.
 - Shift+2 zooms to the selected frame.
 - "?" opens the shortcuts sheet (`Shortcuts.tsx`; keep SHORTCUTS in sync when adding keys).
+- Frame ▾ menu in the tools bar holds + presets, Export HTML, Delete frame, Reset design (no overflow at 1280 px; the demo Clock bigger button is gone). Keys are unchanged.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

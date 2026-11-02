@@ -54,3 +54,4 @@ button:disabled{opacity:.45;cursor:default}
 .fr-busy{position:absolute;inset:0;border-radius:12px;pointer-events:none;z-index:2;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%) 0 0/300% 100%,rgba(20,22,30,.35);animation:frbusy 1.2s linear infinite}@keyframes frbusy{to{background-position:-300% 0,0 0}}@media (prefers-reduced-motion:reduce){.fr-busy{animation:none}}
 .tools{overflow-x:auto;scrollbar-width:none}.tools::-webkit-scrollbar{display:none}.tools>*{flex:none}
 .kbs{margin:6px;display:grid;gap:4px}.kbs>div{display:flex;gap:14px;justify-content:space-between}.kbs dt{min-width:170px}.kbs dd{margin:0;opacity:.8}.kbbtn{min-width:28px;padding:0 8px}
+.framemenu{left:calc(50% - 180px);top:auto;bottom:84px;width:360px;transform-origin:50% 100%}
