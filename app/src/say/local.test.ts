@@ -14,3 +14,12 @@ test('hide, show, opacity, colours and sizes', async () => {
 test('anything ambiguous or creative goes to Claude (null), including injection-looking values', async () => {
   for (const r of ['', 'make it feel warmer', 'color url(javascript:alert(1))', 'color #12', 'background expression(x)', 'color red; position:fixed', 'bigger and bolder']) expect(await localEdits(r, ctx('10px')), r).toBeNull();
 });
+test('type, alignment, corners, padding and border rules', async () => {
+  const g = (vals: Record<string, string>) => ({ get: async (p: string) => vals[p] });
+  expect(await localEdits('bold', ctx())).toEqual([{ prop: 'font-weight', value: '700' }]); expect(await localEdits('Italic.', ctx())).toEqual([{ prop: 'font-style', value: 'italic' }]); expect(await localEdits('all caps', ctx())).toEqual([{ prop: 'text-transform', value: 'uppercase' }]);
+  expect(await localEdits('underline', ctx())).toEqual([{ prop: 'text-decoration', value: 'underline' }]); expect(await localEdits('align center', ctx())).toEqual([{ prop: 'text-align', value: 'center' }]); expect(await localEdits('text align left', ctx())).toEqual([{ prop: 'text-align', value: 'left' }]);
+  expect(await localEdits('left', ctx())).toBeNull(); expect(await localEdits('rounder', g({ 'border-radius': '12px' }))).toEqual([{ prop: 'border-radius', value: '20px' }]); expect(await localEdits('rounder', g({}))).toEqual([{ prop: 'border-radius', value: '8px' }]);
+  expect(await localEdits('sharper', g({ 'border-radius': '12px' }))).toEqual([{ prop: 'border-radius', value: '4px' }]); expect(await localEdits('sharper', g({ 'border-radius': '4px' }))).toEqual([{ prop: 'border-radius', value: '0px' }]); expect(await localEdits('sharper', g({}))).toBeNull(); expect(await localEdits('square corners', g({ 'border-radius': '12px' }))).toEqual([{ prop: 'border-radius', value: '0px' }]);
+  expect(await localEdits('more padding', g({ 'padding-top': '16px' }))).toEqual([{ prop: 'padding', value: '24px' }]); expect(await localEdits('more padding', g({}))).toBeNull(); expect(await localEdits('no border', ctx())).toEqual([{ prop: 'border', value: 'none' }]);
+  expect(await localEdits('bold and italic', ctx())).toBeNull(); expect(await localEdits('make it feel premium', ctx())).toBeNull();
+});

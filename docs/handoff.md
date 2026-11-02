@@ -1,6 +1,6 @@
 # Handoff (2026-11-02, fourth goal hour in progress)
 
-## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (83), `npm run e2e` (pass)
+## Fourth hour (read first): editing basics, all in `app/src`, verified by `npm run typecheck`, `npm test` (84), `npm run e2e` (pass)
 - Autosave/restore of the design (`doc.ts`, localStorage, 1 s debounce, all-or-nothing parse, save errors shown, Reset button); Spark ids continue after restore.
 - Spark: Keep take / Discard takes (`kept` flag on FrameDef), Cancel Spark (AbortSignal through runSpark/runSay; late ops dropped, no repair turn), cap of 8 unreviewed takes (`canSpark`).
 - ⌘D duplicate frame (`canvas/frames.ts`), Delete removes the selected element (one undo step via snapshot; frame root protected), ⌘0 fit, ⌘1 actual size, Escape deselects.
