@@ -137,6 +137,8 @@ try {
   // Keep one take, discard the rest: only the kept take stays (and the base frames are untouched)
   await web.evaluate(() => window.__swift.fitTo(['tv-t2'])); await web.waitForTimeout(200); const tp = await web.evaluate(() => { const v = window.__swift.view(); const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(tp.x, tp.y); await web.waitForFunction(() => !document.querySelector('[data-testid=keep-take]').disabled, null, { timeout: 4000 });
   await web.getByTestId('keep-take').click(); await web.getByTestId('discard-takes').click(); await web.waitForTimeout(500);
+  { const countTakes = () => web.evaluate(() => window.__swift.frames.filter((f) => /^tv-t\d+$/.test(f)).length); const afterDiscard = await countTakes(); await web.getByTestId('undo').click(); await web.waitForTimeout(600); const restored = await countTakes(); const restoredHtml = await web.evaluate(async () => (await window.__swift.snapshot('tv-t1')).length > 0);
+    await web.getByTestId('redo').click(); await web.waitForTimeout(500); cv.discardUndo = { afterDiscard, restored, restoredHtml, again: await countTakes() }; }
   cv.takes = await web.evaluate(() => ({ spark: window.__swift.frames.filter((f) => f.startsWith('tv-t')), total: window.__swift.frames.length })); await web.evaluate(() => window.__swift.fitAll());
   // ⌘K focuses the Say input from anywhere (even with a popover open)
   await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); await web.keyboard.press('Meta+k'); await web.waitForTimeout(150); cv.cmdK = await web.evaluate(() => ({ focused: document.activeElement?.getAttribute('data-testid'), importOpen: !!document.querySelector('[data-testid=import]') }));
@@ -199,7 +201,8 @@ try {
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
   const busyOk = cv0.busy.saw && cv0.busy.left === 0;
-  const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
+  const discardUndoOk = cv0.discardUndo.afterDiscard === 1 && cv0.discardUndo.restored === 4 && cv0.discardUndo.restoredHtml && cv0.discardUndo.again === 1;
+  const takesOk = discardUndoOk &&  busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
   const frameDelOk = cv0.frameDel.gone && cv0.frameDel.back.has && cv0.frameDel.back.n === cv0.frameDel.n0 && cv0.frameDel.back.width === '390px';
   const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
   const compareOk = cv0.compare.sBoth < cv0.compare.sTake && cv0.compare.vis >= 2;

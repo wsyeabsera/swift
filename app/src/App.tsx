@@ -50,7 +50,7 @@ export function App() {
   const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
   const [tier0, setTier0] = useState<string>('');
   const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
-  type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string } | { kind: 'frameDel'; frameId: string; frame: FrameDef; index: number };
+  type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string } | { kind: 'frameDel'; frameId: string; frame: FrameDef; index: number } | { kind: 'discard'; frameId: string; items: { frame: FrameDef; index: number }[] };
   const history = useRef<Entry[]>([]); const [edits, setEdits] = useState(0);
   const lastEditAt = useRef(0);
   const edit = useCallback(async (frameId: string, el: string, prop: string, value: string, record = true, coalesce = false) => {
@@ -63,6 +63,7 @@ export function App() {
     const e = history.current.pop(); if (!e || !window.__swift) return; setEdits(history.current.length);
     if (e.kind === 'say') { const after = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); redoStack.current.push({ kind: 'say', frameId: e.frameId, snapshot: after }); setRevision((n) => n + 1); setSayStatus('Say undone'); }
     else if (e.kind === 'frameDel') { setFrames((f) => (f.some((x) => x.id === e.frame.id) ? f : [...f.slice(0, e.index), e.frame, ...f.slice(e.index)])); redoStack.current.push(e); setSayStatus('Frame restored'); }
+    else if (e.kind === 'discard') { setFrames((f) => { const out = [...f]; for (const it of [...e.items].sort((p, q) => p.index - q.index)) if (!out.some((x) => x.id === it.frame.id)) out.splice(Math.min(it.index, out.length), 0, it.frame); return out; }); redoStack.current.push(e); setSayStatus(`${e.items.length} takes restored`); }
     else { await edit(e.frameId, e.el, e.prop, e.before, false); redoStack.current.push(e); }
     setRedos(redoStack.current.length);
   }, [edit]);
@@ -70,6 +71,7 @@ export function App() {
     const e = redoStack.current.pop(); if (!e || !window.__swift) return; setRedos(redoStack.current.length);
     if (e.kind === 'say') { const before = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); history.current.push({ kind: 'say', frameId: e.frameId, snapshot: before }); setRevision((n) => n + 1); setSayStatus('Redone'); }
     else if (e.kind === 'frameDel') { setFrames((f) => f.filter((x) => x.id !== e.frame.id)); setSelection(null); history.current.push(e); setSayStatus('Frame deleted'); }
+    else if (e.kind === 'discard') { const ids = new Set(e.items.map((i) => i.frame.id)); setFrames((f) => f.filter((x) => !ids.has(x.id))); setSelection(null); history.current.push(e); setSayStatus(`${ids.size} takes discarded`); }
     else { await edit(e.frameId, e.el, e.prop, e.after, false); history.current.push(e); }
     setEdits(history.current.length);
   }, [edit]);
@@ -122,7 +124,12 @@ export function App() {
   const goTo = useCallback(async (next: Registry | null) => { if (!next) { setSayStatus('Could not create a project from that name'); return; } const err = await persist(); if (err) { setSayStatus(`Not switching: ${err}`); return; } const e2 = saveRegistry(next); if (e2) { setSayStatus(`Not switching: ${e2}`); return; } location.reload(); }, [persist]);
   const takeCount = useMemo(() => frames.filter(isTake).length, [frames]); const selIsTake = !!selection && frames.some((f) => f.id === selection.frameId && isTake(f));
   const cmp = useMemo(() => (selection ? compareSet(frames, selection.frameId) : null), [frames, selection]);
-  const discard = useCallback(() => { const gone = new Set(frames.filter(isTake).map((f) => f.id)); history.current = history.current.filter((e) => !gone.has(e.frameId)); redoStack.current = redoStack.current.filter((e) => !gone.has(e.frameId)); setRedos(redoStack.current.length); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded`); }, [frames, selection]);
+  const discard = useCallback(async () => {
+    const takes = frames.map((f, index) => ({ f, index })).filter((x) => isTake(x.f)); if (takes.length === 0 || !window.__swift) return; const gone = new Set(takes.map((x) => x.f.id));
+    const items = await Promise.all(takes.map(async ({ f, index }) => ({ frame: { ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }, index }))); // with their current markup, so undo brings them back as they were
+    history.current = history.current.filter((e) => !gone.has(e.frameId)); redoStack.current = []; setRedos(0);
+    history.current.push({ kind: 'discard', frameId: takes[0]!.f.id, items }); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded (undo brings them back)`);
+  }, [frames, selection]);
   const resetDesign = useCallback(() => { clearDoc(undefined, project.id); location.reload(); }, [project.id]);
   // ⌘D duplicates the selected frame (its current HTML), then selects nothing so the copy can be picked by clicking.
   const duplicate = useCallback(async () => {
@@ -284,7 +291,7 @@ export function App() {
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
         {sparking ? <>{selection && takesRunning.current.has(selection.frameId) && <button className="rb btn" onClick={() => takesRunning.current.get(selection.frameId)?.abort()} data-testid="cancel-take">Cancel this take</button>}<button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button></> : <button className="rb btn" onClick={() => void spark()} data-testid="spark-button">Spark ×4</button>}
         <button className="rb btn" onClick={() => selection && setFrames((f) => keepTake(f, selection.frameId))} disabled={!selIsTake} data-testid="keep-take">Keep take</button>
-        <button className="rb btn" onClick={discard} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
+        <button className="rb btn" onClick={() => void discard()} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
         <button ref={fmRef} className="rb btn" aria-haspopup="dialog" aria-expanded={frameMenuOpen} data-testid="frame-menu" onClick={() => setFrameMenuOpen((o) => !o)}>Frame ▾</button>
         <button className="rb btn" onClick={() => void undo()} disabled={edits === 0} data-testid="undo">Undo{edits ? ` (${edits})` : ''}</button>
         <button className="rb btn" onClick={() => void redo()} disabled={redos === 0} data-testid="redo">Redo{redos ? ` (${redos})` : ''}</button>
