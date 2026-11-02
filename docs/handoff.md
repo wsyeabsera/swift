@@ -28,6 +28,7 @@
 - Big frames (#1734): over 6000 chars the Say prompt carries an outline of every element + the selected element markup (bridge `outer`), not a truncated tree (`treeContext`). Real Claude on an 18 KB frame (`node e2e/real-big-say.mjs "make the text of item 70 red"`): 1 applied, first change 1.4 s. The 30-request spike on small frames was not re-run (small frames are unchanged).
 - Drag the selected positioned element to move it (Canvas `onMove` → App `moveElement`; press inside the selection box = move, elsewhere = pan; live left/top edits, ONE undo step via a start snapshot). Static elements are not draggable (no left/top).
 - Resize: a round handle at the bottom-right of the selection (not on a frame root) drags width/height (live, 4 px floor, ONE undo step).
+- e2e perf budgets: Tier-0 edit p95 < 16 ms and pan/zoom frame gap p95 < 34 ms (measured 9.3 ms) are asserted in `npm run e2e`.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

@@ -71,6 +71,13 @@ try {
     await web.evaluate(() => window.__swift.fitTo(['phone-1'])); await web.waitForTimeout(250); const c = await web.evaluate(() => { const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(c.x, c.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 });
     await web.getByTestId('frame-menu').click(); await web.getByTestId('delete-frame').click(); await web.waitForTimeout(400); const gone = await web.evaluate(() => !window.__swift.frames.includes('phone-1')); await web.getByTestId('undo').click(); await web.waitForTimeout(600);
     cv.frameDel = { gone, back: await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), n: window.__swift.frames.length, width: await window.__swift.get('phone-1', 'phone-1', 'width') })), n0: n0 + 1 }; }
+  // Perf budget: pan and zoom across the 20+ frame canvas keeps frames flowing (p95 frame gap < 34 ms, i.e. no worse than ~30 fps)
+  { await web.evaluate(() => window.__swift.fitAll()); await web.waitForTimeout(200);
+    cv.panFps = await web.evaluate(async () => { const host = document.querySelector('[data-testid=canvas]'); const gaps = []; let last = performance.now(); let n = 0; let stop = false;
+      const tick = (t) => { gaps.push(t - last); last = t; if (!stop) requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+      for (let i = 0; i < 90; i++) { const zoom = i % 3 === 2; host.dispatchEvent(new WheelEvent('wheel', { deltaX: zoom ? 0 : 25, deltaY: zoom ? (i % 6 === 2 ? -30 : 30) : 12, ctrlKey: zoom, clientX: 640, clientY: 360, bubbles: true, cancelable: true })); n++; await new Promise((r) => setTimeout(r, 11)); }
+      stop = true; await new Promise((r) => setTimeout(r, 50)); gaps.shift(); gaps.sort((a, b) => a - b); const p95 = gaps[Math.floor(gaps.length * 0.95)] ?? 0; return { n, frames: gaps.length, p95: +p95.toFixed(1), max: +(gaps[gaps.length - 1] ?? 0).toFixed(1) }; });
+    await web.evaluate(() => window.__swift.fitAll()); await web.waitForTimeout(200); }
   // Canvas keys: ⌘1 actual size, ⌘0 fit, Escape deselects
   { await web.keyboard.press('Meta+1'); await web.waitForTimeout(150); const s1 = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Meta+0'); await web.waitForTimeout(150); const s0 = await web.evaluate(() => window.__swift.view().s);
     await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(150); const p1 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(p1.x, p1.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 }); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
@@ -187,7 +194,8 @@ try {
   const navOk = dragOk &&  zoomSelOk &&  cv0.nav.par === 'tv' && cv0.nav.child === 'clock';
   const nudgeOk = navOk &&  cv0.nudge.l0 === '115px' && cv0.nudge.l1 === '116px' && cv0.nudge.t1 === '96px' && cv0.nudge.back === '115px';
   const histOk = nudgeOk &&  ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
-  const keysOk = histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;
+  const panOk = cv0.panFps.frames > 30 && cv0.panFps.p95 < 34;
+  const keysOk = panOk &&  histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;
   const localOk = keysOk &&  cv0.local.f1 !== cv0.local.f0 && cv0.local.f2 === cv0.local.f0 && cv0.local.f3 === cv0.local.f1 && cv0.local.f4 === cv0.local.f1 && cv0.local.f5 === cv0.local.f0 && /^Local/.test(cv0.local.status);
   const delOk = localOk &&  cv0.del.delGone && cv0.del.delBack && cv0.del.rootKept;
   const docOk = delOk &&  takesOk &&  cv0.docRestored.sameFrames && cv0.docRestored.more && cv0.docRestored.color;
