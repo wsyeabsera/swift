@@ -12,3 +12,12 @@ export function duplicateId(frames: FrameDef[], baseId: string): string {
 export function renameFrame(frames: FrameDef[], id: string, title: string): FrameDef[] {
   const t = title.trim().slice(0, 60); const f = frames.find((x) => x.id === id); if (!f || !t || t === f.title) return frames; return frames.map((x) => (x.id === id ? { ...x, title: t } : x));
 }
+export const PRESETS = { phone: { w: 390, h: 844, label: 'Phone 390' }, desktop: { w: 1280, h: 800, label: 'Desktop 1280' }, tv: { w: 1920, h: 1080, label: 'TV 1920' } } as const;
+export type PresetKey = keyof typeof PRESETS;
+/** A new empty frame of a preset size, right of everything. Ids are `<preset>-<n>` (smallest free n) and double as the root element id, so Say can address it. */
+export function newFrame(frames: FrameDef[], kind: PresetKey): FrameDef {
+  const p = PRESETS[kind]; const used = new Set(frames.map((f) => f.id)); let n = 1; while (used.has(`${kind}-${n}`)) n++; const id = `${kind}-${n}`;
+  const right = frames.reduce((m, f) => Math.max(m, f.x + f.w), 0); const top = frames.reduce((m, f) => Math.min(m, f.y), 0);
+  const html = `<div id="${id}" style="position:relative;width:${p.w}px;height:${p.h}px;overflow:hidden;font-family:system-ui;color:#f5f5f7;background:#14151a"><div id="${id}-title" style="position:absolute;left:${Math.round(p.w * 0.06)}px;top:${Math.round(p.h * 0.06)}px;font-size:${Math.round(p.w * 0.04)}px;font-weight:600">New ${kind}</div></div>`;
+  return { id, root: id, title: `${p.label} ${n}`, x: frames.length ? right + 140 : 0, y: frames.length ? top : 0, w: p.w, h: p.h, html };
+}

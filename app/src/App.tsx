@@ -8,7 +8,7 @@ import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
 import { exportDoc, exportName } from './canvas/exportHtml';
-import { duplicateFrame, duplicateId, renameFrame } from './canvas/frames';
+import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
 import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
@@ -126,6 +126,7 @@ export function App() {
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, importOpen, appearanceOpen]);
+  const addFrame = useCallback((kind: PresetKey) => { const f = newFrame(frames, kind); setFrames((x) => [...x, newFrame(x, kind)]); setSayStatus(`Added ${f.title}`); setTimeout(() => window.__swift?.fitTo([f.id]), 200); }, [frames]);
   // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
   const exportFrame = useCallback(async () => {
     const f = frames.find((x) => x.id === (selection?.frameId ?? 'tv')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
@@ -173,6 +174,7 @@ export function App() {
         {sparking ? <>{selection && takesRunning.current.has(selection.frameId) && <button className="rb btn" onClick={() => takesRunning.current.get(selection.frameId)?.abort()} data-testid="cancel-take">Cancel this take</button>}<button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button></> : <button className="rb btn" onClick={() => void spark()} data-testid="spark-button">Spark ×4</button>}
         <button className="rb btn" onClick={() => selection && setFrames((f) => keepTake(f, selection.frameId))} disabled={!selIsTake} data-testid="keep-take">Keep take</button>
         <button className="rb btn" onClick={discard} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
+        {(Object.keys(PRESETS) as PresetKey[]).map((k) => <button key={k} className="rb btn" onClick={() => addFrame(k)} data-testid={`add-${k}`} title={`New ${PRESETS[k].label} frame`}>+ {k}</button>)}
         <button className="rb btn" onClick={() => void exportFrame()} data-testid="export">Export</button>
         <button className="rb btn" onClick={resetDesign} data-testid="reset">Reset</button>
         <button className="rb btn" onClick={() => void undo()} disabled={edits === 0} data-testid="undo">Undo{edits ? ` (${edits})` : ''}</button>

@@ -52,6 +52,9 @@ try {
   { await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(200); const lab = web.getByTestId('frame-label').filter({ hasText: 'TV · Idle' }).first(); await lab.dblclick(); await web.getByTestId('frame-name').fill('Hero TV'); await web.keyboard.press('Enter'); await web.waitForTimeout(300);
     const renamed = (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1; await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).first().dblclick(); await web.getByTestId('frame-name').fill('Nope'); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
     cv.rename = { renamed, escKept: (await web.getByTestId('frame-label').filter({ hasText: 'Hero TV' }).count()) === 1, inputGone: (await web.$('[data-testid=frame-name]')) === null }; }
+  // + phone adds an empty preset frame whose root id is addressable
+  { const n0 = await web.evaluate(() => window.__swift.frames.length); await web.getByTestId('add-phone').click(); await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n + 1, n0, { timeout: 4000 }); await web.waitForTimeout(400);
+    cv.added = await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), width: await window.__swift.get('phone-1', 'phone-1', 'width') })); }
   // Canvas keys: ⌘1 actual size, ⌘0 fit, Escape deselects
   { await web.keyboard.press('Meta+1'); await web.waitForTimeout(150); const s1 = await web.evaluate(() => window.__swift.view().s); await web.keyboard.press('Meta+0'); await web.waitForTimeout(150); const s0 = await web.evaluate(() => window.__swift.view().s);
     await web.evaluate(() => window.__swift.fitTo(['tv'])); await web.waitForTimeout(150); const p1 = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(p1.x, p1.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 }); await web.keyboard.press('Escape'); await web.waitForTimeout(200);
@@ -123,8 +126,9 @@ try {
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
   const busyOk = cv0.busy.saw && cv0.busy.left === 0;
-  const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 22 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
-  const exportOk = /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
+  const takesOk = busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
+  const addOk = cv0.added.has && cv0.added.width === '390px';
+  const exportOk = addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
   const histOk = ['bigger', 'make the clock bigger'].includes(cv0.hist.up) && cv0.hist.down === '';
   const keysOk = histOk &&  renameOk &&  cv0.keys.s1 === 1 && cv0.keys.fitSmaller && cv0.keys.escDeselects;
