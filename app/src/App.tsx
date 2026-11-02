@@ -9,7 +9,7 @@ import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
-import { nudge } from './canvas/nudge';
+import { movedPos, nudge, startPos } from './canvas/nudge';
 import { firstChild, parentOf } from './canvas/tree';
 import { compareSet } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
@@ -175,6 +175,15 @@ export function App() {
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, edit]);
+  // Drag the selected (positioned) element: live left/top edits while dragging, ONE undo step for the whole drag (a snapshot taken at the start).
+  const moving = useRef<{ frameId: string; el: string; start: { left: number; top: number }; snapshot: string; raf: number } | null>(null);
+  const moveElement = useCallback(async (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => {
+    const api = window.__swift; if (!api) return;
+    if (phase === 'start') { moving.current = null; const [props, snapshot] = await Promise.all([api.props(frameId, el, ['position', 'left', 'top']), api.snapshot(frameId)]); const start = props ? startPos(props) : null; if (start) moving.current = { frameId, el, start, snapshot, raf: 0 }; return; }
+    const m = moving.current; if (!m) return;
+    if (phase === 'move') { const p = movedPos(m.start, dx, dy); void api.edit(m.frameId, m.el, 'left', p.left); void api.edit(m.frameId, m.el, 'top', p.top); if (!m.raf) m.raf = requestAnimationFrame(() => { m.raf = 0; setRevision((n) => n + 1); }); return; }
+    cancelAnimationFrame(m.raf); moving.current = null; history.current.push({ kind: 'say', frameId: m.frameId, snapshot: m.snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setRevision((n) => n + 1);
+  }, []);
   // Delete / Backspace removes the selected element (never a frame root); one snapshot makes it one undo step.
   const removeSelected = useCallback(async () => {
     if (!selection || !window.__swift) return; const f = frames.find((x) => x.id === selection.frameId); if (!f || f.root === selection.el) return;
@@ -221,7 +230,7 @@ export function App() {
           <span className="mono">{helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}</span>
         </div>
       </header>
-      <Canvas painting={painting} key={epoch} onRename={(id, t) => setFrames((f) => renameFrame(f, id, t))} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
+      <Canvas onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => setFrames((f) => renameFrame(f, id, t))} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
       <Layers frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       <form className="gl isl say" aria-label="Say" onSubmit={(e) => { e.preventDefault(); void say(); }}>
