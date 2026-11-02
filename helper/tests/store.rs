@@ -4,7 +4,7 @@ use std::{fs, net::TcpListener, path::Path, thread};
 use tungstenite::{client::IntoClientRequest, connect, Message};
 type Ws = tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>;
 fn start(dir: &Path) -> Ws { let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port();
-    let cfg = Config { port, token: "t".into(), allowed: vec!["chrome-extension://good".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![], data_dir: dir.to_path_buf() }; thread::spawn(move || { let _ = serve(l, cfg); });
+    let cfg = Config { port, token: "t".into(), allowed: vec!["chrome-extension://good".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![], data_dir: dir.to_path_buf(), picker_bin: "osascript".into() }; thread::spawn(move || { let _ = serve(l, cfg); });
     let mut r = format!("ws://127.0.0.1:{port}/?token=t").into_client_request().unwrap(); r.headers_mut().insert("Origin", "chrome-extension://good".parse().unwrap()); let (mut ws, _) = connect(r).unwrap(); let _ = ws.read().unwrap(); ws }
 fn call(ws: &mut Ws, msg: serde_json::Value) -> serde_json::Value { let kind = msg["type"].clone(); ws.send(Message::text(msg.to_string())).unwrap(); loop { let Message::Text(t) = ws.read().unwrap() else { continue }; let v: serde_json::Value = serde_json::from_str(t.as_str()).unwrap(); if v["type"] == kind { return v; } } }
 #[test] fn projects_persist_across_connections_and_bad_input_is_refused() {

@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import type { ScanResult } from './helper';
+import type { PickResult, ScanResult } from './helper';
 import { toBrandTokens } from './brand';
 import { baseName, type Project } from './projects';
 const isColor = (v: string) => /^(#[0-9a-f]{3,8}|rgba?\(|hsla?\(|oklch\()/i.test(v.trim());
 /** Import popover: give a project folder, see the brand kit found in it (tokens, colours, fonts). Only folders the helper was allowed to read can be scanned. */
-export function ImportProject({ scan, onUse, onCreate, onSwitch, projects, kits, active, using, onClose }: { scan: (path: string) => Promise<ScanResult>; onUse: (tokens: Record<string, string>) => void; onCreate: (name: string, tokens: Record<string, string>) => void; onSwitch: (id: string) => void; projects: Project[]; kits: Record<string, string[]>; active: string; using: number; onClose: () => void }) {
+export function ImportProject({ scan, pick, onUse, onCreate, onSwitch, projects, kits, active, using, onClose }: { scan: (path: string) => Promise<ScanResult>; pick: () => Promise<PickResult>; onUse: (tokens: Record<string, string>) => void; onCreate: (name: string, tokens: Record<string, string>) => void; onSwitch: (id: string) => void; projects: Project[]; kits: Record<string, string[]>; active: string; using: number; onClose: () => void }) {
   const [path, setPath] = useState(''); const [busy, setBusy] = useState(false); const [res, setRes] = useState<ScanResult | null>(null);
+  const choose = async () => { if (busy) return; setBusy(true); const r = await pick(); if (r.ok) { setPath(r.path); setRes(await scan(r.path)); } else if (r.error !== 'cancelled') setRes({ ok: false, error: r.error }); setBusy(false); };
   const run = async () => { if (!path.trim() || busy) return; setBusy(true); setRes(null); setRes(await scan(path.trim())); setBusy(false); };
   return (
     <>
@@ -16,6 +17,7 @@ export function ImportProject({ scan, onUse, onCreate, onSwitch, projects, kits,
         <h2>New project from a repo folder</h2>
         <form className="importform" onSubmit={(e) => { e.preventDefault(); void run(); }}>
           <input aria-label="Project folder" data-testid="import-path" placeholder="/Users/you/Hobby/your-project" value={path} onChange={(e) => setPath(e.target.value)} autoFocus />
+          <button type="button" className="rb btn" disabled={busy} data-testid="import-choose" onClick={() => void choose()}>Choose…</button>
           <button type="submit" className="rb btn" disabled={busy || !path.trim()} data-testid="import-scan">{busy ? 'Reading…' : 'Read brand'}</button>
         </form>
         <p className="mu mono" data-testid="import-using">Say uses {using} brand tokens</p>

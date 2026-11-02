@@ -3,7 +3,7 @@ use helper::{serve, Config};
 use std::{fs, net::TcpListener, thread};
 use tungstenite::{client::IntoClientRequest, connect, Message};
 fn start(root: &std::path::Path) -> tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>> { let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port();
-    let cfg = Config { port, token: "t".into(), allowed: vec!["chrome-extension://good".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![root.to_path_buf()], data_dir: std::env::temp_dir().join("sc-unused") }; thread::spawn(move || { let _ = serve(l, cfg); });
+    let cfg = Config { port, token: "t".into(), allowed: vec!["chrome-extension://good".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![root.to_path_buf()], data_dir: std::env::temp_dir().join("sc-unused"), picker_bin: "osascript".into() }; thread::spawn(move || { let _ = serve(l, cfg); });
     let mut r = format!("ws://127.0.0.1:{port}/?token=t").into_client_request().unwrap(); r.headers_mut().insert("Origin", "chrome-extension://good".parse().unwrap()); let (mut ws, _) = connect(r).unwrap(); let _ = ws.read().unwrap(); ws }
 fn scan(ws: &mut tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>, path: &str) -> serde_json::Value {
     ws.send(Message::text(serde_json::json!({ "type": "project.scan", "id": "p1", "path": path }).to_string())).unwrap();
