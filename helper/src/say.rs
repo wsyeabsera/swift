@@ -37,7 +37,7 @@ impl Spare {
 pub struct Pool { spare: Mutex<Option<Spare>>, bin: String, model: String }
 impl Pool {
     pub fn new(bin: &str, model: &str) -> Pool { Pool { spare: Mutex::new(None), bin: bin.to_string(), model: model.to_string() } }
-    pub fn prewarm(&self) { let mut g = self.spare.lock().unwrap(); if g.is_none() { *g = Spare::spawn(&self.bin, &self.model).ok(); } }
+    pub fn prewarm(&self) { let mut g = self.spare.lock().unwrap(); if g.is_none() { match Spare::spawn(&self.bin, &self.model) { Ok(sp) => *g = Some(sp), Err(e) => eprintln!("prewarm: cannot start {}: {e}", self.bin) } } }
     pub fn take(&self) -> Option<Spare> { self.spare.lock().unwrap().take() }
     pub fn has_spare(&self) -> bool { self.spare.lock().unwrap().is_some() }
     pub fn reap(&self, now: Instant, max_age: Duration) -> bool { let mut g = self.spare.lock().unwrap(); if g.as_ref().is_some_and(|s| now.duration_since(s.born) > max_age) { if let Some(mut s) = g.take() { let _ = s.child.kill(); let _ = s.child.wait(); } true } else { false } }
