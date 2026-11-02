@@ -8,7 +8,7 @@ import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
 import { duplicateFrame, duplicateId } from './canvas/frames';
-import { clearDoc, loadDoc, nextSparkN, saveDoc } from './doc';
+import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
 import { loadBrand, saveBrand } from './brand';
@@ -21,6 +21,7 @@ export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
   const [reg] = useState<Registry>(() => loadRegistry()); const project = activeProject(reg);
+  const hadLocal = useRef(loadDoc(undefined, project.id) !== null); const [ready, setReady] = useState(hadLocal.current); const [epoch, setEpoch] = useState(0);
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
   const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand(undefined, project.id));
   const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const [sparking, setSparking] = useState(false);
@@ -68,10 +69,25 @@ export function App() {
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void undo(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo]);
   // Autosave: after the document changes settle, snapshot every frame (current HTML) and store the design; a failure is shown, not swallowed.
   const persist = useCallback(async (): Promise<string | null> => {
-    if (!window.__swift) return null;
-    try { const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const err = saveDoc(snaps, undefined, project.id); setSaveStatus(err ? `not saved: ${err}` : 'saved'); return err; } catch (e) { const m = e instanceof Error ? e.message : 'error'; setSaveStatus(`not saved: ${m}`); return m; }
-  }, [frames, project.id]);
+    if (!window.__swift || !ready) return null; // not before the helper copy had its chance to restore (else fresh fixtures would overwrite it)
+    try {
+      const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const err = saveDoc(snaps, undefined, project.id);
+      const backup = err ? null : await conn.current?.storePut(project.id, JSON.stringify({ frames: snaps }));
+      setSaveStatus(err ? `not saved: ${err}` : backup && !backup.ok && backup.error !== 'helper offline' ? `saved · backup failed: ${backup.error}` : 'saved'); return err; } catch (e) { const m = e instanceof Error ? e.message : 'error'; setSaveStatus(`not saved: ${m}`); return m; }
+  }, [frames, project.id, ready]);
   useEffect(() => { const t = setTimeout(() => void persist(), 1000); return () => clearTimeout(t); }, [persist, revision]);
+  // First connect without a local copy (cleared browser data, new profile): restore the design from the helper's project file.
+  useEffect(() => {
+    if (ready || helper.status === 'connecting') return; if (helper.status === 'offline') { setReady(true); return; }
+    let alive = true;
+    void conn.current?.storeGet(project.id).then((r) => {
+      if (!alive) return;
+      if (!r.ok) setSayStatus(`Backup unreadable: ${r.error}`);
+      else if (r.data) { let f: FrameDef[] | null = null; try { f = parseDoc(JSON.parse(r.data)); } catch { f = null; } if (f) { setFrames(f); sparkN.current = nextSparkN(f); setEpoch((n) => n + 1); setSayStatus('Restored from the helper'); } else setSayStatus('Backup is corrupt: starting fresh'); }
+      setReady(true);
+    });
+    return () => { alive = false; };
+  }, [helper.status, ready, project.id]);
   // Switching: flush the current design first (a failed save stops the switch), then store the registry and reload into the other project.
   const goTo = useCallback(async (next: Registry | null) => { if (!next) { setSayStatus('Could not create a project from that name'); return; } const err = await persist(); if (err) { setSayStatus(`Not switching: ${err}`); return; } const e2 = saveRegistry(next); if (e2) { setSayStatus(`Not switching: ${e2}`); return; } location.reload(); }, [persist]);
   const takeCount = useMemo(() => frames.filter(isTake).length, [frames]); const selIsTake = !!selection && frames.some((f) => f.id === selection.frameId && isTake(f));
@@ -123,7 +139,7 @@ export function App() {
           <span className="mono">{helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}</span>
         </div>
       </header>
-      <Canvas frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
+      <Canvas key={epoch} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
       <Layers frameId={selection?.frameId ?? 'tv'} selection={selection} onSelect={setSelection} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       <form className="gl isl say" aria-label="Say" onSubmit={(e) => { e.preventDefault(); void say(); }}>

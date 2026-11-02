@@ -20,7 +20,7 @@ key), Liquid Glass UI, speed is the product, quality bar (failure modes tested, 
 
 ## Commands (the app, since 2026-11-02)
 - `npm run dev` (Vite on http://localhost:5173, HMR), `npm run build` (writes the extension's app page into `extension/app`), `npm run typecheck` (tsc 7), `npm test` (Vitest), `npm run test:changed`.
-- `npm run helper` (Rust helper on 127.0.0.1:7431; needs `SWIFT_DEV=1` for the dev page, or `SWIFT_ALLOWED_ORIGINS=chrome-extension://<id>` and `SWIFT_HELPER_TOKEN=<token>`), `npm run helper:test` (8 tests incl. a real WebSocket server).
+- `npm run helper` (project files go to `SWIFT_DATA_DIR`, default `~/.swift-canvas`; Rust helper on 127.0.0.1:7431; needs `SWIFT_DEV=1` for the dev page, or `SWIFT_ALLOWED_ORIGINS=chrome-extension://<id>` and `SWIFT_HELPER_TOKEN=<token>`), `npm run helper:test` (8 tests incl. a real WebSocket server).
 - `npm run e2e`: builds, starts helper + dev server, loads the unpacked extension in Playwright's Chromium, checks web page and extension connect and a wrong origin is refused. Load the extension by hand: chrome://extensions -> Load unpacked -> `extension/`.
 - `npm run e2e:contrast`: Liquid Glass contrast in the real app: 8 backdrops x dark/light x thin/regular/thick (48 combos), WCAG >= 4.5 for text and muted text; run it after ANY theme or glass change (it found two failures the design-folder check missed: the mesh backdrop was never covered there). `node e2e/real-say.mjs "<request>"` runs one Say against the REAL Claude Code (uses a little subscription).
 - Layout: `app/` (React + Vite, strict TS), `extension/` (MV3 shell), `helper/` (Rust, tungstenite), `e2e/`, `spikes/`, `docs/`.
