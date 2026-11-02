@@ -8,6 +8,7 @@
 - Import → "Use this brand": scanned tokens (plain custom properties only, max 16, `brand.ts`) replace the hard-coded tvdash tokens in Say/Spark prompts; persisted.
 - Projects (`projects.ts`): registry in localStorage, per-project design + brand keys (default project keeps the old keys), Import popover lists projects and "Create project" from a scanned folder (starts with one blank screen); switching flushes the autosave, then reloads.
 - Durable project files: the helper stores each project at `$SWIFT_DATA_DIR` (default `~/.swift-canvas/<id>.project.json`, atomic writes); the app backs up on every autosave and, when it has NO local copy, restores from the helper on first connect (autosave waits until that attempt finished). The web page and the extension share one project by id.
+- Rename a frame: double-click its label (Enter commits, Esc cancels; `renameFrame`). Gotcha: the canvas host uses a NATIVE pointerdown + pointer capture, so React stopPropagation on children is too late; guard in the native handler.
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

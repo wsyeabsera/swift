@@ -8,3 +8,7 @@ export function duplicateFrame(frames: FrameDef[], base: FrameDef, id: string, h
 export function duplicateId(frames: FrameDef[], baseId: string): string {
   const stem = baseId.replace(/-d\d+$/, ''); const used = new Set(frames.map((f) => f.id)); let n = 1; while (used.has(`${stem}-d${n}`)) n++; return `${stem}-d${n}`;
 }
+/** Rename: trimmed, capped at 60 chars; an empty name keeps the old one. Returns the same array when nothing changes. */
+export function renameFrame(frames: FrameDef[], id: string, title: string): FrameDef[] {
+  const t = title.trim().slice(0, 60); const f = frames.find((x) => x.id === id); if (!f || !t || t === f.title) return frames; return frames.map((x) => (x.id === id ? { ...x, title: t } : x));
+}
