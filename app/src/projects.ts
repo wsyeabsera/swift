@@ -23,3 +23,7 @@ export function addProject(r: Registry, name: string): Registry | null {
 }
 export const switchProject = (r: Registry, id: string): Registry => (r.list.some((p) => p.id === id) ? { ...r, active: id } : r);
 export const baseName = (path: string): string => path.replace(/\/+$/, '').split('/').pop() ?? '';
+/** A name whose slug is not taken yet: "X", then "X 2", "X 3"... (importing a file must never overwrite an existing project). */
+export function uniqueName(list: Project[], name: string): string {
+  const base = name.trim().slice(0, 56); const used = new Set(list.map((p) => p.id)); if (!used.has(slug(base))) return base; let n = 2; while (used.has(slug(`${base} ${n}`))) n++; return `${base} ${n}`;
+}

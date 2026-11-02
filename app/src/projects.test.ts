@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { activeProject, addProject, baseName, DEFAULT_PROJECT, loadRegistry, sanitizeRegistry, saveRegistry, slug, switchProject } from './projects';
+import { activeProject, addProject, baseName, DEFAULT_PROJECT, loadRegistry, sanitizeRegistry, saveRegistry, slug, switchProject, uniqueName } from './projects';
 const fresh = () => loadRegistry({ getItem: () => null });
 test('a fresh registry has tvdash, active', () => { expect(fresh()).toEqual({ active: 'tvdash', list: [DEFAULT_PROJECT] }); });
 test('adding makes the project active; the same name reuses it; empty or symbol-only names are refused', () => {
@@ -17,3 +17,4 @@ test('persistence: round trip, corrupt, throwing storage', () => {
   expect(saveRegistry(a, { setItem: () => { throw new Error('quota'); } })).toBe('quota'); expect(loadRegistry({ getItem: () => { throw new Error('b'); } })).toEqual(fresh());
 });
 test('slug and baseName', () => { expect(slug('My App_2!')).toBe('my-app-2'); expect(baseName('/Users/yab/Hobby/hearth/')).toBe('hearth'); expect(baseName('/')).toBe(''); });
+test('uniqueName never collides with an existing project', () => { const l = addProject(addProject(fresh(), 'Radar')!, 'Radar 2')!.list; expect(uniqueName(l, 'New')).toBe('New'); expect(uniqueName(l, 'tvdash')).toBe('tvdash 2'); expect(uniqueName(l, 'Radar')).toBe('Radar 3'); });

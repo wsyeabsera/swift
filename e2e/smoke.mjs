@@ -131,6 +131,14 @@ try {
   cv.restoredFromHelper = await web.evaluate(async (b) => ({ frames: window.__swift.frames.length === b.n, color: (await window.__swift.get('tv', 'clock', 'color')) === b.color }), docBefore); cv.restoreStatus = (await web.textContent('[data-testid=say-status]'))?.trim();
   await web.waitForFunction(() => window.__theme && window.__swift); th.persisted = await web.evaluate(() => getComputedStyle(document.querySelector('.kit-root')).getPropertyValue('--bg-image').includes('fuji') && getComputedStyle(document.querySelector('.kit-root')).getPropertyValue('--blur').trim() === '48px');
   await web.evaluate(() => window.__theme.set({ bd: 'lake', mode: 'auto', glass: 'regular' })); await web.waitForTimeout(200); cv.theme = th;
+  // Project file: export the project, open that file as a NEW project (never overwrites), same frames; a junk file is refused with a reason
+  { await web.waitForFunction(() => document.querySelector('[data-testid=save-status]')?.textContent === 'saved', null, { timeout: 5000 }); const n0 = await web.evaluate(() => window.__swift.frames.length);
+    await web.getByTestId('frame-menu').click(); const dl = web.waitForEvent('download', { timeout: 5000 }); await web.getByTestId('export-project').click(); const d = await dl; const file = path.join(os.tmpdir(), `sc-proj-${process.pid}.swiftcanvas.json`); await d.saveAs(file);
+    const name = d.suggestedFilename(); await web.getByTestId('project-file-input').setInputFiles(file);
+    await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n && document.querySelector('[data-testid=project-button] b')?.textContent === 'tvdash 2', n0, { timeout: 10000 }); await web.waitForTimeout(300);
+    const opened = { name, project: (await web.textContent('[data-testid=project-button] b'))?.trim(), frames: await web.evaluate(() => window.__swift.frames.length), n0 };
+    const junk = path.join(os.tmpdir(), `sc-junk-${process.pid}.json`); fs.writeFileSync(junk, '{"nope":1}'); await web.getByTestId('project-file-input').setInputFiles(junk); await web.waitForTimeout(400); opened.junkStatus = (await web.textContent('[data-testid=say-status]'))?.trim(); opened.stillHere = (await web.textContent('[data-testid=project-button] b'))?.trim();
+    await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); await web.getByTestId('project-tvdash').click(); await web.waitForFunction(() => document.querySelector('[data-testid=project-button] b')?.textContent === 'tvdash', null, { timeout: 8000 }); cv.projectFile = opened; }
   await web.screenshot({ path: `${root}/e2e/shot-canvas.png` }); out.canvas = cv;
   const ext = await ctx.newPage(); await ext.goto(`chrome-extension://${id}/app/index.html`); out.extension = await status(ext);
   await ext.waitForFunction(() => window.__swift && window.__swift.frames.length > 20, null, { timeout: 10000 }); out.extFrames = await ext.evaluate(() => window.__swift.frames.length); out.extEdit = await ext.evaluate(() => window.__swift.edit('tv', 'clock', 'font-size', '260px')); out.extRead = await ext.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
@@ -154,7 +162,8 @@ try {
   const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
   const frameMenuOk = cv0.frameMenu.closed && cv0.frameMenu.focusBack === 'frame-menu' && cv0.frameMenu.overflow <= 1;
   const shortcutsOk = frameMenuOk &&  cv0.shortcuts.rows >= 10 && cv0.shortcuts.closed && cv0.shortcuts.focusBack === 'shortcuts-button';
-  const flushOk = shortcutsOk &&  cv0.flush === true;
+  const projectFileOk = cv0.projectFile.name === 'tvdash.swiftcanvas.json' && cv0.projectFile.project === 'tvdash 2' && cv0.projectFile.frames === cv0.projectFile.n0 && /Cannot open/.test(cv0.projectFile.junkStatus) && cv0.projectFile.stillHere === 'tvdash 2';
+  const flushOk = projectFileOk &&  shortcutsOk &&  cv0.flush === true;
   const exportOk = flushOk &&  addOk &&  /\.html$/.test(cv0.exported.name) && cv0.exported.doctype && cv0.exported.hasClock;
   const renameOk = exportOk &&  cv0.rename.renamed && cv0.rename.escKept && cv0.rename.inputGone;
   const zoomSelOk = cv0.zoomSel.sAfter > cv0.zoomSel.sBefore;

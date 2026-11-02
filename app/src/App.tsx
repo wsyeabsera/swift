@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { Appearance } from './Appearance';
 import { ImportProject } from './ImportProject';
 import { Shortcuts } from './Shortcuts';
+import { MAX_FILE_BYTES, parseProjectFile, projectFileName, serializeProject } from './projectFile';
 import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type ThemeChoice } from './theme';
 import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
@@ -16,7 +17,7 @@ import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
 import { kitColors, loadBrand, saveBrand } from './brand';
-import { activeProject, addProject, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
+import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
 import { pushHistory, step } from './say/history';
 import { localEdits } from './say/local';
 import { canSpark, discardTakes, isTake, keepTake, runSpark } from './say/spark';
@@ -30,7 +31,7 @@ export function App() {
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
   const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand(undefined, project.id));
   const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const takesRunning = useRef(new Map<string, AbortController>()); const [painting, setPainting] = useState<Set<string>>(new Set()); const [sparking, setSparking] = useState(false);
-  const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null); const [shortcutsOpen, setShortcutsOpen] = useState(false); const [frameMenuOpen, setFrameMenuOpen] = useState(false); const fmRef = useRef<HTMLButtonElement>(null); const kbRef = useRef<HTMLButtonElement>(null);
+  const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null); const [shortcutsOpen, setShortcutsOpen] = useState(false); const [frameMenuOpen, setFrameMenuOpen] = useState(false); const fmRef = useRef<HTMLButtonElement>(null); const fileRef = useRef<HTMLInputElement>(null); const kbRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
   useEffect(() => saveTheme(theme), [theme]);
   useEffect(() => { (window as Window & { __theme?: unknown }).__theme = { set: (p: Partial<ThemeChoice>) => setTheme((t) => sanitize({ ...t, ...p })), get: () => theme }; }, [theme]);
@@ -141,6 +142,16 @@ export function App() {
     const html = (await window.__swift.snapshot(id)) || f.html; history.current.push({ kind: 'frameDel', frameId: id, frame: { ...f, html }, index }); redoStack.current = []; setRedos(0); setEdits(history.current.length);
     setFrames((x) => x.filter((y) => y.id !== id)); setSelection(null); setSayStatus(`Deleted ${f.title}`);
   }, [frames, selection]);
+  // Project files: export everything as one portable JSON file, or open one as a NEW project (never overwrites an existing one).
+  const exportProject = useCallback(async () => {
+    if (!window.__swift) return; const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html })));
+    const url = URL.createObjectURL(new Blob([serializeProject(project.name, snaps, brand)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = projectFileName(project.name); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
+  }, [frames, project.name, brand]);
+  const openProjectFile = useCallback(async (file: File) => {
+    if (file.size > MAX_FILE_BYTES) { setSayStatus('Project file too large'); return; } const r = parseProjectFile(await file.text()); if (!r.ok) { setSayStatus(`Cannot open ${file.name}: ${r.error}`); return; }
+    const next = addProject(reg, uniqueName(reg.list, r.project.name)); if (!next) { setSayStatus('Too many projects'); return; }
+    const e1 = saveDoc(r.project.frames, undefined, next.active); if (e1) { setSayStatus(`Not opened: ${e1}`); return; } saveBrand(r.project.brand, undefined, next.active); void goTo(next);
+  }, [reg, goTo]);
   // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
   const exportFrame = useCallback(async () => {
     const f = frames.find((x) => x.id === (selection?.frameId ?? 'tv')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
@@ -181,6 +192,7 @@ export function App() {
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
         {importOpen && conn.current && <ImportProject scan={conn.current.scan} pick={conn.current.pickFolder} projects={reg.list} kits={Object.fromEntries(reg.list.map((p) => [p.id, kitColors(p.id === project.id ? brand : loadBrand(undefined, p.id))]))} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
+        <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="project-file-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { setFrameMenuOpen(false); void openProjectFile(f); } }} />
         {frameMenuOpen && (<>
           <div className="scrim" onClick={() => { setFrameMenuOpen(false); fmRef.current?.focus(); }} aria-hidden="true" />
           <div className="gl pop framemenu" role="dialog" aria-label="Frame" data-testid="frame-popover" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFrameMenuOpen(false); fmRef.current?.focus(); } }}>
@@ -192,7 +204,7 @@ export function App() {
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void deleteFrame(); }} disabled={!selection} data-testid="delete-frame" title="Delete the selected frame (undoable)">Delete frame</button>
             </div>
             <h2>Project</h2>
-            <div className="projs"><button className="rb btn" onClick={resetDesign} data-testid="reset">Reset design</button></div>
+            <div className="projs"><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportProject(); }} data-testid="export-project">Export project file</button><button className="rb btn" onClick={() => fileRef.current?.click()} data-testid="open-project">Open project file…</button><button className="rb btn" onClick={resetDesign} data-testid="reset">Reset design</button></div>
           </div>
         </>)}
         {shortcutsOpen && <Shortcuts onClose={() => { setShortcutsOpen(false); kbRef.current?.focus(); }} />}
