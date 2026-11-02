@@ -69,4 +69,4 @@ real parallel Spark (memory, usage drop per Spark) still not measured. Subscript
   - token: n=10 first visible p50 1267 ms, max 2590 ms, valid 7/10
   - property: n=10 first visible p50 985 ms, max 1290 ms, valid 8/10
   - full: n=9 first visible p50 1322 ms, max 1855 ms, valid 3/9
-- Implication: send **token and property edits through the local tier first** (instant preview, #1713) and use Claude for the creative ones; budget Say by route (property/token 1.0-1.3 s; creative up to ~2.6 s) instead of one number.
+- Implication: send **token and property edits through the local tier first** (instant preview, #1713) and use Claude for the creative ones; budget Say by route (first visible change p50: property 0.99 s, token 1.27 s, full 1.32 s; the 2.6 s maximum was a token request) instead of one number; with the local tier answering token/property edits instantly, Claude's p95 matters mostly for the creative ones.
