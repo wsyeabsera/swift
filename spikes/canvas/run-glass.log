@@ -1,0 +1,6 @@
+same     freeze=1 glass=none n=20 | pan p50 8.3 p95 9.2 max 9.4 >20ms 0/300 | zoom p95 9.2 max 16.7 | tier0(visible 17) p50 8.3 p95 9.1 ms | RSS 793 MB
+same     freeze=1 glass=none n=40 | pan p50 8.3 p95 8.9 max 9.4 >20ms 0/300 | zoom p95 16.7 max 41.5 | tier0(visible 17) p50 8.3 p95 9 ms | RSS 1060 MB
+same     freeze=1 glass=liquid n=20 | pan p50 8.3 p95 9.1 max 9.4 >20ms 0/300 | zoom p95 9.3 max 33.4 | tier0(visible 17) p50 8.3 p95 9.2 ms | RSS 1010 MB
+same     freeze=1 glass=liquid n=40 | pan p50 8.3 p95 9.1 max 9.4 >20ms 0/300 | zoom p95 16.7 max 33.3 | tier0(visible 17) p50 8.3 p95 8.4 ms | RSS 1063 MB
+same     freeze=1 glass=refract n=20 | pan p50 8.3 p95 9.3 max 9.4 >20ms 0/301 | zoom p95 9.2 max 41.6 | tier0(visible 17) p50 8.3 p95 8.6 ms | RSS 1008 MB
+same     freeze=1 glass=refract n=40 | pan p50 8.3 p95 9.1 max 9.4 >20ms 0/301 | zoom p95 16.7 max 33.4 | tier0(visible 17) p50 8.3 p95 8.5 ms | RSS 1067 MB

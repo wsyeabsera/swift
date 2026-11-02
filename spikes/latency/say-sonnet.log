@@ -1,0 +1,6 @@
+model=sonnet
+turn 1: first token 1808 ms, first complete op 1941 ms, total 2081 ms, 2 ops, valid JSONL false
+turn 2: first token 1500 ms, first complete op 1557 ms, total 1742 ms, 2 ops, valid JSONL true
+turn 3: first token 1482 ms, first complete op 1575 ms, total 1710 ms, 2 ops, valid JSONL true
+turn 4: first token 1015 ms, first complete op 1112 ms, total 2701 ms, 12 ops, valid JSONL true
+turn 5: first token 1348 ms, first complete op undefined ms, total 1533 ms, 1 ops, valid JSONL true

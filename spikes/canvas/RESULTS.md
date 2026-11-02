@@ -27,3 +27,12 @@ frame. `node measure.mjs 20`; raw rows in `run-n20.log` and `results-n20.json`. 
 ## Not measured yet
 Bitmap LOD swap (capture time, flash), blur after zoom settles, 40+ frames, an 8K image frame, live editing inside the
 extension page itself (see #1714), a glass layer over the moving canvas (see liquid glass note).
+
+## Pass 2: glass over the moving canvas, and 40 frames (same-origin iframes, freeze on; `run-glass.log`)
+| Overlay (6 glass islands, backdrop blur) | n=20 pan p95 / RSS | n=40 pan p95 / RSS |
+|---|---|---|
+| none | 9.2 ms / 793 MB | 8.9 ms / 1060 MB |
+| Liquid Glass (rim, sheen) | 9.1 ms / 1010 MB | 9.1 ms / 1063 MB |
+| Liquid Glass + edge refraction (SVG displacement in backdrop-filter) | 9.3 ms / 1008 MB | 9.1 ms / 1067 MB |
+No dropped frames in any run (0 of 300). Glass and even refraction are free on this GPU at these sizes; 40 frames use about the same memory as 20
+(~1.06 GB), so memory is dominated by something other than frame count here (the animated, blurred content). Zoom settle spikes of 33-42 ms appear in all variants.

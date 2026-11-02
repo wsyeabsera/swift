@@ -24,3 +24,15 @@ makes WASM slower. The 3x / > 1 ms gate from task #1710 is far from met, so re-t
 Where Rust should still win: tree diff/merge on big trees, layout (Taffy), 8K image pyramid vs `sharp`, MP4 encode, search. Those need their own runs. A heavier
 op is needed before concluding WASM never pays; this only shows simple array transforms do not.
 `cargo-nextest` and `wasm-pack` are not installed.
+
+## Pass 2: heavier ops, 20,000 nodes (`bench2.mjs`, µs per call)
+| Op | TypeScript | WASM | WASM + SIMD128 |
+|---|---|---|---|
+| Hit-test (top-most rect under a point) | 64 | 47 (1.4x) | 47 |
+| Cull (count rects in the viewport) | 99 | 75 (1.3x) | 71 (1.4x) |
+| Property diff (80k u32 compared) | 514 | 28 (18x) | 12 (42x) |
+
+Outputs match in all three. WASM wins big only on bulk compare scans (diff, auto-vectorised); branchy per-node loops (hit-test, cull) gain ~1.3-1.4x.
+Absolute times are tens to hundreds of microseconds at 20k nodes, so none of these is a bottleneck today and none saves the 1 ms gate in #1710.
+Read: keep the document in TS first; use Rust (native in the helper first) for bulk work that grows with project size (diff/merge of whole projects,
+image work), and re-measure when a real project exceeds ~100k nodes. `-C target-feature=+simd128` is worth turning on if WASM is used.
