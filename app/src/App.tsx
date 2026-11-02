@@ -6,16 +6,17 @@ import { computeTheme, loadTheme, sanitize, saveTheme, backdropThumb, type Theme
 import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { makeFrames, type FrameDef } from './canvas/fixtures';
+import { clearDoc, loadDoc, nextSparkN, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { runSayRepairing } from './say/say';
-import { runSpark } from './say/spark';
+import { discardTakes, isTake, keepTake, runSpark } from './say/spark';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
 const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Diagram'] as const;
 export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
-  const baseFrames = useMemo(() => makeFrames(20), []); const [extra, setExtra] = useState<FrameDef[]>([]); const frames = useMemo(() => [...baseFrames, ...extra], [baseFrames, extra]);
-  const sparkN = useRef(0); const [sparkStatus, setSparkStatus] = useState(''); const [sparking, setSparking] = useState(false);
+  const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc() ?? makeFrames(20)); const [saveStatus, setSaveStatus] = useState('');
+  const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const [sparking, setSparking] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
   useEffect(() => saveTheme(theme), [theme]);
@@ -39,7 +40,7 @@ export function App() {
   const spark = useCallback(async () => {
     const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? 'tv')); if (!window.__swift || !c || !base || sparking) return;
     setSparking(true); setSparkStatus('Sparking 4 directions…');
-    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => setExtra((e) => [...e, ...f]) });
+    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => setFrames((e) => [...e, ...f]) });
     const ok = r.takes.filter((t) => t.result.applied.length > 0).length; const err = r.takes.find((t) => t.result.error)?.result.error; const rej = r.takes.reduce((n, t) => n + t.result.rejected.length, 0); setSparkStatus(`${r.takes.length} takes · ${ok} changed${r.firstPaintMs !== null ? ` · first paint ${r.firstPaintMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${rej ? ` · ${rej} rejected` : ''}${err ? ` · ${err}` : ''}`); setSparking(false);
   }, [frames, selection, sparking]);
   const say = useCallback(async () => {
@@ -53,6 +54,17 @@ export function App() {
     setRevision((n) => n + 1); setSaying(false);
   }, [sayText, saying, selection, frames, pendingAsk]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void undo(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo]);
+  // Autosave: after the document changes settle, snapshot every frame (current HTML) and store the design; a failure is shown, not swallowed.
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (!window.__swift) return;
+      try { const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const err = saveDoc(snaps); setSaveStatus(err ? `not saved: ${err}` : 'saved'); } catch (e) { setSaveStatus(`not saved: ${e instanceof Error ? e.message : 'error'}`); }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [frames, revision]);
+  const takeCount = useMemo(() => frames.filter(isTake).length, [frames]); const selIsTake = !!selection && frames.some((f) => f.id === selection.frameId && isTake(f));
+  const discard = useCallback(() => { const gone = new Set(frames.filter(isTake).map((f) => f.id)); history.current = history.current.filter((e) => !gone.has(e.frameId)); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded`); }, [frames, selection]);
+  const resetDesign = useCallback(() => { clearDoc(); location.reload(); }, []);
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   const dot = helper.status === 'connected' ? 'ok' : helper.status === 'connecting' ? 'warn' : 'bad';
@@ -86,8 +98,12 @@ export function App() {
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
         <button className="rb btn" onClick={() => void edit('tv', 'clock', 'font-size', '280px')}>Clock bigger</button>
         <button className="rb btn" onClick={() => void spark()} disabled={sparking} data-testid="spark-button">Spark ×4</button>
+        <button className="rb btn" onClick={() => selection && setFrames((f) => keepTake(f, selection.frameId))} disabled={!selIsTake} data-testid="keep-take">Keep take</button>
+        <button className="rb btn" onClick={discard} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
+        <button className="rb btn" onClick={resetDesign} data-testid="reset">Reset</button>
         <button className="rb btn" onClick={() => void undo()} disabled={edits === 0} data-testid="undo">Undo{edits ? ` (${edits})` : ''}</button>
         <span className="mono mu" data-testid="tier0">{tier0 || 'Tier 0 · ready'}</span>
+        {saveStatus && <span className="mono mu" data-testid="save-status" role="status">{saveStatus}</span>}
         {sparkStatus && <span className="mono mu" data-testid="spark-status" role="status">{sparkStatus}</span>}
       </footer>
     </div>

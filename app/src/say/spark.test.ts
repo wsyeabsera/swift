@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import type { CanvasApi } from '../canvas/Canvas';
 import type { FrameDef } from '../canvas/fixtures';
-import { DIRECTIONS, runSpark, takeFrame } from './spark';
+import { DIRECTIONS, discardTakes, isTake, keepTake, runSpark, takeFrame } from './spark';
 import type { SayEvent } from './say';
 const base: FrameDef = { id: 'tv', root: 'tv', title: 'TV · Idle 1920×1080', x: 0, y: 0, w: 1920, h: 1080, html: '<div id="tv"></div>' };
 test('takes are laid out above the base, two per row, without overlapping', () => {
@@ -15,4 +15,9 @@ test('runSpark clones the base into n frames and runs one Say per frame in paral
   const send = (_s: string, request: string, on: (e: SayEvent) => void) => { seen.push(request); setTimeout(() => { on({ kind: 'delta', text: '{"op":"set","id":"tv","prop":"opacity","value":"0.9"}\n' }); on({ kind: 'done' }); }, 5); };
   const r = await runSpark({ api, send, base, n: 3, nextId: () => `tv-t${++n}`, addFrames: (f) => added.push(...f) });
   expect(added.map((f) => f.id)).toEqual(['tv-t1', 'tv-t2', 'tv-t3']); expect(new Set(seen).size).toBe(3); expect(r.takes.every((t) => t.result.applied.length === 1)).toBe(true); expect(r.firstPaintMs).not.toBeNull(); expect(api.fitTo).toHaveBeenCalledWith(['tv-t1', 'tv-t2', 'tv-t3']);
+});
+test('keep promotes one take, discard removes the rest and never touches real frames', () => {
+  const f = [base, { ...base, id: 'tv-t1' }, { ...base, id: 'tv-t2' }]; const kept = keepTake(f, 'tv-t2');
+  expect(isTake(kept[1]!)).toBe(true); expect(isTake(kept[2]!)).toBe(false); expect(discardTakes(kept).map((x) => x.id)).toEqual(['tv', 'tv-t2']);
+  expect(keepTake(f, 'tv')).toEqual(f); expect(discardTakes([base])).toEqual([base]);
 });

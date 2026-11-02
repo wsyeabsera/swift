@@ -28,3 +28,7 @@ export async function runSpark(a: { api: CanvasApi; send: SayTransport; base: Fr
   }));
   return { takes, firstPaintMs: firstPaint, totalMs: performance.now() - t0 };
 }
+/** A Spark take is a frame `<base>-t<n>` that was not kept. Discarding removes the takes (the user keeps the ones they like first). */
+export const isTake = (f: FrameDef): boolean => /-t\d+$/.test(f.id) && !f.kept;
+export const discardTakes = (frames: FrameDef[]): FrameDef[] => frames.filter((f) => !isTake(f));
+export const keepTake = (frames: FrameDef[], id: string): FrameDef[] => frames.map((f) => (f.id === id && isTake(f) ? { ...f, kept: true } : f));

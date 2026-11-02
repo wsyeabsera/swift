@@ -45,6 +45,10 @@ try {
   await web.evaluate(() => window.__swift.fitAll()); await web.getByTestId('spark-button').click();
   await web.waitForFunction(() => /takes/.test(document.querySelector('[data-testid=spark-status]')?.textContent ?? ''), null, { timeout: 20000 }); cv.sparkStatus = (await web.textContent('[data-testid=spark-status]'))?.trim();
   cv.spark = await web.evaluate(async () => { const ids = window.__swift.frames.filter((f) => f.startsWith('tv-t')); const sizes = await Promise.all(ids.map((id) => window.__swift.get(id, 'clock', 'font-size'))); return { ids, sizes }; });
+  // Keep one take, discard the rest: only the kept take stays (and the base frames are untouched)
+  await web.evaluate(() => window.__swift.fitTo(['tv-t2'])); await web.waitForTimeout(200); const tp = await web.evaluate(() => { const v = window.__swift.view(); const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(tp.x, tp.y); await web.waitForFunction(() => !document.querySelector('[data-testid=keep-take]').disabled, null, { timeout: 4000 });
+  await web.getByTestId('keep-take').click(); await web.getByTestId('discard-takes').click(); await web.waitForTimeout(500);
+  cv.takes = await web.evaluate(() => ({ spark: window.__swift.frames.filter((f) => f.startsWith('tv-t')), total: window.__swift.frames.length })); await web.evaluate(() => window.__swift.fitAll());
   // ⌘K focuses the Say input from anywhere (even with a popover open)
   await web.getByTestId('project-button').click(); await web.waitForSelector('[data-testid=import]'); await web.keyboard.press('Meta+k'); await web.waitForTimeout(150); cv.cmdK = await web.evaluate(() => ({ focused: document.activeElement?.getAttribute('data-testid'), importOpen: !!document.querySelector('[data-testid=import]') }));
   // Import a project: scan an allowed folder (this repo's own app/), refuse a folder outside the allowed roots; Escape closes with focus back
@@ -58,7 +62,12 @@ try {
   await web.getByRole('button', { name: 'Thick' }).click(); await web.waitForTimeout(150); th.blur = await web.evaluate(() => getComputedStyle(document.querySelector('.kit-root')).getPropertyValue('--blur'));
   await web.keyboard.press('Escape'); await web.waitForTimeout(150); th.escClosed = (await web.$('[data-testid=appearance]')) === null; th.focusBack = await web.evaluate(() => document.activeElement?.getAttribute('data-testid'));
   await web.getByTestId('appearance-button').click(); await web.waitForSelector('[data-testid=appearance]'); await web.mouse.click(700, 500); await web.waitForTimeout(150); th.scrimClosed = (await web.$('[data-testid=appearance]')) === null;
-  await web.reload(); await web.waitForFunction(() => window.__theme && window.__swift); th.persisted = await web.evaluate(() => getComputedStyle(document.querySelector('.kit-root')).getPropertyValue('--bg-image').includes('fuji') && getComputedStyle(document.querySelector('.kit-root')).getPropertyValue('--blur').trim() === '48px');
+  // Autosave: wait for the saved marker, then the reload must bring back the Spark takes and the edited colour
+  await web.waitForFunction(() => document.querySelector('[data-testid=save-status]')?.textContent === 'saved', null, { timeout: 5000 }); await web.waitForTimeout(1300);
+  const docBefore = await web.evaluate(async () => ({ n: window.__swift.frames.length, color: await window.__swift.get('tv', 'clock', 'color') }));
+  await web.reload(); await web.waitForFunction(() => window.__theme && window.__swift && window.__swift.frames.length > 0); await web.waitForTimeout(500);
+  cv.docRestored = await web.evaluate(async (b) => ({ sameFrames: window.__swift.frames.length === b.n, more: window.__swift.frames.length > 20, color: (await window.__swift.get('tv', 'clock', 'color')) === b.color }), docBefore);
+  await web.waitForFunction(() => window.__theme && window.__swift); th.persisted = await web.evaluate(() => getComputedStyle(document.querySelector('.kit-root')).getPropertyValue('--bg-image').includes('fuji') && getComputedStyle(document.querySelector('.kit-root')).getPropertyValue('--blur').trim() === '48px');
   await web.evaluate(() => window.__theme.set({ bd: 'lake', mode: 'auto', glass: 'regular' })); await web.waitForTimeout(200); cv.theme = th;
   await web.screenshot({ path: `${root}/e2e/shot-canvas.png` }); out.canvas = cv;
   const ext = await ctx.newPage(); await ext.goto(`chrome-extension://${id}/app/index.html`); out.extension = await status(ext);
@@ -73,5 +82,7 @@ try {
   const importOk = /tokens/.test(cv0.import.ok) && cv0.import.ok.includes('files') && cv0.import.refused && cv0.import.escClosed && cv0.import.focusBack === 'project-button';
   const cmdKOk = cv0.cmdK.focused === 'say-input' && cv0.cmdK.importOpen === false;
   const extOk = out.extEdit.ok && out.extRead === '260px';
-  const ok = canvasOk && selOk && sayOk && sparkOk && importOk && cmdKOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { canvasOk, selOk, sayOk, sparkOk, importOk, cmdKOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
+  const takesOk = cv0.takes.spark.length === 1 && cv0.takes.total === 21;
+  const docOk = takesOk &&  cv0.docRestored.sameFrames && cv0.docRestored.more && cv0.docRestored.color;
+  const ok = docOk && canvasOk && selOk && sayOk && sparkOk && importOk && cmdKOk && themeOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { docOk, canvasOk, selOk, sayOk, sparkOk, importOk, cmdKOk, themeOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
 } catch (e) { console.error(e); kill(); process.exit(1); }

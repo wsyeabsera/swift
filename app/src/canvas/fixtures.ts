@@ -1,5 +1,5 @@
 // Example frames: real tvdash-style surfaces with stable element ids (the Say op language addresses elements by id).
-export type FrameDef = { id: string; root: string; title: string; x: number; y: number; w: number; h: number; html: string };
+export type FrameDef = { id: string; root: string; title: string; x: number; y: number; w: number; h: number; html: string; kept?: boolean };
 const row = (i: number, t: string, m: string) => `<div id="row${i}" style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,.1)"><div id="row${i}-t" style="font-size:24px">${t}</div><div id="row${i}-m" style="opacity:.6;font-size:16px">${m}</div></div>`;
 export const tvIdle = (): string => `<div id="tv" style="position:relative;width:1920px;height:1080px;overflow:hidden;font-family:system-ui;color:#f5f5f7;background:linear-gradient(135deg,#0b1a3a,#1a0b3a 50%,#0b3a2a)">
 <div id="clock" style="position:absolute;left:115px;top:86px;font-size:230px;font-weight:200;letter-spacing:-.03em">21:53</div>
