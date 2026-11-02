@@ -11,6 +11,7 @@
 - Rename a frame: double-click its label (Enter commits, Esc cancels; `renameFrame`). Gotcha: the canvas host uses a NATIVE pointerdown + pointer capture, so React stopPropagation on children is too late; guard in the native handler.
 - Say input: ↑/↓ recall earlier requests (`say/history.ts`).
 - Spark: skeleton shimmer on takes while Claude paints (`painting` set, `.fr-busy`), Cancel this take, swatches in the switcher.
+- Redo: ⌘⇧Z / Redo button (redo stack cleared by any new action; say entries swap snapshots).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 

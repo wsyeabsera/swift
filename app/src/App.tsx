@@ -42,10 +42,22 @@ export function App() {
   const history = useRef<Entry[]>([]); const [edits, setEdits] = useState(0);
   const edit = useCallback(async (frameId: string, el: string, prop: string, value: string, record = true) => {
     const r = await window.__swift?.edit(frameId, el, prop, value); if (!r?.ok) return;
-    if (record) { history.current.push({ kind: 'edit', frameId, el, prop, before: r.before, after: value }); setEdits(history.current.length); }
+    if (record) { history.current.push({ kind: 'edit', frameId, el, prop, before: r.before, after: value }); redoStack.current = []; setRedos(0); setEdits(history.current.length); }
     setTier0(`Tier 0 · ${r.ms.toFixed(1)} ms`); setRevision((n) => n + 1);
   }, []);
-  const undo = useCallback(async () => { const e = history.current.pop(); if (!e) return; setEdits(history.current.length); if (e.kind === 'say') { await window.__swift?.load(e.frameId, e.snapshot); setRevision((n) => n + 1); setSayStatus('Say undone'); } else await edit(e.frameId, e.el, e.prop, e.before, false); }, [edit]);
+  const redoStack = useRef<Entry[]>([]); const [redos, setRedos] = useState(0);
+  const undo = useCallback(async () => {
+    const e = history.current.pop(); if (!e || !window.__swift) return; setEdits(history.current.length);
+    if (e.kind === 'say') { const after = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); redoStack.current.push({ kind: 'say', frameId: e.frameId, snapshot: after }); setRevision((n) => n + 1); setSayStatus('Say undone'); }
+    else { await edit(e.frameId, e.el, e.prop, e.before, false); redoStack.current.push(e); }
+    setRedos(redoStack.current.length);
+  }, [edit]);
+  const redo = useCallback(async () => {
+    const e = redoStack.current.pop(); if (!e || !window.__swift) return; setRedos(redoStack.current.length);
+    if (e.kind === 'say') { const before = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); history.current.push({ kind: 'say', frameId: e.frameId, snapshot: before }); setRevision((n) => n + 1); setSayStatus('Redone'); }
+    else { await edit(e.frameId, e.el, e.prop, e.after, false); history.current.push(e); }
+    setEdits(history.current.length);
+  }, [edit]);
   const spark = useCallback(async () => {
     const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? 'tv')); if (!window.__swift || !c || !base || sparking) return;
     const gate = canSpark(frames, 4); if (!gate.ok) { setSparkStatus(gate.reason); return; }
@@ -64,11 +76,11 @@ export function App() {
     const base = pendingAsk ? `${pendingAsk.original}\n\nYou asked: "${pendingAsk.question}". My answer: ${text}` : text; setPendingAsk(null);
     const r = await runSayRepairing({ api: liveApi, send: c.say, frameId, root, request: selection ? `${base} (the selected element is #${selection.el})` : base, tokens: brand });
     if (r.asked[0] && r.applied.length === 0) setPendingAsk({ question: r.asked[0], original: pendingAsk ? pendingAsk.original : text }); setSayText('');
-    if (r.applied.length > 0) { history.current.push({ kind: 'say', frameId, snapshot: r.snapshot }); setEdits(history.current.length); }
+    if (r.applied.length > 0) { history.current.push({ kind: 'say', frameId, snapshot: r.snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); }
     setSayStatus(r.error && r.applied.length === 0 ? `Say failed: ${r.error}` : `${r.applied.length} applied${r.repaired ? ` · ${r.repaired} repaired` : ''}${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''}${r.firstMs !== null ? ` · first change ${r.firstMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${r.asked[0] ? ` · Claude asks: ${r.asked[0]}` : ''}`);
     setRevision((n) => n + 1); setSaying(false);
   }, [sayText, saying, selection, frames, pendingAsk, edit, brand]);
-  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); void undo(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo]);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z' || e.target instanceof HTMLInputElement) return; e.preventDefault(); void (e.shiftKey ? redo() : undo()); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo, redo]);
   // Autosave: after the document changes settle, snapshot every frame (current HTML) and store the design; a failure is shown, not swallowed.
   const persist = useCallback(async (): Promise<string | null> => {
     if (!window.__swift || !ready) return null; // not before the helper copy had its chance to restore (else fresh fixtures would overwrite it)
@@ -93,7 +105,7 @@ export function App() {
   // Switching: flush the current design first (a failed save stops the switch), then store the registry and reload into the other project.
   const goTo = useCallback(async (next: Registry | null) => { if (!next) { setSayStatus('Could not create a project from that name'); return; } const err = await persist(); if (err) { setSayStatus(`Not switching: ${err}`); return; } const e2 = saveRegistry(next); if (e2) { setSayStatus(`Not switching: ${e2}`); return; } location.reload(); }, [persist]);
   const takeCount = useMemo(() => frames.filter(isTake).length, [frames]); const selIsTake = !!selection && frames.some((f) => f.id === selection.frameId && isTake(f));
-  const discard = useCallback(() => { const gone = new Set(frames.filter(isTake).map((f) => f.id)); history.current = history.current.filter((e) => !gone.has(e.frameId)); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded`); }, [frames, selection]);
+  const discard = useCallback(() => { const gone = new Set(frames.filter(isTake).map((f) => f.id)); history.current = history.current.filter((e) => !gone.has(e.frameId)); redoStack.current = redoStack.current.filter((e) => !gone.has(e.frameId)); setRedos(redoStack.current.length); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded`); }, [frames, selection]);
   const resetDesign = useCallback(() => { clearDoc(undefined, project.id); location.reload(); }, [project.id]);
   // ⌘D duplicates the selected frame (its current HTML), then selects nothing so the copy can be picked by clicking.
   const duplicate = useCallback(async () => {
@@ -117,7 +129,7 @@ export function App() {
   const removeSelected = useCallback(async () => {
     if (!selection || !window.__swift) return; const f = frames.find((x) => x.id === selection.frameId); if (!f || f.root === selection.el) return;
     const snapshot = await window.__swift.snapshot(selection.frameId); if (!(await window.__swift.remove(selection.frameId, selection.el))) { setSayStatus(`Could not remove #${selection.el}`); return; }
-    history.current.push({ kind: 'say', frameId: selection.frameId, snapshot }); setEdits(history.current.length); setSelection(null); setRevision((n) => n + 1); setSayStatus(`Removed #${selection.el}`);
+    history.current.push({ kind: 'say', frameId: selection.frameId, snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setSelection(null); setRevision((n) => n + 1); setSayStatus(`Removed #${selection.el}`);
   }, [selection, frames]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return; e.preventDefault(); void removeSelected(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [removeSelected]);
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
@@ -157,6 +169,7 @@ export function App() {
         <button className="rb btn" onClick={discard} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
         <button className="rb btn" onClick={resetDesign} data-testid="reset">Reset</button>
         <button className="rb btn" onClick={() => void undo()} disabled={edits === 0} data-testid="undo">Undo{edits ? ` (${edits})` : ''}</button>
+        <button className="rb btn" onClick={() => void redo()} disabled={redos === 0} data-testid="redo">Redo{redos ? ` (${redos})` : ''}</button>
         <span className="mono mu" data-testid="tier0">{tier0 || 'Tier 0 · ready'}</span>
         {saveStatus && <span className="mono mu" data-testid="save-status" role="status">{saveStatus}</span>}
         {sparkStatus && <span className="mono mu" data-testid="spark-status" role="status">{sparkStatus}</span>}
