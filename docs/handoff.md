@@ -34,7 +34,7 @@
 - New projects from a scanned folder start with an ON-BRAND screen (`canvas/starter.ts`: bg/fg/accent/card/border tokens as CSS variables) instead of a generic dark one; arrow nudges are serialized (a held key repeated faster than the props round trip and lost presses: found by the e2e hold check).
 - Fixed: the default frame was hard-coded to `tv`, so Layers/Say/Spark/export targeted a missing frame in other projects; it is now the selection, else the first frame.
 - Shared library (`library.ts`): Frame ▾ → Library: Save selection (markup + origin project, localStorage, shared across projects, max 50 x 20 KB) and click an item to insert it into the selected frame (ids de-duplicated to x-2, one undo step).
-- Re-theme on insert (`retheme.ts`): a library item carries its origin brand tokens; inserted into ANOTHER project, literals equal to an origin token value become `var(<target token of the same name or role>, <literal>)`. Unit-tested only (no cross-project e2e yet).
+- Re-theme on insert (`retheme.ts`): a library item carries its origin brand tokens; inserted into ANOTHER project, literals equal to an origin token value become `var(<target token of the same name or role>, <literal>)`. Unit-tested and e2e-tested across projects (a "radar" card inserted into tvdash: "re-themed 2 colours", markup has var(--mu, ...)).
 - Gotcha: e2e selection carries over between steps (Layers shows the SELECTED frame): clear/click the root before picking layers.
 Next: #1673 project file on disk via helper + switcher, #1734 smaller subtree summary (needs the real-Claude regression `spikes/latency/say.mjs`), MLX router, #1721 re-plan.
 
