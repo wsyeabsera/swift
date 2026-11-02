@@ -30,3 +30,6 @@ button:focus-visible { outline:2px solid var(--ac); outline-offset:2px; }
 .layers{left:16px}.layers ul{list-style:none;margin:0;padding:0}.layers .row{display:block;width:100%;text-align:left;height:28px;line-height:28px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layers .row.on{background:rgba(255,255,255,.16)}
 .inspector{right:16px}.fld{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:6px;margin:2px 4px}.fld input{height:28px;border-radius:9px;border:1px solid var(--bd);background:rgba(255,255,255,.08);color:var(--tx);padding:0 8px;font:12px 'JetBrains Mono',monospace}
 button:disabled{opacity:.45;cursor:default}
+
+.say{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:5;width:min(720px,calc(100vw - 32px));gap:10px;padding:0 10px 0 20px}.say input{flex:1;height:36px;border:0;background:none;color:var(--tx);font:15px Inter,system-ui,sans-serif;outline:none}.say input::placeholder{color:var(--mu);opacity:.7}
+.say-go{background:var(--ac)!important;color:#04221a;font-weight:600}.say-status{font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

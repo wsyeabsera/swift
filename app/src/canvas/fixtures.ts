@@ -1,5 +1,5 @@
 // Example frames: real tvdash-style surfaces with stable element ids (the Say op language addresses elements by id).
-export type FrameDef = { id: string; title: string; x: number; y: number; w: number; h: number; html: string };
+export type FrameDef = { id: string; root: string; title: string; x: number; y: number; w: number; h: number; html: string };
 const row = (i: number, t: string, m: string) => `<div id="row${i}" style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,.1)"><div id="row${i}-t" style="font-size:24px">${t}</div><div id="row${i}-m" style="opacity:.6;font-size:16px">${m}</div></div>`;
 export const tvIdle = (): string => `<div id="tv" style="position:relative;width:1920px;height:1080px;overflow:hidden;font-family:system-ui;color:#f5f5f7;background:linear-gradient(135deg,#0b1a3a,#1a0b3a 50%,#0b3a2a)">
 <div id="clock" style="position:absolute;left:115px;top:86px;font-size:230px;font-weight:200;letter-spacing:-.03em">21:53</div>
@@ -12,13 +12,13 @@ export const email = (): string => `<div id="em" style="width:600px;height:800px
 /** The three real tvdash frames, then `n - 3` more in a grid below (to stress the canvas). */
 export function makeFrames(n = 20): FrameDef[] {
   const base: FrameDef[] = [
-    { id: 'tv', title: 'TV · Idle 1920×1080', x: 0, y: 0, w: 1920, h: 1080, html: tvIdle() },
-    { id: 'phone', title: 'Remote · phone 390', x: 2100, y: 0, w: 390, h: 844, html: phone() },
-    { id: 'popup', title: 'Popup 380', x: 2590, y: 0, w: 380, h: 600, html: popup() },
+    { id: 'tv', root: 'tv', title: 'TV · Idle 1920×1080', x: 0, y: 0, w: 1920, h: 1080, html: tvIdle() },
+    { id: 'phone', root: 'ph', title: 'Remote · phone 390', x: 2100, y: 0, w: 390, h: 844, html: phone() },
+    { id: 'popup', root: 'pp', title: 'Popup 380', x: 2590, y: 0, w: 380, h: 600, html: popup() },
   ];
   const extra: FrameDef[] = Array.from({ length: Math.max(0, n - 3) }, (_, i) => {
     const col = i % 5; const r = Math.floor(i / 5); const isMail = i % 3 === 2;
-    return { id: `x${i}`, title: isMail ? 'Digest email 600' : `Remote ${i + 2}`, x: col * 700, y: 1300 + r * 1000, w: isMail ? 600 : 390, h: isMail ? 800 : 844, html: isMail ? email() : phone(i + 2) };
+    return { id: `x${i}`, root: isMail ? 'em' : 'ph', title: isMail ? 'Digest email 600' : `Remote ${i + 2}`, x: col * 700, y: 1300 + r * 1000, w: isMail ? 600 : 390, h: isMail ? 800 : 844, html: isMail ? email() : phone(i + 2) };
   });
   return [...base, ...extra].slice(0, Math.max(n, 0));
 }

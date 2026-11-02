@@ -1,14 +1,15 @@
 //! Local helper for Swift Canvas: an authenticated WebSocket on 127.0.0.1.
 //! Security rules (task #1719): bind loopback only; accept a connection only when its Origin is on the exact allow-list AND the token matches;
 //! the allow-list is empty by default, so nothing connects until an extension id (or dev origin) is configured.
-use std::{io, net::TcpListener, process::Command, thread};
-use tungstenite::{accept_hdr, handshake::server::{ErrorResponse, Request, Response}, http, Message};
+pub mod say;
+use std::{io, net::TcpListener, process::Command, sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc}, thread, time::Duration};
+use tungstenite::{accept_hdr, handshake::server::{ErrorResponse, Request, Response}, http, Error as WsError, Message};
 
 pub const DEFAULT_PORT: u16 = 7431;
 pub const DEV_ORIGIN: &str = "http://localhost:5173";
 
 #[derive(Clone, Debug)]
-pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String> }
+pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String>, pub claude_bin: String, pub model: String }
 
 /// Build the config from environment-like lookups (so it is testable without touching the process environment).
 pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn() -> String) -> Config {
@@ -17,7 +18,7 @@ pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn()
     if dev { allowed.push(DEV_ORIGIN.to_string()); }
     let token = get("SWIFT_HELPER_TOKEN").filter(|t| !t.is_empty()).unwrap_or_else(|| if dev { "dev-token".to_string() } else { random_token() });
     let port = get("SWIFT_HELPER_PORT").and_then(|p| p.parse().ok()).unwrap_or(DEFAULT_PORT);
-    Config { port, token, allowed }
+    Config { port, token, allowed, claude_bin: get("SWIFT_CLAUDE_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "claude".to_string()), model: get("SWIFT_CLAUDE_MODEL").filter(|m| !m.is_empty()).unwrap_or_else(|| "haiku".to_string()) }
 }
 
 /// Exact match only: "chrome-extension://abc" must not match "chrome-extension://abcd", and an empty Origin never matches.
@@ -55,8 +56,9 @@ fn forbidden() -> ErrorResponse { http::Response::builder().status(403).body(Som
 
 /// Accept loop: one thread per connection. Returns only on listener error.
 pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
+    let busy = Arc::new(AtomicUsize::new(0));
     for stream in listener.incoming() {
-        let stream = stream?; let cfg = cfg.clone();
+        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone();
         thread::spawn(move || {
             let check = |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
                 let origin = req.headers().get("origin").and_then(|v| v.to_str().ok()).unwrap_or("");
@@ -66,12 +68,36 @@ pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
             let Ok(mut ws) = accept_hdr(stream, check) else { return };
             let hello = serde_json::json!({ "type": "hello", "version": env!("CARGO_PKG_VERSION"), "claude": claude_status() });
             if ws.send(Message::text(hello.to_string())).is_err() { return; }
-            while let Ok(msg) = ws.read() {
-                if let Message::Text(t) = msg { if t.as_str().contains("\"ping\"") && ws.send(Message::text("{\"type\":\"pong\"}")).is_err() { break; } } else if msg.is_close() { break; }
+            // Writes from Say worker threads go through a channel; the read loop uses a short timeout so it can flush them.
+            let (tx, rx) = mpsc::channel::<String>(); let _ = ws.get_mut().set_read_timeout(Some(Duration::from_millis(30)));
+            loop {
+                while let Ok(m) = rx.try_recv() { if ws.send(Message::text(m)).is_err() { return; } }
+                match ws.read() {
+                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy),
+                    Ok(Message::Close(_)) | Err(WsError::ConnectionClosed) | Err(WsError::AlreadyClosed) => break,
+                    Err(WsError::Io(e)) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => continue,
+                    Err(_) => break, Ok(_) => {}
+                }
             }
         });
     }
     Ok(())
+}
+
+/// Messages from the app: ping, and say {id, system, request}. Everything is validated; unknown or malformed input is ignored, never executed.
+fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>) {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
+    match v.get("type").and_then(|t| t.as_str()) {
+        Some("ping") => { let _ = tx.send("{\"type\":\"pong\"}".to_string()); }
+        Some("say") => {
+            let (Some(id), Some(system), Some(request)) = (v.get("id").and_then(|x| x.as_str()), v.get("system").and_then(|x| x.as_str()), v.get("request").and_then(|x| x.as_str())) else { return };
+            let id = id.chars().take(64).collect::<String>(); let ev = move |kind: &str, text: &str| serde_json::json!({ "type": "say.event", "id": id, "kind": kind, "text": text }).to_string();
+            if busy.fetch_add(1, Ordering::SeqCst) >= say::MAX_CONCURRENT { busy.fetch_sub(1, Ordering::SeqCst); let _ = tx.send(ev("error", "too many Says at once")); return; }
+            let (tx, busy, bin, model, system, request) = (tx.clone(), busy.clone(), cfg.claude_bin.clone(), cfg.model.clone(), system.to_string(), request.to_string());
+            thread::spawn(move || { say::run_say(&bin, &model, &system, &request, |o| { let _ = tx.send(match o { say::Out::Delta(t) => ev("delta", &t), say::Out::Done => ev("done", ""), say::Out::Error(e) => ev("error", &e) }); }); busy.fetch_sub(1, Ordering::SeqCst); });
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]

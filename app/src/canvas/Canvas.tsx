@@ -11,6 +11,11 @@ export type CanvasApi = {
   props: (frameId: string, el: string, props: string[]) => Promise<Record<string, string> | undefined>;
   tree: (frameId: string) => Promise<TreeNode[]>;
   hit: (frameId: string, x: number, y: number) => Promise<string | null | undefined>;
+  snapshot: (frameId: string) => Promise<string>;
+  load: (frameId: string, html: string) => Promise<boolean>;
+  text: (frameId: string, el: string, value: string) => Promise<boolean>;
+  add: (frameId: string, parent: string, html: string) => Promise<boolean>;
+  remove: (frameId: string, el: string) => Promise<boolean>;
 };
 declare global { interface Window { __swift?: CanvasApi } }
 declare const chrome: { runtime?: { id?: string; getURL: (p: string) => string } } | undefined;
@@ -63,6 +68,11 @@ export function Canvas({ frames, selection, onSelect, revision, onReady }: { fra
       props: async (id, el, props) => (await bridge(id)?.request({ t: 'props', el, props }))?.values,
       tree: async (id) => (await bridge(id)?.request({ t: 'tree' }))?.tree ?? [],
       hit: async (id, x, y) => (await bridge(id)?.request({ t: 'hit', x, y }))?.id,
+      snapshot: async (id) => (await bridge(id)?.request({ t: 'snapshot' }))?.html ?? '',
+      load: async (id, html) => !!(await bridge(id)?.request({ t: 'load', html }))?.ok,
+      text: async (id, el, value) => !!(await bridge(id)?.request({ t: 'text', el, value }))?.ok,
+      add: async (id, parent, html) => !!(await bridge(id)?.request({ t: 'add', el: parent, html }))?.ok,
+      remove: async (id, el) => !!(await bridge(id)?.request({ t: 'remove', el }))?.ok,
     };
     onReadyRef.current?.(); // the hooks exist now: panels that read frames (layers) can fetch
     return () => { host.removeEventListener('wheel', onWheel); host.removeEventListener('pointerdown', down); host.removeEventListener('pointermove', move); host.removeEventListener('pointerup', up); host.removeEventListener('pointercancel', up); window.removeEventListener('message', onMessage); window.removeEventListener('resize', onResize); delete window.__swift; };
