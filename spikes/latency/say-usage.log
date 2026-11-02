@@ -1,0 +1,4 @@
+model=haiku
+turn 1: first token 890 ms, first complete op undefined ms, total 1084 ms, 1 ops, valid JSONL true usage {"in":2,"out":30,"cacheRead":2800,"cacheWrite":2531} apiEquivUSD 0.0005493999999999999
+turn 2: first token 599 ms, first complete op 791 ms, total 813 ms, 2 ops, valid JSONL true usage {"in":4,"out":72,"cacheRead":5016,"cacheWrite":374} apiEquivUSD 0.00071076
+turn 3: first token 985 ms, first complete op 1082 ms, total 1152 ms, 2 ops, valid JSONL true usage {"in":4,"out":136,"cacheRead":5390,"cacheWrite":91} apiEquivUSD 0.00085126

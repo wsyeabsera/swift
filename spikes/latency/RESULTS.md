@@ -50,3 +50,13 @@ real parallel Spark (memory, usage drop per Spark) still not measured. Subscript
 - A minimal SDK `query()` is as fast as or faster than the CLI's first turn (1.3-1.8 s), so the SDK is a fine driver; **`prewarm()` showed no consistent gain at n=3** (high variance, needs 30+ runs). A parked spare holds 230-260 MB (matches the ~250 MB per session measured).
 - `claim()` needs `options.cwd` (without it the process answers `not_claimed`).
 - Fastest remains a **persistent session**: 0.45-0.9 s to first token on warm turns (CLI stream-json; the SDK streaming-input mode should match, not tested).
+
+## Pass 5: tokens per Say request (Claude Code `result.usage`, Haiku, 3 turns, 2026-11-02)
+| Turn | Input (new) | Cache write | Cache read | Output | API-equivalent cost |
+|---|---|---|---|---|---|
+| 1 (cold, instructions + 2 KB subtree) | 2 | 2531 | 2800 | 30 | $0.00055 |
+| 2 | 4 | 374 | 5016 | 72 | $0.00071 |
+| 3 | 4 | 91 | 5390 | 136 | $0.00085 |
+- Even with `--tools ''`, Claude Code's own prompt is ~2.8k cached tokens per session; the subtree and instructions add ~2.5k once.
+- **A Spark of 12 cold sessions is ~64k input tokens (about 30k cache-written, 34k cache-read) plus ~0.4k output at this output size: roughly $0.007 API-equivalent.** Whole-direction outputs (2-4k tokens each) would dominate: ~12 x 3k = ~36k output tokens.
+- The subscription's own usage meter is still not readable from here; token counts are the usable proxy for the Account board's "cost before you run" estimate (cost per Say ~0.0005-0.0009 USD-equivalent, ~5.3k tokens).
