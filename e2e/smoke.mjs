@@ -22,12 +22,24 @@ try {
   cv.edit = await web.evaluate(() => window.__swift.edit('tv', 'clock', 'font-size', '260px')); cv.editRead = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
   cv.editMissing = await web.evaluate(() => window.__swift.edit('tv', 'nope', 'color', 'red')); cv.hit = await web.evaluate(() => window.__swift.hit('tv', 200, 200));
   cv.parentCannotReadFrame = await web.evaluate(() => { try { return document.querySelector('.fr iframe').contentDocument === null; } catch { return true; } });
+  // select by clicking, layers + inspector, edit through the inspector, undo, pick a layer
+  await web.evaluate(() => window.__swift.fitAll()); await web.waitForTimeout(200); const startFs = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
+  const pt = await web.evaluate(() => { const v = window.__swift.view(); return { x: v.x + 190 * v.s, y: v.y + 186 * v.s }; }); await web.mouse.click(pt.x, pt.y);
+  await web.waitForSelector('[data-testid=sel]', { timeout: 4000 }); cv.selected = (await web.textContent('[data-testid=inspector-id]'))?.trim();
+  await web.waitForSelector('[data-testid=layers] .row', { timeout: 4000 }); cv.layers = await web.$$eval('[data-testid=layers] .row', (els) => els.map((e) => e.querySelector('.mono').textContent));
+  const fsz = web.getByLabel('font-size'); await fsz.fill('300px'); await fsz.press('Enter'); await web.waitForTimeout(300); cv.inspectorEdit = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
+  cv.tier0Label = (await web.textContent('[data-testid=tier0]'))?.trim(); await web.getByTestId('undo').click(); await web.waitForTimeout(300); cv.afterUndo = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); cv.startFs = startFs;
+  await web.getByRole('button', { name: /^date/ }).click(); await web.waitForTimeout(300); cv.pickedLayer = (await web.textContent('[data-testid=inspector-id]'))?.trim();
+  await web.mouse.click(5, 400); await web.waitForTimeout(300); cv.cleared = (await web.textContent('[data-testid=inspector-id]'))?.trim();
+  // Tier-0 budget (task #1676): 30 edits through the bridge, p95 under 16 ms
+  const times = await web.evaluate(async () => { const t = []; for (let i = 0; i < 30; i++) { const r = await window.__swift.edit('tv', 'clock', 'color', `hsl(${i * 12} 80% 70%)`); t.push(r.ms); } return t; }); times.sort((a, b) => a - b); cv.tier0p95 = +times[Math.floor(times.length * 0.95)].toFixed(2); cv.tier0max = +times.at(-1).toFixed(2);
   await web.screenshot({ path: `${root}/e2e/shot-canvas.png` }); out.canvas = cv;
   const ext = await ctx.newPage(); await ext.goto(`chrome-extension://${id}/app/index.html`); out.extension = await status(ext);
   await ext.waitForFunction(() => window.__swift && window.__swift.frames.length === 20); out.extEdit = await ext.evaluate(() => window.__swift.edit('tv', 'clock', 'font-size', '260px')); out.extRead = await ext.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
   const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.jpg': 'image/jpeg' }; const srv = http.createServer((q, r) => { const f = path.join(root, 'extension/app', q.url === '/' ? 'index.html' : q.url.split('?')[0]); fs.readFile(f, (e, d) => { if (e) { r.statusCode = 404; r.end(); } else { r.setHeader('content-type', mime[path.extname(f)] ?? 'application/octet-stream'); r.end(d); } }); }).listen(5199, '127.0.0.1'); procs.push({ kill: () => srv.close() });
   const bad = await ctx.newPage(); await bad.goto('http://127.0.0.1:5199/'); out.wrongOrigin = await status(bad);
-  const c = out.canvas; const canvasOk = c.frames === 20 && c.sandbox && c.zoomed && c.panned && c.frozenFar.visible === 0 && c.frozenFar.hidden === 20 && c.edit.ok && c.edit.ms < 50 && c.editRead === '260px' && c.editMissing.ok === false && c.hit === 'clock' && c.parentCannotReadFrame;
+  const c = out.canvas; const cv0 = c; const canvasOk = c.frames === 20 && c.sandbox && c.zoomed && c.panned && c.frozenFar.visible === 0 && c.frozenFar.hidden === 20 && c.edit.ok && c.edit.ms < 50 && c.tier0p95 < 16 && c.editRead === '260px' && c.editMissing.ok === false && c.hit === 'clock' && c.parentCannotReadFrame;
+  const selOk = cv0.selected === 'clock' && cv0.layers.includes('clock') && cv0.layers.includes('recent') && cv0.inspectorEdit === '300px' && cv0.afterUndo === cv0.startFs && cv0.pickedLayer === 'date' && cv0.cleared === 'nothing selected';
   const extOk = out.extEdit.ok && out.extRead === '260px';
-  const ok = canvasOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
+  const ok = canvasOk && selOk && extOk && out.web.includes('claude') && out.extension.includes('claude') && !out.wrongOrigin.includes('claude'); out.checks = { canvasOk, selOk, extOk, web: out.web.includes('claude'), extension: out.extension.includes('claude'), wrongOrigin: !out.wrongOrigin.includes('claude') }; out.pass = ok; console.log(JSON.stringify(out, null, 1)); await ctx.close(); kill(); process.exit(ok ? 0 : 1);
 } catch (e) { console.error(e); kill(); process.exit(1); }

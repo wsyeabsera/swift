@@ -7,10 +7,14 @@ export type BridgeRequest =
   | { t: 'load'; rid: number; html: string }
   | { t: 'edit'; rid: number; el: string; prop: string; value: string }
   | { t: 'get'; rid: number; el: string; prop: string }
-  | { t: 'hit'; rid: number; x: number; y: number };
+  | { t: 'hit'; rid: number; x: number; y: number }
+  | { t: 'rect'; rid: number; el: string }
+  | { t: 'props'; rid: number; el: string; props: string[] }
+  | { t: 'tree'; rid: number };
+export type TreeNode = { id: string; parent: string | null; depth: number; tag: string; text: string };
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 export type BridgeInput = DistributiveOmit<BridgeRequest, 'rid'>;
-export type BridgeReply = { t: 'reply'; rid: number; ok: boolean; value?: string; id?: string | null };
+export type BridgeReply = { t: 'reply'; rid: number; ok: boolean; value?: string; id?: string | null; before?: string; rect?: { x: number; y: number; w: number; h: number }; values?: Record<string, string>; tree?: TreeNode[] };
 import frameJs from './bridge-frame.js?raw';
 export const FRAME_JS: string = frameJs;
 export const BRIDGE_SCRIPT = `<script>${frameJs}</script>`;
