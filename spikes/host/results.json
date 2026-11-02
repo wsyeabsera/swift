@@ -1,0 +1,38 @@
+{
+ "wasm": "ok",
+ "sandboxFrame": {
+  "t": "info",
+  "origin": "chrome-extension://dkkgihfanbfgpfaklaojcfnhphelfhel",
+  "innerH": 500,
+  "vhPx": 500,
+  "hasChrome": false
+ },
+ "parentCanReadFrameDom": false,
+ "postMessageRoundTripMs": {
+  "p50": 0.1,
+  "p95": 0.4
+ },
+ "promptApi": "unavailable",
+ "hasFileSystemAccess": true,
+ "capture": {
+  "bg": "rgb(11, 11, 15)",
+  "font": "Inter, sans-serif",
+  "nodes": 5
+ },
+ "helperStream": {
+  "messages": 200,
+  "seconds": 20.2,
+  "maxGapMs": 107
+ },
+ "done": true,
+ "wrongOriginAccepted": false,
+ "helperLog": {
+  "rejected": [
+   {
+    "origin": "http://127.0.0.1:47320",
+    "tokenOk": true
+   }
+  ],
+  "accepted": 1
+ }
+}
