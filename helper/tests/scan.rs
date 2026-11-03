@@ -15,3 +15,11 @@ fn scan(ws: &mut tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std:
     let ok = scan(&mut ws, root.join("app").to_str().unwrap()); assert_eq!(ok["ok"], true); assert_eq!(ok["scan"]["tokens"][0]["name"], "--ink"); assert_eq!(ok["scan"]["fonts"][0]["value"], "Inter");
     for bad in [outside.to_str().unwrap().to_string(), format!("{}/../{}", root.display(), outside.file_name().unwrap().to_string_lossy()), "/etc".to_string(), root.join("missing").to_string_lossy().into_owned(), String::new()] { let r = scan(&mut ws, &bad); assert_eq!(r["ok"], false, "{bad}"); assert!(r["error"].as_str().unwrap().contains("not allowed")); }
 }
+#[test] fn project_write_lands_in_an_allowed_repo_and_nowhere_else() {
+    let root = std::env::temp_dir().join(format!("proj-write-{}", std::process::id())); let _ = fs::remove_dir_all(&root); fs::create_dir_all(root.join("repo")).unwrap(); let outside = std::env::temp_dir().join(format!("proj-write-out-{}", std::process::id())); fs::create_dir_all(&outside).unwrap();
+    let mut ws = start(&root); let mut write = |path: &str, data: &str| -> serde_json::Value { ws.send(Message::text(serde_json::json!({ "type": "project.write", "id": "w1", "path": path, "data": data }).to_string())).unwrap(); loop { let Message::Text(t) = ws.read().unwrap() else { continue }; let v: serde_json::Value = serde_json::from_str(t.as_str()).unwrap(); if v["type"] == "project.write" { return v; } } };
+    let ok = write(root.join("repo").to_str().unwrap(), "{\"frames\":[]}"); assert_eq!(ok["ok"], true, "{ok}"); assert_eq!(fs::read_to_string(root.join("repo/.swift-canvas/project.json")).unwrap(), "{\"frames\":[]}");
+    assert_eq!(write(outside.to_str().unwrap(), "{}")["ok"], false); assert!(!outside.join(".swift-canvas").exists());
+    assert_eq!(write(&format!("{}/../{}", root.join("repo").display(), outside.file_name().unwrap().to_str().unwrap()), "{}")["ok"], false);
+    assert_eq!(write(root.join("repo").to_str().unwrap(), "not json")["ok"], false);
+}

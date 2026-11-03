@@ -34,6 +34,19 @@ Electron is the fallback host (same web app).
 | Language split | TS for UI/Claude/MCP/document; Rust for the helper and bulk compute | re-theme 5k nodes: TS 2.5 us vs WASM 2.7 us; 20k-node diff 514 us vs 28 us (42x with SIMD); hit-test 1.4x (spikes/core) | measured; WASM only for bulk scans |
 | Build on tldraw? | No | paid license + watermark for production; no HTML-shape evidence (spikes/canvas/BUILD-VS-BUY.md) | provisional |
 
+## Rust core crate gate decision (task #1710, from spikes/core/RESULTS.md, 2026-11-02)
+**Decision: defer the shared crate; keep the document, tokens and edits in TypeScript. If bulk work is needed first, build it native-only in the helper. Do not ship WASM yet.**
+- Simple array ops give no WASM win: re-theme 5000 nodes TS 2.48 us vs WASM 2.68 us (3.30 us with copy in/out). The 3x / > 1 ms gate is far from met.
+- Branchy per-node loops at 20k nodes gain only 1.3-1.4x (hit-test 64 -> 47 us, cull 99 -> 75 us). Only the bulk compare scan wins big: property diff 514 us -> 28 us (18x), 12 us with SIMD128 (42x). All absolute times are tens to hundreds of microseconds, so none is a bottleneck.
+- Cost side (tiny crate, a floor): WASM build 1.3 s cold, 20 KB; native `cargo test` 0.30 s incremental. Cheap, but a second toolchain and marshalling layer is not justified by the gains above.
+- What would change the answer: a real project over ~100k nodes where diff/merge or hit-test exceeds the frame budget (re-measure then; native-only in the helper for project-wide diff/merge, native+WASM only if the browser side needs it, with `+simd128`); or measured wins on the unmeasured ops (Taffy layout, whole-tree merge, 8K pyramid vs `sharp`, search, MP4 encode).
+
+## Update 2026-11-03: `core/` crate and in-app MCP server (tasks #1710, #1712)
+- **`core/` (Rust, native only, no WASM).** Node tree with stable ids, typed ops (`set`, `token`, `text`, `add`, `remove` + `insert`/`replace` so every op has an exact inverse), 3-way merge (per-property last-writer-wins), token resolver. TS types (ts-rs) and JSON Schema (schemars) are generated into `app/src/generated/` (`npm run gen:core`; a test fails when they are stale). proptest: any op sequence then its inverses restores the tree exactly; merge is deterministic, idempotent and commutes for disjoint edits.
+- **The renderer does NOT use it (gate result, spikes/core/RESULTS.md): simple ops, tokens and edits stay in TypeScript.** The crate earns its place in the helper: it validates and dry-runs every op batch arriving from MCP before the app sees it.
+- **MCP server:** `swift-canvas-helper mcp` (stdio, JSON-RPC 2.0, protocol 2024-11-05, no SDK). Tools: `read_subtree`, `apply_ops` (batch, max 200, validated + dry-run by core, applied as ONE undo step), `set_token`, `undo`. Use: `claude mcp add swift -- swift-canvas-helper mcp` or `claude -p --mcp-config <file> --strict-mcp-config` (config: `{"mcpServers":{"swift":{"command":"<path>/swift-canvas-helper","args":["mcp"]}}}`; set `SWIFT_DATA_DIR` in `env` if the helper uses a non-default one). The helper must be running with the app open.
+- **Auth path for the MCP process:** the helper writes `<data dir>/mcp.json` (`{port, token}`, mode 0600) at start; the MCP process connects to the same WebSocket with `role=mcp` and the token and NO Origin header. A web page cannot take this path (browsers always send an Origin); such a connection may only send `mcp.call`/`ping`. The app registers itself with `mcp.register` and answers relayed `mcp.req` calls (`app/src/mcp.ts`), re-validating ops with the Say rules (`checkLine`). Not the Say hot path.
+
 ## Not measured yet (do before Gate 1)
 Bitmap level-of-detail when zoomed out; 8K image pyramid (Rust vs `sharp`); MP4 encode; real Spark (memory, subscription usage per Spark); folder-handle
 persistence (File System Access); side panel and DevTools surfaces; Prompt API in branded Chrome; 60 s+ real streams; Rust incremental build times on a real crate.

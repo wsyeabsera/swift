@@ -15,7 +15,7 @@ export function treeContext(a: { html: string; tree: { id: string; depth: number
   return `(This frame is too large to show in full: outline of every element, then the selected element.)\n${outline(a.tree)}${sel}`;
 }
 export function buildSystemPrompt(a: { tokens: Record<string, string>; ids: string[]; tree: string }): string {
-  const tokens = Object.entries(a.tokens).map(([k, v]) => `${k} ${v}`).join(', ');
+  const tokens = Object.entries(a.tokens).slice(0, 16).map(([k, v]) => `${k} ${v}`).join(', ');
   return `You edit UI designs. Reply with ONLY JSON operations, one object per line (JSONL), no prose, no code fences, never explanations.
 Ops:
 {"op":"set","id":"<existing id>","prop":"<css property>","value":"<css value>"}

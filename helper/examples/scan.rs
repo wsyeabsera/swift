@@ -1,0 +1,2 @@
+// cargo run -p swift-canvas-helper --example scan -- /path/to/repo   (what Import -> Read brand finds, without the app)
+fn main() { let p = std::env::args().nth(1).expect("usage: scan <folder>"); let s = helper::scan::scan_dir(std::path::Path::new(&p)).unwrap(); println!("{} files, {} tokens", s.files, s.tokens.len()); for t in s.tokens.iter().filter(|t| t.name.starts_with("--kt-") || t.name.starts_with("--tw-")).take(12) { println!("{} {} ({})", t.name, t.value, t.file); } }

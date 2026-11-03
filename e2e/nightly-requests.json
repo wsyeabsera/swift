@@ -1,0 +1,21 @@
+[
+ {"id":"tok1","class":"token","project":"tvdash","kind":"say","request":"change the accent to green"},
+ {"id":"prop1","class":"property","project":"tvdash","kind":"say","request":"make the clock bigger","select":"clock"},
+ {"id":"add1","class":"add","project":"tvdash","kind":"say","request":"add a QR code on the left that links to the remote"},
+ {"id":"spark1","class":"spark","project":"tvdash","kind":"spark"},
+ {"id":"blank-add1","class":"blank-add","project":"blank","kind":"say","request":"add a centered title that says Hello and a rounded button below it"},
+ {"id":"blank-spark1","class":"blank-spark","project":"blank","kind":"spark"},
+ {"id":"tok2","class":"token","project":"tvdash","kind":"say","request":"use Barlow instead of Inter"},
+ {"id":"tok3","class":"token","project":"tvdash","kind":"say","request":"make the glass thicker"},
+ {"id":"tok4","class":"token","project":"tvdash","kind":"say","request":"make the text white","select":"clock"},
+ {"id":"tok5","class":"token","project":"tvdash","kind":"say","request":"turn this into a dark theme"},
+ {"id":"prop2","class":"property","project":"tvdash","kind":"say","request":"round the corners more"},
+ {"id":"prop3","class":"property","project":"tvdash","kind":"say","request":"increase padding to 32"},
+ {"id":"prop4","class":"property","project":"tvdash","kind":"say","request":"nudge the title up 8 px"},
+ {"id":"prop5","class":"property","project":"tvdash","kind":"say","request":"reduce the blur"},
+ {"id":"add2","class":"add","project":"tvdash","kind":"say","request":"add a second row with the next three links and a progress bar"},
+ {"id":"add3","class":"add","project":"tvdash","kind":"say","request":"add a settings sheet with three toggles"},
+ {"id":"add4","class":"add","project":"tvdash","kind":"say","request":"write a friendlier empty state"},
+ {"id":"spark2","class":"spark","project":"tvdash","kind":"spark"},
+ {"id":"blank-add2","class":"blank-add","project":"blank","kind":"say","request":"add a card with an avatar, a name and a follow button"}
+]

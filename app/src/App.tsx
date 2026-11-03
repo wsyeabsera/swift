@@ -9,23 +9,35 @@ import { Inspector, Layers } from './Panels';
 import { Canvas, liveApi, type Sel } from './canvas/Canvas';
 import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
-import { movedPos, nudge, resizedSize, startPos } from './canvas/nudge';
+import { moveEdits, moveStart, type MoveStart, nudge, resizedSize } from './canvas/nudge';
 import { firstChild, parentOf } from './canvas/tree';
 import { compareSet } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
 import { starterFrames } from './canvas/starter';
 import { retheme } from './retheme';
+import { addRef, dominantColors, loadMoodboard, moodboardPrompt, removeRef, saveMoodboard, type Moodboard } from './moodboard';
+import { isDue, parseProposals, refinePrompt, type Proposal } from './refine';
+import * as L from './oplog';
+import type { Log, Op } from './oplog';
+import { addUsage, appendUsage, estimateSpark, loadUsage, saveUsage, summarizeUsage, tokensShort, type Usage } from './usage';
+import { addRecord, loadRecords, markUndone, saveRecords, summarize, flags, type Rec } from './telemetry';
 import { filterItems, origins, removeItem, addItem, loadLibrary, saveLibrary, uniquifyIds, type LibItem } from './library';
-import { duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
-import { clearDoc, loadDoc, nextSparkN, parseDoc, saveDoc } from './doc';
+import { pageTokens } from './canvas/capture';
+import { frameSizeFor, readScreenshot, rebuildScreenshot } from './canvas/screenshot';
+import type { CaptureOutcome } from './ImportProject';
+import type { PoolStatus } from './helper';
+import { capturedFrame, duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
+import { clearDoc, fitLog, loadDoc, loadLog, nextSparkN, parseDoc, parseLog, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
+import { handleMcp, type McpEnv } from './mcp';
 import { runSayRepairing } from './say/say';
-import { kitColors, loadBrand, saveBrand } from './brand';
+import { compareKits, isColorValue, kitColors, loadBrand, replaceColor, saveBrand, shareToken, toBrandTokens } from './brand';
 import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
 import { pushHistory, step } from './say/history';
-import { localEdits } from './say/local';
+import { localEdits, propTokenRequest, themeRequest, tokenRequest } from './say/local';
 import { suggestions, type SuggestProps } from './say/suggest';
-import { canSpark, discardTakes, isTake, keepTake, runSpark } from './say/spark';
+import { canSpark, DIRECTIONS, discardTakes, isTake, keepTake, runSpark } from './say/spark';
+import { buildSystemPrompt } from './say/prompt';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
 const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Diagram'] as const;
 export function App() {
@@ -34,6 +46,48 @@ export function App() {
   const [reg] = useState<Registry>(() => loadRegistry()); const project = activeProject(reg);
   const hadLocal = useRef(loadDoc(undefined, project.id) !== null); const [ready, setReady] = useState(hadLocal.current); const [epoch, setEpoch] = useState(0);
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
+  // Pulse telemetry (local only): one record per local edit / Say / Spark; an undo marks its record, a redo unmarks it.
+  const [recs, setRecs] = useState<Rec[]>(() => loadRecords()); const recsRef = useRef(recs);
+  const track = useCallback((r: Omit<Rec, 'id' | 'undone'>) => { const x = addRecord(recsRef.current, r); recsRef.current = x.list; setRecs(x.list); saveRecords(x.list); return x.id; }, []);
+  const markRec = useCallback((id: number | undefined, undone: boolean) => { if (id === undefined) return; recsRef.current = markUndone(recsRef.current, id, undone); setRecs(recsRef.current); saveRecords(recsRef.current); }, []);
+  // Moodboard: reference images (downscaled thumbnail + dominant colours) steer Spark directions as text only.
+  const [mood, setMood] = useState<Moodboard>(() => loadMoodboard(project.id)); const moodFile = useRef<HTMLInputElement>(null);
+  const changeMood = useCallback((next: Moodboard) => { setMood(next); const err = saveMoodboard(project.id, next); if (err) setSayStatus(`Moodboard kept for now, not stored: ${err}`); }, [project.id]);
+  const addMoodImage = useCallback(async (f: File) => {
+    try { const bmp = await createImageBitmap(f); const draw = (w: number) => { const h = Math.max(1, Math.round((bmp.height / bmp.width) * w)); const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d')!; g.drawImage(bmp, 0, 0, w, h); return { c, g, w, h }; };
+      const small = draw(48); const colors = dominantColors(small.g.getImageData(0, 0, small.w, small.h).data, 5); const thumb = draw(160).c.toDataURL('image/jpeg', 0.7); const r = addRef(mood, { name: f.name.replace(/\.[^.]+$/, ''), dataUrl: thumb, colors });
+      if (!r.ok) setSayStatus(`Moodboard: ${r.error}`); else changeMood(r.board); } catch { setSayStatus('Moodboard: that file is not an image I can read'); }
+  }, [mood, changeMood]);
+  // Skill refiner (#1694): asks the local Claude about FLAGGED skills only; proposals are shown, never applied. Last run time is kept per device.
+  const [proposals, setProposals] = useState<Proposal[]>([]); const [refining, setRefining] = useState(false); const [refineNote, setRefineNote] = useState('');
+  const lastRefine = (): number | null => { try { const v = Number(localStorage.getItem('swift-canvas.refine.last')); return v > 0 ? v : null; } catch { return null; } };
+  const refine = useCallback(async () => {
+    const c = conn.current; if (!c || refining) return; const stats = summarize(recsRef.current); const prompt = refinePrompt(stats, { say: buildSystemPrompt({ tokens: brand, ids: ['<element ids of the frame>'], tree: '<the frame markup is inserted here>' }), spark: DIRECTIONS.map((d) => `${d.name}: ${d.prompt}`).join('\n') }); // the prompts these skills really use, with the frame parts elided
+    if (!prompt) { setRefineNote('Nothing is flagged: no skill is slow or often undone yet.'); return; }
+    setRefining(true); setRefineNote('Asking Claude…'); let text = ''; let err = '';
+    await new Promise<void>((done) => c.say('You are a careful reviewer. Answer only in the requested format.', prompt, (e) => { if (e.kind === 'delta') text += e.text; else { if (e.kind === 'error') err = e.text; done(); } }));
+    setRefining(false); if (err && !text) { setRefineNote(`Review failed: ${err}`); return; }
+    const r = parseProposals(text, stats.map((x) => x.skill)); setProposals(r.proposals); try { localStorage.setItem('swift-canvas.refine.last', String(Date.now())); } catch { /* not stored */ }
+    setRefineNote(`${r.proposals.length} proposal${r.proposals.length === 1 ? '' : 's'}${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''} (shown only, nothing applied)`);
+  }, [refining]);
+  const [dropping, setDropping] = useState(false); // while an image is dragged over the window, a cover catches the drop (frames are sandboxed iframes that would swallow it)
+  useEffect(() => { // pasting or dropping an image (outside a text field for paste) adds it to the moodboard
+    const onPaste = (e: ClipboardEvent) => { if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return; const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith('image/')); if (!f) return; e.preventDefault(); void addMoodImage(f); };
+    const hasImage = (e: DragEvent) => [...(e.dataTransfer?.items ?? [])].some((i) => i.kind === 'file' && i.type.startsWith('image/'));
+    const onOver = (e: DragEvent) => { if (hasImage(e)) e.preventDefault(); }; // allow the drop
+    const onDrop = (e: DragEvent) => { const f = [...(e.dataTransfer?.files ?? [])].find((x) => x.type.startsWith('image/')); if (!f) return; e.preventDefault(); void addMoodImage(f); };
+    const onEnter = (e: DragEvent) => { if (hasImage(e)) setDropping(true); }; const onEnd = () => setDropping(false);
+    window.addEventListener('paste', onPaste); window.addEventListener('dragover', onOver); window.addEventListener('drop', onDrop); window.addEventListener('dragenter', onEnter); window.addEventListener('dragend', onEnd); window.addEventListener('drop', onEnd);
+    return () => { window.removeEventListener('paste', onPaste); window.removeEventListener('dragover', onOver); window.removeEventListener('drop', onDrop); window.removeEventListener('dragenter', onEnter); window.removeEventListener('dragend', onEnd); window.removeEventListener('drop', onEnd); };
+  }, [addMoodImage]);
+  // Opt-in weekly review (OFF by default: it spends a little subscription): once per due period, when the helper is connected and some skill is flagged.
+  const [autoRefine, setAutoRefine] = useState<boolean>(() => { try { return localStorage.getItem('swift-canvas.refine.auto') === '1'; } catch { return false; } });
+  const toggleAutoRefine = (on: boolean) => { setAutoRefine(on); try { localStorage.setItem('swift-canvas.refine.auto', on ? '1' : '0'); } catch { /* not stored */ } };
+  const autoRan = useRef(false);
+  useEffect(() => { if (!autoRefine || autoRan.current || helper.status !== 'connected' || !isDue(lastRefine(), Date.now()) || summarize(recsRef.current).every((x) => flags(x).length === 0)) return; autoRan.current = true; void refine(); }, [autoRefine, helper.status, refine]);
+  // Token usage per Claude request (from the helper's result.usage; Say and each Spark take), local only, for the usage meter.
+  const [usage, setUsage] = useState(() => loadUsage()); const usageRef = useRef(usage);
+  const addTokens = useCallback((u: Usage | undefined) => { if (!u) return; usageRef.current = appendUsage(usageRef.current, { ...u, at: Date.now() }); setUsage(usageRef.current); saveUsage(usageRef.current); }, []);
   const [library, setLibrary] = useState<LibItem[]>(() => loadLibrary()); const [libFilter, setLibFilter] = useState<string | null>(null);
   const dropFromLibrary = useCallback((id: string) => { const next = removeItem(library, id); setLibrary(next); const err = saveLibrary(next); setSayStatus(err ? `Removed for now, not stored: ${err}` : 'Removed from the library'); }, [library]);
   const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand(undefined, project.id));
@@ -49,63 +103,99 @@ export function App() {
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setImportOpen(false); setAppearanceOpen(false); setShortcutsOpen(false); setFrameMenuOpen(false); sayRef.current?.focus(); sayRef.current?.select(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
   const closeAppearance = useCallback(() => { setAppearanceOpen(false); swatchRef.current?.focus(); }, []);
   const [tier0, setTier0] = useState<string>('');
-  const [selection, setSelection] = useState<Sel | null>(null); const [revision, setRevision] = useState(0);
-  type Entry = { kind: 'edit'; frameId: string; el: string; prop: string; before: string; after: string } | { kind: 'say'; frameId: string; snapshot: string } | { kind: 'frameDel'; frameId: string; frame: FrameDef; index: number } | { kind: 'discard'; frameId: string; items: { frame: FrameDef; index: number }[] } | { kind: 'rename'; frameId: string; before: string; after: string };
-  const history = useRef<Entry[]>([]); const [edits, setEdits] = useState(0);
+  const editTokenRef = useRef<((name: string, value: string) => Promise<void>) | null>(null); const editTokensRef = useRef<((pairs: { name: string; value: string }[]) => Promise<void>) | null>(null);
+  const [selection, setSelection] = useState<Sel | null>(null); const [xs, setXs] = useState<{ key: string; els: string[] }>({ key: '', els: [] }); const selKey = selection ? `${selection.frameId}/${selection.el}` : ''; const extras = xs.key === selKey ? xs.els : []; /* shift-click extras, valid only for the primary they were built on */ const [revision, setRevision] = useState(0);
+  // One op log for the whole session (app/src/oplog.ts, design docs/oplog-design.md): undo/redo move its head; a new op drops the redo tail.
+  const logRef = useRef<Log>(loadLog(undefined, project.id) ?? L.emptyLog()); // the saved undo history comes back with the design (empty when none or damaged)
+  const [edits, setEdits] = useState(() => logRef.current.head); const [redos, setRedos] = useState(() => { const l = logRef.current; return l.branches[l.current]!.ops.length - l.head; });
+  const [, setLogRev] = useState(0); // re-render when the branch set/current changes even if the counts do not
+  const syncLog = useCallback(() => { const l = logRef.current; setEdits(l.head); setRedos(l.branches[l.current]!.ops.length - l.head); setLogRev((n) => n + 1); }, []);
+  const recordOp = useCallback((op: Op) => { logRef.current = L.push(logRef.current, op); syncLog(); }, [syncLog]);
   const lastEditAt = useRef(0);
   const edit = useCallback(async (frameId: string, el: string, prop: string, value: string, record = true, coalesce = false) => {
     const r = await window.__swift?.edit(frameId, el, prop, value); if (!r?.ok) return;
-    if (record) { const last = history.current[history.current.length - 1]; const now = Date.now(); if (coalesce && last?.kind === 'edit' && last.frameId === frameId && last.el === el && last.prop === prop && now - lastEditAt.current < 800) last.after = value; else history.current.push({ kind: 'edit', frameId, el, prop, before: r.before, after: value }); lastEditAt.current = now; redoStack.current = []; setRedos(0); setEdits(history.current.length); }
+    if (record) { const now = Date.now(); const merged = coalesce && now - lastEditAt.current < 800 ? L.amendLast(logRef.current, (o) => (o.kind === 'set' && o.frame === frameId && o.el === el && o.prop === prop ? { ...o, after: value } : null)) : null; // rapid edits of one property = ONE undo step
+      if (merged) { logRef.current = merged; syncLog(); } else recordOp({ kind: 'set', frame: frameId, el, prop, before: r.before, after: value }); lastEditAt.current = now; }
     setTier0(`Tier 0 · ${r.ms.toFixed(1)} ms`); setRevision((n) => n + 1);
-  }, []);
-  const redoStack = useRef<Entry[]>([]); const [redos, setRedos] = useState(0);
+  }, [recordOp, syncLog]);
+  // Apply one op to the design (undo applies the inverted op, redo the op itself).
+  const runOp = useCallback(async (op: Op): Promise<void> => {
+    const sw = window.__swift; if (!sw) return;
+    switch (op.kind) {
+      case 'set': await edit(op.frame, op.el, op.prop, op.after, false); return;
+      case 'snap': await sw.load(op.frame, op.after); setRevision((n) => n + 1); return;
+      case 'frameDel': setFrames((f) => f.filter((x) => x.id !== op.def.id)); setSelection(null); return;
+      case 'frameAdd': setFrames((f) => (f.some((x) => x.id === op.def.id) ? f : [...f.slice(0, op.index), op.def, ...f.slice(op.index)])); return;
+      case 'discard': { const ids = new Set(op.items.map((i) => i.def.id)); setFrames((f) => f.filter((x) => !ids.has(x.id))); setSelection(null); return; }
+      case 'restore': setFrames((f) => { const out = [...f]; for (const it of [...op.items].sort((p, q) => p.index - q.index)) if (!out.some((x) => x.id === it.def.id)) out.splice(Math.min(it.index, out.length), 0, it.def); return out; }); return;
+      case 'brand': setBrand((b) => { const next = { ...b, [op.name]: op.after }; saveBrand(next, undefined, project.id); return next; }); setRevision((n) => n + 1); return; // revision bump: the autosave must see this step too
+      case 'rename': setFrames((f) => f.map((x) => (x.id === op.frame ? { ...x, title: op.after } : x))); return;
+      case 'group': for (const o of op.ops) await runOp(o); return;
+      default: throw new Error(`the app does not apply "${op.kind}" ops yet`);
+    }
+  }, [edit]);
   const undo = useCallback(async () => {
-    const e = history.current.pop(); if (!e || !window.__swift) return; setEdits(history.current.length);
-    if (e.kind === 'say') { const after = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); redoStack.current.push({ kind: 'say', frameId: e.frameId, snapshot: after }); setRevision((n) => n + 1); setSayStatus('Say undone'); }
-    else if (e.kind === 'frameDel') { setFrames((f) => (f.some((x) => x.id === e.frame.id) ? f : [...f.slice(0, e.index), e.frame, ...f.slice(e.index)])); redoStack.current.push(e); setSayStatus('Frame restored'); }
-    else if (e.kind === 'rename') { setFrames((f) => f.map((x) => (x.id === e.frameId ? { ...x, title: e.before } : x))); redoStack.current.push(e); setSayStatus('Rename undone'); }
-    else if (e.kind === 'discard') { setFrames((f) => { const out = [...f]; for (const it of [...e.items].sort((p, q) => p.index - q.index)) if (!out.some((x) => x.id === it.frame.id)) out.splice(Math.min(it.index, out.length), 0, it.frame); return out; }); redoStack.current.push(e); setSayStatus(`${e.items.length} takes restored`); }
-    else { await edit(e.frameId, e.el, e.prop, e.before, false); redoStack.current.push(e); }
-    setRedos(redoStack.current.length);
-  }, [edit]);
+    const cur = L.lastApplied(logRef.current); if (!cur || !window.__swift) return; const u = L.undo(logRef.current); logRef.current = u.log; syncLog(); markRec(cur.rec, true); await runOp(u.apply!);
+    if (cur.kind === 'snap') setSayStatus('Say undone'); else if (cur.kind === 'frameDel') setSayStatus('Frame restored'); else if (cur.kind === 'rename') setSayStatus('Rename undone'); else if (cur.kind === 'discard') setSayStatus(`${cur.items.length} takes restored`);
+  }, [runOp, syncLog, markRec]);
   const redo = useCallback(async () => {
-    const e = redoStack.current.pop(); if (!e || !window.__swift) return; setRedos(redoStack.current.length);
-    if (e.kind === 'say') { const before = await window.__swift.snapshot(e.frameId); await window.__swift.load(e.frameId, e.snapshot); history.current.push({ kind: 'say', frameId: e.frameId, snapshot: before }); setRevision((n) => n + 1); setSayStatus('Redone'); }
-    else if (e.kind === 'frameDel') { setFrames((f) => f.filter((x) => x.id !== e.frame.id)); setSelection(null); history.current.push(e); setSayStatus('Frame deleted'); }
-    else if (e.kind === 'rename') { setFrames((f) => f.map((x) => (x.id === e.frameId ? { ...x, title: e.after } : x))); history.current.push(e); setSayStatus('Rename redone'); }
-    else if (e.kind === 'discard') { const ids = new Set(e.items.map((i) => i.frame.id)); setFrames((f) => f.filter((x) => !ids.has(x.id))); setSelection(null); history.current.push(e); setSayStatus(`${ids.size} takes discarded`); }
-    else { await edit(e.frameId, e.el, e.prop, e.after, false); history.current.push(e); }
-    setEdits(history.current.length);
-  }, [edit]);
+    const nxt = L.nextRedo(logRef.current); if (!nxt || !window.__swift) return; const r = L.redo(logRef.current); logRef.current = r.log; syncLog(); markRec(nxt.rec, false); await runOp(r.apply!);
+    if (nxt.kind === 'snap') setSayStatus('Redone'); else if (nxt.kind === 'frameDel') setSayStatus('Frame deleted'); else if (nxt.kind === 'rename') setSayStatus('Rename redone'); else if (nxt.kind === 'discard') setSayStatus(`${nxt.items.length} takes discarded`);
+  }, [runOp, syncLog, markRec]);
+  // Branches (#1741): fork the current point, switch (replays exactly the difference), keep (fast-forward main), delete.
+  const busy = saying || sparking;
+  const forkHere = useCallback(() => { if (busy) return; let n = 1; while (logRef.current.branches[`try-${n}`]) n++; const r = L.fork(logRef.current, `try-${n}`); if (!r.ok) { setSayStatus(r.error); return; } logRef.current = r.log; syncLog(); setSayStatus(`Forked try-${n}: edits now go to it, main stays as it was`); }, [busy, syncLog]);
+  const switchBranch = useCallback(async (name: string) => {
+    if (busy) return; const r = L.switchTo(logRef.current, name); if ('error' in r) { setSayStatus(r.error); return; }
+    try { for (const op of r.steps) await runOp(op); } catch (e) { setSayStatus(`Could not switch to ${name}: ${e instanceof Error ? e.message : 'failed'}`); return; }
+    logRef.current = r.log; syncLog(); setSelection(null); setSayStatus(`On ${name}`);
+  }, [busy, runOp, syncLog]);
+  const keepBranch = useCallback(() => { const r = L.keep(logRef.current, logRef.current.current); if (!r.ok) { setSayStatus(r.error); return; } logRef.current = r.log; syncLog(); setSayStatus('Kept: main now includes this branch'); }, [syncLog]);
+  const dropBranch = useCallback((name: string) => { const r = L.remove(logRef.current, name); if (!r.ok) { setSayStatus(r.error); return; } logRef.current = r.log; syncLog(); setSayStatus(`Deleted ${name}`); }, [syncLog]);
   const spark = useCallback(async () => {
     const c = conn.current; const base = frames.find((f) => f.id === (selection?.frameId ?? frames[0]?.id ?? '')); if (!window.__swift || !c || !base || sparking) return;
+    if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { setSparkStatus(`Claude is not ready: ${helper.claudeStatus.message}`); return; }
     const gate = canSpark(frames, 4); if (!gate.ok) { setSparkStatus(gate.reason); return; }
     setSparking(true); setSparkStatus('Sparking 4 directions…'); const ac = new AbortController(); sparkAbort.current = ac;
-    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => { setFrames((e) => [...e, ...f]); setPainting(new Set(f.map((x) => x.id))); }, signal: ac.signal, tokens: brand, running: takesRunning.current, onTakeDone: (id) => setPainting((p) => { const n = new Set(p); n.delete(id); return n; }) }); setPainting(new Set()); sparkAbort.current = null;
-    const ok = r.takes.filter((t) => t.result.applied.length > 0).length; const err = r.takes.find((t) => t.result.error)?.result.error; const rej = r.takes.reduce((n, t) => n + t.result.rejected.length, 0); setSparkStatus(`${r.takes.length} takes · ${ok} changed${r.firstPaintMs !== null ? ` · first paint ${r.firstPaintMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${rej ? ` · ${rej} rejected` : ''}${err ? ` · ${err}` : ''}`); setSparking(false);
-  }, [frames, selection, sparking, brand]);
+    const r = await runSpark({ api: liveApi, send: c.say, base, n: 4, nextId: () => `${base.id}-t${++sparkN.current}`, addFrames: (f) => { setFrames((e) => [...e, ...f]); setPainting(new Set(f.map((x) => x.id))); }, signal: ac.signal, tokens: brand, extra: moodboardPrompt(mood), running: takesRunning.current, onTakeDone: (id) => setPainting((p) => { const n = new Set(p); n.delete(id); return n; }) }); setPainting(new Set()); sparkAbort.current = null;
+    const ok = r.takes.filter((t) => t.result.applied.length > 0).length; const err = r.takes.find((t) => t.result.error)?.result.error; const rej = r.takes.reduce((n, t) => n + t.result.rejected.length, 0); let spent: Usage = { input: 0, output: 0 }; for (const t of r.takes) { addTokens(t.result.usage); if (t.result.usage) spent = addUsage(spent, t.result.usage); } const spentTxt = spent.input + spent.output > 0 ? ` · ${tokensShort(spent.input + spent.output)} tokens (est. ${tokensShort((e => e.input + e.output)(estimateSpark(usageRef.current.slice(0, -r.takes.length), 4)))})` : ''; track({ at: Date.now(), tier: 'claude', skill: 'spark', model: 'claude-code', ms: r.totalMs, ok: ok > 0 }); setSparkStatus(`${r.takes.length} takes · ${ok} changed${r.firstPaintMs !== null ? ` · first paint ${r.firstPaintMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${rej ? ` · ${rej} rejected` : ''}${err ? ` · ${err}` : ''}${spentTxt}`); setSparking(false);
+  }, [frames, selection, sparking, brand, track, mood, helper.claudeStatus, addTokens]);
   const say = useCallback(async (override?: string) => {
     const text = (override ?? sayText).trim(); const c = conn.current; if (!text || !window.__swift || !c || saying) return;
     sayHist.current = pushHistory(sayHist.current, text); histPos.current = sayHist.current.length;
-    if (selection && !pendingAsk && window.__swift) { // local tier: unambiguous requests on the selection never reach Claude
-      const t0 = performance.now(); const sel = selection; const edits = await localEdits(text, { get: (p) => window.__swift!.get(sel.frameId, sel.el, p) });
-      if (edits) { for (const e of edits) await edit(sel.frameId, sel.el, e.prop, e.value); setSayText(''); setSayStatus(`Local · ${edits.map((e) => `${e.prop}: ${e.value}`).join(', ')} · ${(performance.now() - t0).toFixed(0)} ms`); return; }
+    const th = !pendingAsk ? themeRequest(text, brand) : null; if (th && editTokensRef.current) { const t0 = performance.now(); await editTokensRef.current(th); track({ at: Date.now(), tier: 'local', skill: 'token', model: 'rules', ms: performance.now() - t0, ok: true, prompt: text.slice(0, 200) }); setSayText(''); return; } // dark / light theme: the background and text tokens together, one undo step
+    const tk = !pendingAsk ? tokenRequest(text, brand) : null; if (tk && editTokenRef.current) { const t0 = performance.now(); await editTokenRef.current(tk.name, tk.value); track({ at: Date.now(), tier: 'local', skill: 'token', model: 'rules', ms: performance.now() - t0, ok: true, prompt: text.slice(0, 200) }); setSayText(''); return; } // a colour token request: the Brand editor path, no model
+    const frame0 = frames.find((f) => f.id === (selection?.frameId ?? frames[0]?.id ?? '')); const localTarget: Sel | null = selection ?? (frame0 ? { frameId: frame0.id, el: frame0.root } : null); // nothing selected: the local tier works on the FRAME (its root element)
+    if (frame0 && !pendingAsk && window.__swift) { // px / font tokens ("make the glass thicker", "use Barlow instead of Inter"): a custom property on the frame root, one undo step, no model
+      const first = propTokenRequest(text, brand); if (first) { const t0 = performance.now(); const live = (await window.__swift.get(frame0.id, frame0.root, first.name))?.trim(); const pt = (live && propTokenRequest(text, { ...brand, [first.name]: live })) || first; await edit(frame0.id, frame0.root, pt.name, pt.value);
+        track({ at: Date.now(), tier: 'local', skill: 'token', model: 'rules', ms: performance.now() - t0, ok: true, prompt: text.slice(0, 200) }); setSayText(''); setSayStatus(`Local · ${pt.name}: ${pt.value} · ${(performance.now() - t0).toFixed(0)} ms`); return; } }
+    if (localTarget && !pendingAsk && window.__swift) { // local tier: unambiguous requests on the selection (or the frame) never reach Claude
+      const t0 = performance.now(); const sel = localTarget; const edits = await localEdits(text, { get: (p) => window.__swift!.get(sel.frameId, sel.el, p) });
+      if (extras.length) { // several elements: compute every edit first (all or none), apply them live, ONE undo step via a snapshot
+        const per: { el: string; edits: NonNullable<typeof edits> }[] = []; for (const el of [sel.el, ...extras]) { const ed = await localEdits(text, { get: (p) => window.__swift!.get(sel.frameId, el, p) }); if (!ed) { per.length = 0; break; } per.push({ el, edits: ed }); }
+        if (per.length) { const api = window.__swift; const before = await api.snapshot(sel.frameId); for (const x of per) for (const e of x.edits) await api.edit(sel.frameId, x.el, e.prop, e.value);
+          recordOp({ kind: 'snap', frame: sel.frameId, before, after: await api.snapshot(sel.frameId) }); track({ at: Date.now(), tier: 'local', skill: 'local', model: 'rules', ms: performance.now() - t0, ok: true, prompt: text.slice(0, 200) }); setRevision((n) => n + 1); setSayText(''); setSayStatus(`Local · ${per.length} elements · ${per[0]!.edits.map((e) => e.prop).join(', ')} · ${(performance.now() - t0).toFixed(0)} ms`); return; }
+      }
+      if (edits && edits.length > 1) { const api = window.__swift; const before = await api.snapshot(sel.frameId); for (const e of edits) await api.edit(sel.frameId, sel.el, e.prop, e.value); recordOp({ kind: 'snap', frame: sel.frameId, before, after: await api.snapshot(sel.frameId) }); track({ at: Date.now(), tier: 'local', skill: 'local', model: 'rules', ms: performance.now() - t0, ok: true, prompt: text.slice(0, 200) }); setRevision((n) => n + 1); setSayText(''); setSayStatus(`Local · ${edits.map((e) => `${e.prop}: ${e.value}`).join(', ')} · ${(performance.now() - t0).toFixed(0)} ms`); return; } // several properties = ONE undo step
+      if (edits) { for (const e of edits) await edit(sel.frameId, sel.el, e.prop, e.value); const rec = track({ at: Date.now(), tier: 'local', skill: 'local', model: 'rules', ms: performance.now() - t0, ok: true, prompt: text.slice(0, 200) }); const tagged = L.amendLast(logRef.current, (o) => (o.kind === 'set' ? { ...o, rec } : null)); if (tagged) logRef.current = tagged; setSayText(''); setSayStatus(`Local · ${edits.map((e) => `${e.prop}: ${e.value}`).join(', ')} · ${(performance.now() - t0).toFixed(0)} ms`); return; }
     }
+    if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { setSayStatus(`Claude is not ready: ${helper.claudeStatus.message} (local edits still work)`); return; }
     const frameId = selection?.frameId ?? frames[0]?.id ?? ''; const root = frames.find((f) => f.id === frameId)?.root ?? frameId; setSaying(true); setSayStatus('Saying…');
     const base = pendingAsk ? `${pendingAsk.original}\n\nYou asked: "${pendingAsk.question}". My answer: ${text}` : text; setPendingAsk(null);
-    const r = await runSayRepairing({ api: liveApi, send: c.say, frameId, root, request: selection ? `${base} (the selected element is #${selection.el})` : base, tokens: brand, selected: selection?.el });
+    const r = await runSayRepairing({ api: liveApi, send: c.say, frameId, root, request: selection ? `${base} (${extras.length ? `the selected elements are ${[selection.el, ...extras].map((e) => '#' + e).join(', ')}: apply the change to each` : `the selected element is #${selection.el}`})` : base, tokens: brand, selected: selection?.el });
     if (r.asked[0] && r.applied.length === 0) setPendingAsk({ question: r.asked[0], original: pendingAsk ? pendingAsk.original : text }); setSayText('');
-    if (r.applied.length > 0) { history.current.push({ kind: 'say', frameId, snapshot: r.snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); }
-    setSayStatus(r.error && r.applied.length === 0 ? `Say failed: ${r.error}` : `${r.applied.length} applied${r.repaired ? ` · ${r.repaired} repaired` : ''}${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''}${r.firstMs !== null ? ` · first change ${r.firstMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${r.asked[0] ? ` · Claude asks: ${r.asked[0]}` : ''}`);
+    addTokens(r.usage); const rec = track({ at: Date.now(), tier: 'claude', skill: 'say', model: 'claude-code', ms: r.totalMs, ok: r.applied.length > 0 || r.asked.length > 0, prompt: text.slice(0, 200), rejected: r.rejected.length, ...(r.firstMs !== null ? { firstMs: r.firstMs } : {}) });
+    if (r.applied.length > 0) recordOp({ kind: 'snap', frame: frameId, before: r.snapshot, after: await window.__swift.snapshot(frameId), rec });
+    setSayStatus(r.error && r.applied.length === 0 ? `Say failed: ${r.error}` : `${r.applied.length} applied${r.repaired ? ` · ${r.repaired} repaired` : ''}${r.rejected.length ? ` · ${r.rejected.length} rejected` : ''}${r.firstMs !== null ? ` · first change ${r.firstMs.toFixed(0)} ms` : ''} · ${(r.totalMs / 1000).toFixed(1)} s${r.asked[0] ? ` · Claude asks: ${r.asked[0]}` : ''}${r.error && r.applied.length > 0 ? ` · stopped early: ${r.error}` : ''}`); // a Say cut off after some ops still says so
     setRevision((n) => n + 1); setSaying(false);
-  }, [sayText, saying, selection, frames, pendingAsk, edit, brand]);
+  }, [sayText, saying, selection, extras, frames, brand, pendingAsk, edit, brand, track, helper.claudeStatus, recordOp, addTokens]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z' || e.target instanceof HTMLInputElement) return; e.preventDefault(); void (e.shiftKey ? redo() : undo()); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [undo, redo]);
   // Autosave: after the document changes settle, snapshot every frame (current HTML) and store the design; a failure is shown, not swallowed.
   const persist = useCallback(async (): Promise<string | null> => {
     if (!window.__swift || !ready) return null; // not before the helper copy had its chance to restore (else fresh fixtures would overwrite it)
     try {
-      const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const err = saveDoc(snaps, undefined, project.id);
-      const backup = err ? null : await conn.current?.storePut(project.id, JSON.stringify({ frames: snaps }));
+      const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const err = saveDoc(snaps, undefined, project.id, logRef.current);
+      const backup = err ? null : await conn.current?.storePut(project.id, JSON.stringify({ frames: snaps, log: fitLog(logRef.current) }));
       setSaveStatus(err ? `not saved: ${err}` : backup && !backup.ok && backup.error !== 'helper offline' ? `saved · backup failed: ${backup.error}` : 'saved'); return err; } catch (e) { const m = e instanceof Error ? e.message : 'error'; setSaveStatus(`not saved: ${m}`); return m; }
   }, [frames, project.id, ready]);
   useEffect(() => { const t = setTimeout(() => void persist(), 1000); return () => clearTimeout(t); }, [persist, revision]);
@@ -117,7 +207,7 @@ export function App() {
     void conn.current?.storeGet(project.id).then((r) => {
       if (!alive) return;
       if (!r.ok) setSayStatus(`Backup unreadable: ${r.error}`);
-      else if (r.data) { let f: FrameDef[] | null = null; try { f = parseDoc(JSON.parse(r.data)); } catch { f = null; } if (f) { setFrames(f); sparkN.current = nextSparkN(f); setEpoch((n) => n + 1); setSayStatus('Restored from the helper'); } else setSayStatus('Backup is corrupt: starting fresh'); }
+      else if (r.data) { let f: FrameDef[] | null = null; try { f = parseDoc(JSON.parse(r.data)); } catch { f = null; } if (f) { let lg: Log | null = null; try { lg = parseLog((JSON.parse(r.data) as { log?: unknown }).log); } catch { lg = null; } if (lg) { logRef.current = lg; syncLog(); } setFrames(f); sparkN.current = nextSparkN(f); setEpoch((n) => n + 1); setSayStatus(lg ? 'Restored from the helper (with its undo history)' : 'Restored from the helper'); } else setSayStatus('Backup is corrupt: starting fresh'); }
       setReady(true);
     });
     return () => { alive = false; };
@@ -128,9 +218,9 @@ export function App() {
   const cmp = useMemo(() => (selection ? compareSet(frames, selection.frameId) : null), [frames, selection]);
   const discard = useCallback(async () => {
     const takes = frames.map((f, index) => ({ f, index })).filter((x) => isTake(x.f)); if (takes.length === 0 || !window.__swift) return; const gone = new Set(takes.map((x) => x.f.id));
-    const items = await Promise.all(takes.map(async ({ f, index }) => ({ frame: { ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }, index }))); // with their current markup, so undo brings them back as they were
-    history.current = history.current.filter((e) => !gone.has(e.frameId)); redoStack.current = []; setRedos(0);
-    history.current.push({ kind: 'discard', frameId: takes[0]!.f.id, items }); setEdits(history.current.length); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded (undo brings them back)`);
+    const items = await Promise.all(takes.map(async ({ f, index }) => ({ def: { ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }, index }))); // with their current markup, so undo brings them back as they were
+    logRef.current = L.prune(logRef.current, (o) => 'frame' in o && gone.has(o.frame)); // edits inside the discarded takes can no longer be undone
+    recordOp({ kind: 'discard', frame: takes[0]!.f.id, items }); if (selection && gone.has(selection.frameId)) setSelection(null); setFrames(discardTakes); setSparkStatus(`${gone.size} takes discarded (undo brings them back)`);
   }, [frames, selection]);
   const resetDesign = useCallback(() => { clearDoc(undefined, project.id); location.reload(); }, [project.id]);
   // ⌘D duplicates the selected frame (its current HTML), then selects nothing so the copy can be picked by clicking.
@@ -153,33 +243,75 @@ export function App() {
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, importOpen, appearanceOpen, shortcutsOpen, frameMenuOpen]);
+  const [brandTick, setBrandTick] = useState(0); const [pool, setPool] = useState<PoolStatus | null>(null); const [cmpId, setCmpId] = useState(''); const cmpKit = useMemo(() => (cmpId ? loadBrand(undefined, cmpId) : null), [cmpId, brand, brandTick]); // Brand board: the other project's kit, read-only until a token is shared
+  const shareTokenTo = useCallback((name: string) => {
+    if (!cmpId) return; const r = shareToken(loadBrand(undefined, cmpId), name, brand[name] ?? ''); if (!r.ok) { setSayStatus(r.error); return; }
+    const err = saveBrand(r.kit, undefined, cmpId); const other = reg.list.find((p) => p.id === cmpId)?.name ?? cmpId; setSayStatus(err ? `Not shared: ${err}` : `Shared ${name} with ${other} (only that token)`); setBrandTick((n) => n + 1);
+  }, [cmpId, brand, reg.list]);
+  useEffect(() => { if (!frameMenuOpen) return; let alive = true; const tick = () => { void conn.current?.poolStatus().then((p) => { if (alive) setPool(p); }); }; tick(); const t = setInterval(tick, 3000); return () => { alive = false; clearInterval(t); }; }, [frameMenuOpen]); // Pulse: the Claude pool while the menu is open
+  // Brand board: edit a colour token. Its old value becomes the new one in EVERY frame of this project (one undo group), the kit is saved, Say/Spark prompts use it from now on.
+  const editTokens = useCallback(async (pairs: { name: string; value: string }[]) => {
+    const api = window.__swift; if (!api || busy) return; const t0 = performance.now(); const ops: Op[] = []; let n = 0; let kit = { ...brand }; const done: string[] = [];
+    for (const { name, value } of pairs) { const old = kit[name]; const v = value.trim(); if (old === undefined) continue; const colour = isColorValue(old);
+      if (colour ? !isColorValue(v) : Object.keys(toBrandTokens([{ name, value: v }])).length === 0) { setSayStatus(`${name}: ${colour ? 'not a colour I can use' : 'not a plain value'}`); continue; } if (v.toLowerCase() === old.trim().toLowerCase()) continue;
+      for (const id of api.frames) { const before = await api.snapshot(id); if (!before) continue;
+        if (colour) { const r = replaceColor(before, old, v); if (r.count === 0) continue; await api.load(id, r.html); ops.push({ kind: 'snap', frame: id, before, after: r.html }); n += r.count; }
+        else { const root = frames.find((f) => f.id === id)?.root; if (!root) continue; const r = await api.edit(id, root, name, v); if (!r.ok) continue; ops.push({ kind: 'snap', frame: id, before, after: await api.snapshot(id) }); n++; } } // a font or size token is a custom property on each frame root: the frame's own rules pick it up
+      ops.push({ kind: 'brand', name, before: old, after: v }); kit = { ...kit, [name]: v }; done.push(name); }
+    if (!done.length) return; const err = saveBrand(kit, undefined, project.id); setBrand(kit); recordOp(ops.length === 1 ? ops[0]! : { kind: 'group', label: `brand ${done.join(', ')}`, ops }); setRevision((x) => x + 1);
+    const nf = ops.filter((o) => o.kind === 'snap').length; setSayStatus(err ? `Brand not saved: ${err}` : `${done.map((d) => `${d} → ${kit[d]}`).join(', ')}: ${n} place${n === 1 ? '' : 's'} in ${nf} frame${nf === 1 ? '' : 's'} · ${(performance.now() - t0).toFixed(0)} ms`);
+  }, [brand, busy, project.id, recordOp, frames]);
+  const editToken = useCallback((name: string, value: string) => editTokens([{ name, value }]), [editTokens]);
+  editTokenRef.current = editToken; editTokensRef.current = editTokens;
+  // Capture a running localhost page into a new frame (the helper renders it with Chrome; see helper/src/capture.rs).
+  const captureUrl = useCallback(async (url: string, size: { w: number; h: number }, add: boolean, fullPage: boolean): Promise<CaptureOutcome> => {
+    const c = conn.current; if (!c) return { message: 'The helper is offline', tokens: [] }; const r = await c.captureUrl(url, size); if (!r.ok) return { message: r.error, tokens: [] };
+    if (!add) return { message: 'Opening as a project…', tokens: pageTokens(r.html), page: { html: r.html, url, size } };
+    const f = capturedFrame(frames, r.html, url, size, fullPage); setFrames((x) => [...x, capturedFrame(x, r.html, url, size, fullPage)]);
+    if (fullPage) setTimeout(() => { void window.__swift?.get(f.id, f.root, 'height').then((hh) => { const h = Math.min(8000, Math.ceil(parseFloat(hh ?? ''))); if (h > f.h) setFrames((x) => x.map((y) => (y.id === f.id ? { ...y, h } : y))); }); }, 700); // the page's real height, once it has laid out
+    setTimeout(() => window.__swift?.fitTo([f.id]), fullPage ? 1200 : 300); return { message: `Added ${f.title} (${r.html.length >> 10} KB)`, tokens: pageTokens(r.html), page: { html: r.html, url, size } };
+  }, [frames]);
+  // Screenshot import: the image goes through the helper to the local Claude Code (vision); the rebuilt HTML takes the same path as a captured page.
+  const importShot = useCallback(async (file: File, asProject: boolean): Promise<string> => {
+    const c = conn.current; if (!c) return 'The helper is offline.';
+    const shot = await readScreenshot(file); if (!shot.ok) return shot.error;
+    if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') return `Claude is not ready: ${helper.claudeStatus.message}`;
+    const r = await rebuildScreenshot(c.say, shot.value); if (!r.ok) return r.error; const size = frameSizeFor(shot.value.size); const name = file.name.replace(/\.[^.]+$/, '').slice(0, 40) || 'screenshot';
+    if (asProject) { const next = addProject(reg, name); if (next && !reg.list.some((p) => p.id === next.active)) { const fr = capturedFrame([], r.html, name, size); saveDoc([{ ...fr, id: 'page-1', title: name }], undefined, next.active); } void goTo(next); return 'Opening as a project…'; }
+    const f = capturedFrame(frames, r.html, name, size); setFrames((x) => [...x, capturedFrame(x, r.html, name, size)]); setTimeout(() => window.__swift?.fitTo([f.id]), 300); return `Added ${f.title} (${r.html.length >> 10} KB)`;
+  }, [frames, helper.claudeStatus, reg, saveDoc, goTo]);
   const addFrame = useCallback((kind: PresetKey) => { const f = newFrame(frames, kind); setFrames((x) => [...x, newFrame(x, kind)]); setSayStatus(`Added ${f.title}`); setTimeout(() => window.__swift?.fitTo([f.id]), 200); }, [frames]);
   // Delete the selected frame (always keeps at least one); undo puts it back at the same place with its edits.
   const deleteFrame = useCallback(async () => {
     const id = selection?.frameId; const index = frames.findIndex((f) => f.id === id); const f = frames[index]; if (!id || !f || !window.__swift) return; if (frames.length <= 1) { setSayStatus('Cannot delete the last frame'); return; }
-    const html = (await window.__swift.snapshot(id)) || f.html; history.current.push({ kind: 'frameDel', frameId: id, frame: { ...f, html }, index }); redoStack.current = []; setRedos(0); setEdits(history.current.length);
+    const html = (await window.__swift.snapshot(id)) || f.html; recordOp({ kind: 'frameDel', frame: id, def: { ...f, html }, index });
     setFrames((x) => x.filter((y) => y.id !== id)); setSelection(null); setSayStatus(`Deleted ${f.title}`);
   }, [frames, selection]);
   // Project files: export everything as one portable JSON file, or open one as a NEW project (never overwrites an existing one).
   const exportProject = useCallback(async () => {
     if (!window.__swift) return; const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html })));
-    const url = URL.createObjectURL(new Blob([serializeProject(project.name, snaps, brand)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = projectFileName(project.name); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
+    const url = URL.createObjectURL(new Blob([serializeProject(project.name, snaps, brand, logRef.current)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = projectFileName(project.name); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
+  }, [frames, project.name, brand]);
+  // Write the project into a repo folder (git-friendly: <folder>/.swift-canvas/project.json) via the helper; choosing the folder in the native dialog is the consent.
+  const saveToRepo = useCallback(async () => {
+    const c = conn.current; if (!c || !window.__swift) { setSayStatus('The helper is offline'); return; } const pick = await c.pickFolder(); if (!pick.ok) { if (pick.error !== 'cancelled') setSayStatus(`Not saved: ${pick.error}`); return; }
+    const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const r = await c.writeRepo(pick.path, serializeProject(project.name, snaps, brand, logRef.current)); setSayStatus(r.ok ? `Saved ${r.path}` : `Not saved: ${r.error}`);
   }, [frames, project.name, brand]);
   const openProjectFile = useCallback(async (file: File) => {
     if (file.size > MAX_FILE_BYTES) { setSayStatus('Project file too large'); return; } const r = parseProjectFile(await file.text()); if (!r.ok) { setSayStatus(`Cannot open ${file.name}: ${r.error}`); return; }
     const next = addProject(reg, uniqueName(reg.list, r.project.name)); if (!next) { setSayStatus('Too many projects'); return; }
-    const e1 = saveDoc(r.project.frames, undefined, next.active); if (e1) { setSayStatus(`Not opened: ${e1}`); return; } saveBrand(r.project.brand, undefined, next.active); void goTo(next);
+    const e1 = saveDoc(r.project.frames, undefined, next.active, r.project.log ?? undefined); if (e1) { setSayStatus(`Not opened: ${e1}`); return; } saveBrand(r.project.brand, undefined, next.active); void goTo(next);
   }, [reg, goTo]);
   // Shared library: save the selected element (markup + origin project), insert it into any frame later (ids de-duplicated, one undo step).
   const saveToLibrary = useCallback(async () => {
-    if (!selection || !window.__swift) return; const html = await window.__swift.outer(selection.frameId, selection.el); const r = addItem(library, selection.el, project.name, html, brand);
+    if (!selection || !window.__swift) return; const html = (await window.__swift.styled(selection.frameId, selection.el, brand)) || (await window.__swift.outer(selection.frameId, selection.el)); /* portable: computed look inlined, brand colours as var(--token, colour) */ const r = addItem(library, selection.el, project.name, html, brand);
     if (!r.ok) { setSayStatus(`Library: ${r.error}`); return; } const err = saveLibrary(r.list); setLibrary(r.list); setSayStatus(err ? `Saved for now, not stored: ${err}` : `Saved #${selection.el} to the library`);
   }, [selection, library, project.name, brand]);
   const insertFromLibrary = useCallback(async (item: LibItem) => {
     const api = window.__swift; const f = frames.find((x) => x.id === (selection?.frameId ?? frames[0]?.id)); if (!api || !f) return;
-    const taken = new Set((await api.tree(f.id)).map((n) => n.id)); const unique = uniquifyIds(item.html, taken); const rt = item.origin !== project.name && item.tokens ? retheme(unique, item.tokens, brand) : { html: unique, mapped: 0 }; const html = rt.html; const snapshot = await api.snapshot(f.id);
+    const taken = new Set((await api.tree(f.id)).map((n) => n.id)); const tRe = performance.now(); const unique = uniquifyIds(item.html, taken); const rt = item.origin !== project.name && item.tokens ? retheme(unique, item.tokens, brand) : { html: unique, mapped: 0 }; const reMs = performance.now() - tRe; const html = rt.html; const snapshot = await api.snapshot(f.id);
     if (!(await api.add(f.id, f.root, html))) { setSayStatus(`Could not insert ${item.name}`); return; }
-    history.current.push({ kind: 'say', frameId: f.id, snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setRevision((n) => n + 1); setSayStatus(`Inserted ${item.name} (from ${item.origin}) into ${f.title}${rt.mapped ? ` · re-themed ${rt.mapped} colour${rt.mapped === 1 ? '' : 's'}` : ''}`);
+    recordOp({ kind: 'snap', frame: f.id, before: snapshot, after: await api.snapshot(f.id) }); setRevision((n) => n + 1); setSayStatus(`Inserted ${item.name} (from ${item.origin}) into ${f.title}${rt.mapped ? ` · re-themed ${rt.mapped} colour${rt.mapped === 1 ? '' : 's'} in ${reMs.toFixed(1)} ms` : ''}`);
   }, [frames, selection, project.name, brand]);
   // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
   const exportFrame = useCallback(async () => {
@@ -199,20 +331,30 @@ export function App() {
   useEffect(() => {
     const k = async (e: KeyboardEvent) => {
       if (!selection || !e.key.startsWith('Arrow') || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
-      const key = e.key, shift = e.shiftKey, sel = selection; // serialized: each nudge reads the position AFTER the previous one landed (held keys repeat faster than a round trip)
-      nudgeChain.current = nudgeChain.current.then(async () => { const props = await window.__swift?.props(sel.frameId, sel.el, ['position', 'left', 'top']); if (!props) return; const n = nudge(props, key, shift); if (!n) return; await edit(sel.frameId, sel.el, n.prop, n.value, true, true); });
+      if (extras.length) { // several elements: each key press moves them all, ONE undo step per press (snapshot pair)
+        const key = e.key, shift = e.shiftKey, sel = selection, els = [sel.el, ...extras]; nudgeChain.current = nudgeChain.current.then(async () => { const api = window.__swift; if (!api) return; const before = await api.snapshot(sel.frameId); let moved = 0;
+          for (const el of els) { const props = await api.props(sel.frameId, el, ['position', 'left', 'top', 'translate']); const n = props ? nudge(props, key, shift) : null; if (n) { const r = await api.edit(sel.frameId, el, n.prop, n.value); if (r.ok) moved++; } }
+          if (moved) { recordOp({ kind: 'snap', frame: sel.frameId, before, after: await api.snapshot(sel.frameId) }); setRevision((x) => x + 1); } }); return; } const key = e.key, shift = e.shiftKey, sel = selection; // serialized: each nudge reads the position AFTER the previous one landed (held keys repeat faster than a round trip)
+      nudgeChain.current = nudgeChain.current.then(async () => { const props = await window.__swift?.props(sel.frameId, sel.el, ['position', 'left', 'top', 'translate']); if (!props) return; const n = nudge(props, key, shift); if (!n) return; await edit(sel.frameId, sel.el, n.prop, n.value, true, true); });
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
-  }, [selection, edit]);
+  }, [selection, extras, edit, recordOp]);
+  // Click selects one element; shift-click adds or removes one in the same frame (the primary is the first).
+  const pickElement = useCallback((s: Sel | null, additive?: boolean) => {
+    if (!additive || !s || !selection || s.frameId !== selection.frameId) { if (!additive || s) setSelection(s); return; }
+    const all = [selection.el, ...extras]; const next = all.includes(s.el) ? all.filter((e) => e !== s.el) : [...all, s.el]; const [first, ...rest] = next;
+    if (!first) { setSelection(null); return; } setSelection({ frameId: s.frameId, el: first }); setXs({ key: `${s.frameId}/${first}`, els: rest });
+  }, [selection, extras]);
   // Drag the selected (positioned) element: live left/top edits while dragging, ONE undo step for the whole drag (a snapshot taken at the start).
-  const moving = useRef<{ frameId: string; el: string; start: { left: number; top: number }; snapshot: string; raf: number } | null>(null);
+  const moving = useRef<{ frameId: string; items: { el: string; start: MoveStart }[]; snapshot: string; raf: number } | null>(null);
   const moveElement = useCallback(async (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => {
     const api = window.__swift; if (!api) return;
-    if (phase === 'start') { moving.current = null; const [props, snapshot] = await Promise.all([api.props(frameId, el, ['position', 'left', 'top']), api.snapshot(frameId)]); const start = props ? startPos(props) : null; if (start) moving.current = { frameId, el, start, snapshot, raf: 0 }; return; }
+    if (phase === 'start') { moving.current = null; const els = [el, ...extras.filter((x) => x !== el)]; const [snapshot, ...all] = await Promise.all([api.snapshot(frameId), ...els.map((e) => api.props(frameId, e, ['position', 'left', 'top', 'translate']))]);
+      const items = els.flatMap((e, i) => { const st = all[i] ? moveStart(all[i]!) : null; return st ? [{ el: e, start: st }] : []; }); if (items.length) moving.current = { frameId, items, snapshot: snapshot as string, raf: 0 }; return; } // the whole selection moves together; elements that cannot move stay put
     const m = moving.current; if (!m) return;
-    if (phase === 'move') { const p = movedPos(m.start, dx, dy); void api.edit(m.frameId, m.el, 'left', p.left); void api.edit(m.frameId, m.el, 'top', p.top); if (!m.raf) m.raf = requestAnimationFrame(() => { m.raf = 0; setRevision((n) => n + 1); }); return; }
-    cancelAnimationFrame(m.raf); moving.current = null; history.current.push({ kind: 'say', frameId: m.frameId, snapshot: m.snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setRevision((n) => n + 1);
-  }, []);
+    if (phase === 'move') { for (const it of m.items) for (const e of moveEdits(it.start, dx, dy)) void api.edit(m.frameId, it.el, e.prop, e.value); if (!m.raf) m.raf = requestAnimationFrame(() => { m.raf = 0; setRevision((n) => n + 1); }); return; }
+    cancelAnimationFrame(m.raf); moving.current = null; recordOp({ kind: 'snap', frame: m.frameId, before: m.snapshot, after: await api.snapshot(m.frameId) }); setRevision((n) => n + 1);
+  }, [extras.length]);
   // Resize with the bottom-right handle: live width/height, ONE undo step (start snapshot), 4 px floor.
   const resizing = useRef<{ frameId: string; el: string; start: { w: number; h: number }; snapshot: string; raf: number } | null>(null);
   const resizeElement = useCallback(async (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => {
@@ -220,14 +362,14 @@ export function App() {
     if (phase === 'start') { resizing.current = null; const [props, snapshot] = await Promise.all([api.props(frameId, el, ['width', 'height']), api.snapshot(frameId)]); const w = parseFloat(props?.width ?? ''), h = parseFloat(props?.height ?? ''); if (Number.isFinite(w) && Number.isFinite(h)) resizing.current = { frameId, el, start: { w, h }, snapshot, raf: 0 }; return; }
     const m = resizing.current; if (!m) return;
     if (phase === 'move') { const s = resizedSize(m.start, dw, dh); void api.edit(m.frameId, m.el, 'width', s.width); void api.edit(m.frameId, m.el, 'height', s.height); if (!m.raf) m.raf = requestAnimationFrame(() => { m.raf = 0; setRevision((n) => n + 1); }); return; }
-    cancelAnimationFrame(m.raf); resizing.current = null; history.current.push({ kind: 'say', frameId: m.frameId, snapshot: m.snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setRevision((n) => n + 1);
+    cancelAnimationFrame(m.raf); resizing.current = null; recordOp({ kind: 'snap', frame: m.frameId, before: m.snapshot, after: await api.snapshot(m.frameId) }); setRevision((n) => n + 1);
   }, []);
   // Delete / Backspace removes the selected element (never a frame root); one snapshot makes it one undo step.
   const removeSelected = useCallback(async () => {
     if (!selection || !window.__swift) return; const f = frames.find((x) => x.id === selection.frameId); if (!f || f.root === selection.el) return;
-    const snapshot = await window.__swift.snapshot(selection.frameId); if (!(await window.__swift.remove(selection.frameId, selection.el))) { setSayStatus(`Could not remove #${selection.el}`); return; }
-    history.current.push({ kind: 'say', frameId: selection.frameId, snapshot }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setSelection(null); setRevision((n) => n + 1); setSayStatus(`Removed #${selection.el}`);
-  }, [selection, frames]);
+    const snapshot = await window.__swift.snapshot(selection.frameId); const gone: string[] = []; for (const el of [selection.el, ...extras]) { if (el === f.root) continue; if (!(await window.__swift.remove(selection.frameId, el))) { setSayStatus(`Could not remove #${el}`); break; } gone.push(el); } if (!gone.length) return;
+    recordOp({ kind: 'snap', frame: selection.frameId, before: snapshot, after: await window.__swift.snapshot(selection.frameId) }); setSelection(null); setRevision((n) => n + 1); setSayStatus(`Removed ${gone.map((e) => '#' + e).join(', ')}`);
+  }, [selection, extras, frames]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return; e.preventDefault(); void removeSelected(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [removeSelected]);
   // Suggestion chips for the selection: what its computed style allows, answered by the local tier.
   const [selProps, setSelProps] = useState<SuggestProps | null>(null);
@@ -239,7 +381,10 @@ export function App() {
   const actualSize = useCallback(() => { const r = document.querySelector('[data-testid=canvas]')?.getBoundingClientRect(); const v = window.__swift?.view(); if (r && v && window.__swift) window.__swift.setView(zoomAt(v, r.width / 2, r.height / 2, 1 / v.s)); }, []);
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
-  const dot = helper.status === 'connected' ? 'ok' : helper.status === 'connecting' ? 'warn' : 'bad';
+  // In-app MCP server (#1712): the helper relays design-op calls from Claude Code sessions here; a batch = ONE undo step. The ref keeps the handler on the latest state.
+  const mcpEnv = useRef<McpEnv | null>(null); mcpEnv.current = { api: window.__swift, frames, selection, record: recordOp, bump: () => setRevision((n) => n + 1), undo: async () => { if (!L.canUndo(logRef.current)) return false; await undo(); return true; } };
+  useEffect(() => { conn.current?.setMcpHandler((tool, args) => handleMcp(mcpEnv.current!, tool, args)); }, []);
+  const dot = helper.status === 'connected' ? (helper.claudeStatus && helper.claudeStatus.state !== 'ready' ? 'warn' : 'ok') : helper.status === 'connecting' ? 'warn' : 'bad';
   return (
     <div className={`kit-root m-${mode}`} style={vars as CSSProperties}>
       <header className="kit-top">
@@ -248,7 +393,8 @@ export function App() {
           <button ref={pjRef} className="rb pj pjbtn" aria-haspopup="dialog" aria-expanded={importOpen} data-testid="project-button" onClick={() => setImportOpen((o) => !o)}><b>{project.name}</b><span className="mono mu">{frames.length} {frames.length === 1 ? 'frame' : 'frames'}</span></button>
           <button ref={swatchRef} className="rb swatch" aria-label="Appearance" aria-haspopup="dialog" aria-expanded={appearanceOpen} data-testid="appearance-button" style={{ backgroundImage: backdropThumb(theme.bd) }} onClick={() => setAppearanceOpen((o) => !o)} />
         </div>
-        {importOpen && conn.current && <ImportProject scan={conn.current.scan} pick={conn.current.pickFolder} projects={reg.list} kits={Object.fromEntries(reg.list.map((p) => [p.id, kitColors(p.id === project.id ? brand : loadBrand(undefined, p.id))]))} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next && !reg.list.some((p) => p.id === next.active)) { saveDoc(starterFrames(name, t), undefined, next.active); } if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
+        {importOpen && conn.current && <ImportProject onCreatePage={(page, t) => { let host = page.url; try { host = new URL(page.url).host; } catch { /* keep text */ } const next = addProject(reg, host); if (next && !reg.list.some((p) => p.id === next.active)) { const fr = capturedFrame([], page.html, page.url, page.size); saveDoc([{ ...fr, id: 'page-1', title: host }], undefined, next.active); } if (next) saveBrand(t, undefined, next.active); void goTo(next); }} capture={captureUrl} screenshot={importShot} scan={conn.current.scan} pick={conn.current.pickFolder} projects={reg.list} kits={Object.fromEntries(reg.list.map((p) => [p.id, kitColors(p.id === project.id ? brand : loadBrand(undefined, p.id))]))} active={project.id} onSwitch={(id) => void goTo(switchProject(reg, id))} onCreate={(name, t) => { const next = addProject(reg, name); if (next && !reg.list.some((p) => p.id === next.active)) { saveDoc(starterFrames(name, t), undefined, next.active); } if (next) saveBrand(t, undefined, next.active); void goTo(next); }} using={Object.keys(brand).length} onUse={(t) => { const err = saveBrand(t, undefined, project.id); setBrand(t); if (err) setSayStatus(`Brand not saved: ${err}`); }} onClose={() => { setImportOpen(false); pjRef.current?.focus(); }} />}
+        <input ref={moodFile} type="file" accept="image/*" hidden data-testid="mood-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void addMoodImage(f); }} />
         <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="project-file-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { setFrameMenuOpen(false); void openProjectFile(f); } }} />
         {frameMenuOpen && (<>
           <div className="scrim" onClick={() => { setFrameMenuOpen(false); fmRef.current?.focus(); }} aria-hidden="true" />
@@ -265,10 +411,31 @@ export function App() {
             <div className="projs"><button className="rb btn" onClick={() => void saveToLibrary()} disabled={!selection} data-testid="lib-save">Save selection</button></div>
             {origins(library).length > 1 && <div className="projs" role="group" aria-label="Filter by project" data-testid="lib-filters"><button className={`rb btn${libFilter === null ? ' on' : ''}`} aria-pressed={libFilter === null} onClick={() => setLibFilter(null)}>All</button>{origins(library).map((o) => <button key={o} className={`rb btn${libFilter === o ? ' on' : ''}`} aria-pressed={libFilter === o} onClick={() => setLibFilter(o)} data-testid={`lib-filter-${o}`}>{o}</button>)}</div>}
             <ul className="liblist" data-testid="library">{filterItems(library, libFilter).slice(0, 12).map((it) => (<li key={it.id} className="libitem"><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void insertFromLibrary(it); }} data-testid="lib-item" title={`Insert into the selected frame`}>{it.name}<span className="mono mu"> · {it.origin}</span></button><button className="rb btn libx" aria-label={`Remove ${it.name} from the library`} data-testid="lib-remove" onClick={() => dropFromLibrary(it.id)}>✕</button></li>))}{library.length === 0 && <li className="mu">Nothing saved yet.</li>}</ul>
+            <h2>Moodboard <span className="mono mu">steers Spark, this project</span></h2>
+            <div className="projs"><button className="rb btn" onClick={() => moodFile.current?.click()} disabled={mood.length >= 8} data-testid="mood-add">Add image…</button></div>
+            <ul className="liblist" data-testid="moodboard">{mood.map((r) => (<li key={r.id} className="libitem" data-testid="mood-ref">{r.dataUrl && <img src={r.dataUrl} alt="" width={40} height={28} style={{ objectFit: 'cover', borderRadius: 4 }} />}<span className="mono mu"> {r.name} {r.colors.slice(0, 3).map((c) => <span key={c} style={{ background: c, display: 'inline-block', width: 10, height: 10, borderRadius: 5 }} />)}</span><button className="rb btn" onClick={() => changeMood(removeRef(mood, r.id))} aria-label={`Remove ${r.name}`} data-testid="mood-remove">✕</button></li>))}</ul>
+            <h2>Branches <span className="mono mu">on {logRef.current.current}</span></h2>
+            <div className="projs"><button className="rb btn" onClick={forkHere} disabled={busy} data-testid="fork" title="Start a branch here; main stays as it is">Fork here</button><button className="rb btn" onClick={keepBranch} disabled={logRef.current.current === L.MAIN} data-testid="keep-branch" title="Make main include this branch">Keep this branch</button></div>
+            <ul className="liblist" data-testid="branches">{Object.keys(logRef.current.branches).map((n) => (<li key={n} className="libitem" data-testid="branch"><button className="rb btn" onClick={() => void switchBranch(n)} disabled={busy || n === logRef.current.current} data-testid="branch-switch">{n}{n === logRef.current.current ? ' · current' : ''}</button>{n !== L.MAIN && <button className="rb btn" onClick={() => dropBranch(n)} aria-label={`Delete ${n}`} data-testid="branch-del">✕</button>}</li>))}</ul>
+            <h2>Brand <span className="mono mu">this project</span></h2>
+            <label className="mono mu">Compare with <select aria-label="Compare kit with" data-testid="brand-compare" value={cmpId} onChange={(e) => setCmpId(e.target.value)}><option value="">nothing</option>{reg.list.filter((p) => p.id !== project.id).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            {cmpKit && <ul className="liblist" data-testid="brand-diff">{compareKits(brand, cmpKit).map((r) => (<li key={r.name} className="libitem" data-testid="brand-diff-row" data-state={r.state}><span className="mono">{r.name}</span><span className="mu mono"> {r.state === 'same' ? 'same' : r.state === 'differs' ? `${r.a} ≠ ${r.b}` : r.state === 'only-a' ? 'only here' : `only there: ${r.b}`}</span>{r.a !== undefined && r.state !== 'same' && <button type="button" className="rb btn" data-testid="brand-share" onClick={() => shareTokenTo(r.name)} title="Copy this one token to the other project">Share →</button>}</li>))}</ul>}
+            <ul className="liblist" data-testid="brand-kit">{Object.entries(brand).map(([name, val]) => (<li key={name} className="libitem" data-testid="brand-token"><span className="mono">{name}</span> {/^#[0-9a-f]{3,8}$/i.test(val) ? <input type="color" aria-label={`Edit ${name}`} data-testid="brand-color" value={/^#[0-9a-f]{6}$/i.test(val) ? val : '#808080'} onChange={(e) => void editToken(name, e.target.value)} title="Changes this colour in every frame" /> : null}{!/^#[0-9a-f]{3,8}$/i.test(val) ? <input key={val} className="mono" aria-label={`Edit ${name} as text`} data-testid="brand-text" defaultValue={val} onKeyDown={(e) => { if (e.key === 'Enter') void editToken(name, e.currentTarget.value); }} title="Type a new value (a colour, a size like 16px, a font family) and press Enter" /> : null}{/^#[0-9a-f]{3,8}$/i.test(val) ? <span className="mu mono"> {val}</span> : null}</li>))}</ul>
+            <p className="mono mu" data-testid="pool">{pool ? `Claude pool: ${pool.running}/${pool.max} running · ${pool.spare ? 'warm spare ready' : 'no spare'}${pool.availableMb != null ? ` · ${(pool.availableMb / 1024).toFixed(1)} GB free (floor ${(pool.minFreeMb / 1024).toFixed(1)} GB)` : ''}` : 'Claude pool: helper offline'}</p>
+            <h2>History <span className="mono mu">Says on this device</span></h2>
+            <ul className="liblist" data-testid="history">{recs.filter((r) => r.prompt).slice(-12).reverse().map((r) => (<li key={r.id} className="mono" data-testid="history-row">“{r.prompt}” <span className="mu">· {r.tier}{r.firstMs != null ? ` · first ${r.firstMs.toFixed(0)} ms` : ''} · {r.ms.toFixed(0)} ms{r.rejected ? ` · ${r.rejected} rejected` : ''}{!r.ok ? ' · failed' : ''}{r.undone ? ' · undone' : ''}</span></li>))}</ul>
+            <h2>Pulse <span className="mono mu">this device, last {recs.length}</span></h2>
+            <ul className="liblist" data-testid="pulse">{summarize(recs).map((x) => (<li key={`${x.tier}/${x.skill}`} className="mono" data-testid="pulse-row">{x.skill} <span className="mu">· {x.tier} · n {x.n} · p50 {x.p50.toFixed(0)} ms · p95 {x.p95.toFixed(0)} ms{x.failed ? ` · ${x.failed} failed` : ''}{x.undone ? ` · ${x.undone} undone` : ''}</span>{flags(x).map((f) => <span key={f} className="mono" data-testid="pulse-flag"> ⚑ {f}</span>)}</li>))}{recs.length === 0 && <li className="mu">No edits yet</li>}</ul>
+            {(() => { const u = summarizeUsage(usage); return <p className="mono mu" data-testid="usage">{u.requests === 0 ? 'No Claude requests yet' : `Claude tokens: ${u.requests} requests · ${u.input.toLocaleString()} in · ${u.output.toLocaleString()} out · avg ${Math.round(u.avgInput).toLocaleString()} in / ${Math.round(u.avgOutput).toLocaleString()} out · Spark ×4 ≈ ${tokensShort((e => e.input + e.output)(estimateSpark(usage, 4)))}`}</p>; })()}
+            <div className="projs"><button className="rb btn" onClick={() => void refine()} disabled={refining || helper.status !== 'connected'} data-testid="refine" title="Ask Claude to propose changes for flagged skills; nothing is applied">Review skills{isDue(lastRefine(), Date.now()) && recs.length > 0 ? ' · due' : ''}</button></div>
+            <label className="mono mu"><input type="checkbox" checked={autoRefine} onChange={(e) => toggleAutoRefine(e.target.checked)} data-testid="refine-auto" /> Review weekly when flagged (uses a little subscription)</label>
+            {refineNote && <p className="mono mu" data-testid="refine-note">{refineNote}</p>}
+            <ul className="liblist" data-testid="proposals">{proposals.map((p, i) => (<li key={i} className="mono" data-testid="proposal"><b>{p.skill}</b> <span className="mu">{p.problem}</span><br />{p.change}</li>))}</ul>
             <h2>Project</h2>
-            <div className="projs"><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportProject(); }} data-testid="export-project">Export project file</button><button className="rb btn" onClick={() => fileRef.current?.click()} data-testid="open-project">Open project file…</button><button className="rb btn" onClick={resetDesign} data-testid="reset">Reset design</button></div>
+            <div className="projs"><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportProject(); }} data-testid="export-project">Export project file</button><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void saveToRepo(); }} data-testid="save-repo" title="Write .swift-canvas/project.json into a repo folder you choose">Save into a repo folder…</button><button className="rb btn" onClick={() => fileRef.current?.click()} data-testid="open-project">Open project file…</button><button className="rb btn" onClick={resetDesign} data-testid="reset">Reset design</button></div>
           </div>
         </>)}
+        {dropping && <div className="dropcover mono" data-testid="dropcover" onDragOver={(e) => e.preventDefault()} onDragLeave={() => setDropping(false)} onDrop={() => setDropping(false)}>Drop to add to the moodboard</div>}
         {shortcutsOpen && <Shortcuts onClose={() => { setShortcutsOpen(false); kbRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
@@ -278,11 +445,12 @@ export function App() {
           <span className={`dot ${dot}`} aria-hidden />
           <button className="rb btn zoombtn" aria-label={`Zoom ${zoomPct} percent: click for actual size`} title="Click for actual size (⌘1)" data-testid="zoom" onClick={actualSize}>{zoomPct}%</button>
           <button ref={kbRef} className="rb btn kbbtn" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-expanded={shortcutsOpen} data-testid="shortcuts-button" onClick={() => setShortcutsOpen((o) => !o)}>?</button>
-          <span className="mono helpertxt" title={helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}>{helper.status === 'connected' ? `helper · claude ${(helper.claude ?? '?').split(' (')[0]}` : `helper · ${helper.status}`}</span>
+          <span className="mono helpertxt" title={helper.status === 'connected' ? `helper · claude ${helper.claude ?? '?'}` : `helper · ${helper.status}`}>{helper.status === 'connected' ? (helper.claudeStatus && helper.claudeStatus.state !== 'ready' ? `helper · claude ${helper.claudeStatus.state.replace('_', ' ')}` : `helper · claude ${(helper.claude ?? '?').split(' (')[0]}`) : `helper · ${helper.status}`}</span>
+          {helper.status === 'connected' && helper.claudeStatus && helper.claudeStatus.state !== 'ready' && <button className="rb btn" onClick={() => conn.current?.recheckClaude()} title={helper.claudeStatus.message} data-testid="claude-recheck">Re-check</button>}
         </div>
       </header>
-      <Canvas onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => { const next = renameFrame(frames, id, t); if (next === frames) return; const before = frames.find((f) => f.id === id)?.title ?? ''; const after = next.find((f) => f.id === id)?.title ?? ''; history.current.push({ kind: 'rename', frameId: id, before, after }); redoStack.current = []; setRedos(0); setEdits(history.current.length); setFrames(next); }} frames={frames} selection={selection} onSelect={setSelection} revision={revision} onReady={() => setRevision((n) => n + 1)} />
-      <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} onSelect={setSelection} revision={revision} />
+      <Canvas onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => { const next = renameFrame(frames, id, t); if (next === frames) return; const before = frames.find((f) => f.id === id)?.title ?? ''; const after = next.find((f) => f.id === id)?.title ?? ''; recordOp({ kind: 'rename', frame: id, before, after }); setFrames(next); }} frames={frames} selection={selection} extras={extras} onSelect={pickElement} revision={revision} onReady={() => setRevision((n) => n + 1)} />
+      <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} extras={extras} onSelect={pickElement} revision={revision} />
       <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
       {chips.length > 0 && !saying && !sayText && !pendingAsk && (
         <div className="gl isl chips" role="group" aria-label="Suggestions" data-testid="chips">
@@ -296,7 +464,7 @@ export function App() {
       </form>
       <footer className="gl isl tools" aria-label="Canvas tools">
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
-        {sparking ? <>{selection && takesRunning.current.has(selection.frameId) && <button className="rb btn" onClick={() => takesRunning.current.get(selection.frameId)?.abort()} data-testid="cancel-take">Cancel this take</button>}<button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button></> : <button className="rb btn" onClick={() => void spark()} data-testid="spark-button">Spark ×4</button>}
+        {sparking ? <>{selection && takesRunning.current.has(selection.frameId) && <button className="rb btn" onClick={() => takesRunning.current.get(selection.frameId)?.abort()} data-testid="cancel-take">Cancel this take</button>}<button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button></> : <button className="rb btn" onClick={() => void spark()} data-testid="spark-button" title={`Spark ×4 costs about ${tokensShort((e => e.input + e.output)(estimateSpark(usage, 4)))} tokens (from your recent requests, cached input included)`}>Spark ×4</button>}
         <button className="rb btn" onClick={() => selection && setFrames((f) => keepTake(f, selection.frameId))} disabled={!selIsTake} data-testid="keep-take">Keep take</button>
         <button className="rb btn" onClick={() => void discard()} disabled={takeCount === 0} data-testid="discard-takes">Discard takes{takeCount ? ` (${takeCount})` : ''}</button>
         <button ref={fmRef} className="rb btn" aria-haspopup="dialog" aria-expanded={frameMenuOpen} data-testid="frame-menu" onClick={() => setFrameMenuOpen((o) => !o)}>Frame ▾</button>

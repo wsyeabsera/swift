@@ -1,0 +1,702 @@
+[
+{
+"id": "h001",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to green"
+},
+{
+"id": "h002",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to teal"
+},
+{
+"id": "h003",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to purple"
+},
+{
+"id": "h004",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to orange"
+},
+{
+"id": "h005",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to pink"
+},
+{
+"id": "h006",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to red"
+},
+{
+"id": "h007",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to yellow"
+},
+{
+"id": "h008",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to blue"
+},
+{
+"id": "h009",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to gray"
+},
+{
+"id": "h010",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "change the accent to cyan"
+},
+{
+"id": "h011",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "make the glass thicker"
+},
+{
+"id": "h012",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "make the glass thinner"
+},
+{
+"id": "h013",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "reduce the blur"
+},
+{
+"id": "h014",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "increase the blur"
+},
+{
+"id": "h015",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "rounder corners"
+},
+{
+"id": "h016",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "sharper corners"
+},
+{
+"id": "h017",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "use Barlow instead of Inter"
+},
+{
+"id": "h018",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "use Georgia instead of Inter"
+},
+{
+"id": "h019",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "make the background darker"
+},
+{
+"id": "h020",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "make the background lighter"
+},
+{
+"id": "h021",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "turn this into a light theme"
+},
+{
+"id": "h022",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "turn this into a dark theme"
+},
+{
+"id": "h023",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "make the text white"
+},
+{
+"id": "h024",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "make the text muted"
+},
+{
+"id": "h025",
+"class": "token",
+"project": "tvdash",
+"kind": "say",
+"request": "use a warmer palette"
+},
+{
+"id": "h026",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the clock bigger"
+},
+{
+"id": "h027",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the clock smaller"
+},
+{
+"id": "h028",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the date fainter"
+},
+{
+"id": "h029",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the date bolder"
+},
+{
+"id": "h030",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "center the clock"
+},
+{
+"id": "h031",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "move the clock down 40 px"
+},
+{
+"id": "h032",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "move the date up 10 px"
+},
+{
+"id": "h033",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "round the recent card more"
+},
+{
+"id": "h034",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "give the recent card more padding"
+},
+{
+"id": "h035",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "remove the border from the recent card"
+},
+{
+"id": "h036",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the recent card background darker"
+},
+{
+"id": "h037",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the clock font lighter"
+},
+{
+"id": "h038",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "increase the letter spacing of the clock"
+},
+{
+"id": "h039",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make everything 10% bigger"
+},
+{
+"id": "h040",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "hide the date"
+},
+{
+"id": "h041",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "show the date again"
+},
+{
+"id": "h042",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the clock red"
+},
+{
+"id": "h043",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the date italic"
+},
+{
+"id": "h044",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "uppercase the date"
+},
+{
+"id": "h045",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "align the date to the right"
+},
+{
+"id": "h046",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the recent card narrower"
+},
+{
+"id": "h047",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the recent card wider"
+},
+{
+"id": "h048",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "add a shadow to the recent card"
+},
+{
+"id": "h049",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the clock thinner"
+},
+{
+"id": "h050",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "tighten the line height of the date"
+},
+{
+"id": "h051",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "give the clock a subtle glow"
+},
+{
+"id": "h052",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the recent card translucent"
+},
+{
+"id": "h053",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the date opacity 50%"
+},
+{
+"id": "h054",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "make the title bigger"
+},
+{
+"id": "h055",
+"class": "property",
+"project": "tvdash",
+"kind": "say",
+"request": "space the rows more"
+},
+{
+"id": "h056",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a QR code on the left"
+},
+{
+"id": "h057",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a settings button in the top right"
+},
+{
+"id": "h058",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a progress bar under the clock"
+},
+{
+"id": "h059",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a second recent card below the first"
+},
+{
+"id": "h060",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a weather chip next to the clock"
+},
+{
+"id": "h061",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a greeting above the clock"
+},
+{
+"id": "h062",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a footer with three links"
+},
+{
+"id": "h063",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a search field at the top"
+},
+{
+"id": "h064",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a battery indicator"
+},
+{
+"id": "h065",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a notification badge to the recent card"
+},
+{
+"id": "h066",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "write a friendlier empty state"
+},
+{
+"id": "h067",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a row of three quick actions"
+},
+{
+"id": "h068",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a profile avatar top left"
+},
+{
+"id": "h069",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a divider between the rows"
+},
+{
+"id": "h070",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a hint line that says Press OK to open"
+},
+{
+"id": "h071",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a volume slider at the bottom"
+},
+{
+"id": "h072",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a pill showing the current network"
+},
+{
+"id": "h073",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a clock for another timezone below the first"
+},
+{
+"id": "h074",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a card that shows the next event"
+},
+{
+"id": "h075",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a tab bar with Home, Search, Library"
+},
+{
+"id": "h076",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a banner announcing an update"
+},
+{
+"id": "h077",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a toggle for dark mode"
+},
+{
+"id": "h078",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a loading skeleton for the recent card"
+},
+{
+"id": "h079",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a back button top left"
+},
+{
+"id": "h080",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a keyboard shortcut hint line"
+},
+{
+"id": "h081",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a rating of five stars to the recent card"
+},
+{
+"id": "h082",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a countdown timer"
+},
+{
+"id": "h083",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a short caption under the date"
+},
+{
+"id": "h084",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add a close button to the recent card"
+},
+{
+"id": "h085",
+"class": "add",
+"project": "tvdash",
+"kind": "say",
+"request": "add an icon next to each row"
+},
+{
+"id": "h086",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it look like Apple TV"
+},
+{
+"id": "h087",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it feel calmer"
+},
+{
+"id": "h088",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it more playful"
+},
+{
+"id": "h089",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it feel premium"
+},
+{
+"id": "h090",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "simplify the layout"
+},
+{
+"id": "h091",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it work better from the couch"
+},
+{
+"id": "h092",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "give it a night mode feel"
+},
+{
+"id": "h093",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it more colourful"
+},
+{
+"id": "h094",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make the hierarchy clearer"
+},
+{
+"id": "h095",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it look less cluttered"
+},
+{
+"id": "h096",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "redesign the recent card"
+},
+{
+"id": "h097",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it more modern"
+},
+{
+"id": "h098",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make it feel warmer"
+},
+{
+"id": "h099",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make this feel like a game launcher"
+},
+{
+"id": "h100",
+"class": "creative",
+"project": "tvdash",
+"kind": "say",
+"request": "make the home screen feel friendly"
+}
+]

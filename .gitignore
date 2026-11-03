@@ -4,3 +4,9 @@ dist/
 extension/app/
 *.log
 spikes/**/node_modules/
+e2e/nightly-report.partial.json
+.swift-canvas/
+e2e/shot-real-*.png
+e2e/shot-*import*.png
+e2e/*-report.json
+!docs/say-regression.json

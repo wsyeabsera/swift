@@ -1,0 +1,54 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: cargo test -q
+
+  e2e:
+    needs: checks
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      # Playwright-matched Chromium: branded Chrome ignores --load-extension (see CLAUDE.md).
+      - run: npx playwright-core install chromium
+      # NOTE: e2e/budgets.json panGapP95Ms is hardware-sensitive (measured on an M2 Pro on AC power).
+      # Shared CI runners are slower and noisier, so a pan-gap failure here may be the runner, not a
+      # regression; compare against a local run on AC power before loosening the budget.
+      - run: npm run e2e
+      - name: Upload e2e output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-output
+          path: |
+            e2e/*.png
+            ~/Library/Logs/DiagnosticReports/*
+          if-no-files-found: ignore

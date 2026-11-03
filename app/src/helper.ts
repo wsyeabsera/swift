@@ -1,14 +1,26 @@
 // Client for the local helper: an authenticated WebSocket on 127.0.0.1. The helper checks the Origin and the token (see helper/src/lib.rs).
 import type { SayEvent, SayTransport } from './say/say';
 export const HELPER_PORT = 7431;
-export type HelperState = { status: 'connecting' | 'connected' | 'offline'; claude?: string; version?: string };
+export type ClaudeState = 'missing' | 'logged_out' | 'ready' | 'limit_reached';
+export type ClaudeStatus = { state: ClaudeState; message: string };
+export type HelperState = { status: 'connecting' | 'connected' | 'offline'; claude?: string; version?: string; claudeStatus?: ClaudeStatus };
+const CLAUDE_STATES: readonly string[] = ['missing', 'logged_out', 'ready', 'limit_reached'];
+function asClaudeStatus(x: unknown): ClaudeStatus | undefined { const m = x as { state?: unknown; message?: unknown } | null; return m && typeof m.state === 'string' && CLAUDE_STATES.includes(m.state) ? { state: m.state as ClaudeState, message: typeof m.message === 'string' ? m.message : '' } : undefined; }
+/** A `claude.status` event (pushed on change, or the answer to recheckClaude). */
+export function parseClaudeStatus(data: string): ClaudeStatus | null { try { const m = JSON.parse(data) as { type?: string }; return m.type === 'claude.status' ? (asClaudeStatus(m) ?? null) : null; } catch { return null; } }
+export type PoolStatus = { running: number; max: number; spare: boolean; availableMb: number | null; minFreeMb: number };
+export type CaptureResult = { ok: true; html: string } | { ok: false; error: string };
+export function parseCaptureReply(data: string): { id: string; result: CaptureResult } | null {
+  try { const m = JSON.parse(data) as { type?: string; id?: string; ok?: boolean; html?: unknown; error?: string }; if (m.type !== 'capture.url' || typeof m.id !== 'string') return null; return { id: m.id, result: m.ok === true && typeof m.html === 'string' ? { ok: true, html: m.html } : { ok: false, error: m.error ?? 'capture failed' } }; } catch { return null; }
+}
 export type ScanResult = { ok: true; scan: { files: number; tokens: { name: string; value: string; file: string }[]; colors: { value: string; count: number }[]; fonts: { value: string; count: number }[] } } | { ok: false; error: string };
 export type StoreResult = { ok: true; data: string | null } | { ok: false; error: string };
 export type PickResult = { ok: true; path: string } | { ok: false; error: string };
 export function parsePickReply(data: string): { id: string; result: PickResult } | null {
   try { const m = JSON.parse(data) as { type?: string; id?: string; ok?: boolean; path?: unknown; error?: string }; if (m.type !== 'project.pick' || typeof m.id !== 'string') return null; return { id: m.id, result: m.ok === true && typeof m.path === 'string' ? { ok: true, path: m.path } : { ok: false, error: m.error ?? 'no folder chosen' } }; } catch { return null; }
 }
-export type HelperConnection = { close: () => void; say: SayTransport; prewarm: () => void; scan: (path: string) => Promise<ScanResult>; storePut: (project: string, data: string) => Promise<StoreResult>; pickFolder: () => Promise<PickResult>; storeGet: (project: string) => Promise<StoreResult> };
+export type HelperConnection = { close: () => void; say: SayTransport; prewarm: () => void; recheckClaude: () => void; scan: (path: string) => Promise<ScanResult>; captureUrl: (url: string, size?: { w: number; h: number }) => Promise<CaptureResult>; storePut: (project: string, data: string) => Promise<StoreResult>; pickFolder: () => Promise<PickResult>; writeRepo: (path: string, data: string) => Promise<PickResult>; poolStatus: () => Promise<PoolStatus | null>; storeGet: (project: string) => Promise<StoreResult>; setMcpHandler: (h: McpHandler | null) => void };
+export type McpHandler = (tool: string, args: Record<string, unknown>) => Promise<unknown>; // the app's side of the in-app MCP server (app/src/mcp.ts)
 export function parseStoreReply(data: string): { id: string; result: StoreResult } | null {
   try { const m = JSON.parse(data) as { type?: string; id?: string; ok?: boolean; data?: unknown; error?: string }; if ((m.type !== 'store.put' && m.type !== 'store.get') || typeof m.id !== 'string') return null; return { id: m.id, result: m.ok === true ? { ok: true, data: typeof m.data === 'string' ? m.data : null } : { ok: false, error: m.error ?? 'store failed' } }; } catch { return null; }
 }
@@ -17,26 +29,34 @@ export function parseScanReply(data: string): { id: string; result: ScanResult }
 }
 export function helperUrl(token: string, port = HELPER_PORT): string { return `ws://127.0.0.1:${port}/?token=${encodeURIComponent(token)}`; }
 export function parseHello(data: string): HelperState | null {
-  try { const m = JSON.parse(data) as { type?: string; claude?: string; version?: string }; return m.type === 'hello' ? { status: 'connected', ...(m.claude !== undefined ? { claude: m.claude } : {}), ...(m.version !== undefined ? { version: m.version } : {}) } : null; } catch { return null; }
+  try { const m = JSON.parse(data) as { type?: string; claude?: string; version?: string; claudeStatus?: unknown }; const cs = asClaudeStatus(m.claudeStatus); return m.type === 'hello' ? { status: 'connected', ...(cs ? { claudeStatus: cs } : {}), ...(m.claude !== undefined ? { claude: m.claude } : {}), ...(m.version !== undefined ? { version: m.version } : {}) } : null; } catch { return null; }
 }
 export function parseSayEvent(data: string): { id: string; event: SayEvent } | null {
-  try { const m = JSON.parse(data) as { type?: string; id?: string; kind?: string; text?: string }; if (m.type !== 'say.event' || typeof m.id !== 'string') return null;
-    if (m.kind === 'delta') return { id: m.id, event: { kind: 'delta', text: m.text ?? '' } }; if (m.kind === 'done') return { id: m.id, event: { kind: 'done' } }; if (m.kind === 'error') return { id: m.id, event: { kind: 'error', text: m.text ?? 'error' } }; return null; } catch { return null; }
+  try { const m = JSON.parse(data) as { type?: string; id?: string; kind?: string; text?: string; usage?: Record<string, unknown> }; if (m.type !== 'say.event' || typeof m.id !== 'string') return null;
+    if (m.kind === 'delta') return { id: m.id, event: { kind: 'delta', text: m.text ?? '' } }; if (m.kind === 'done') { const u = m.usage; const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? x : 0); const hasU = u && typeof u === 'object'; const input = hasU ? n(u.input_tokens) + n(u.cache_read_input_tokens) + n(u.cache_creation_input_tokens) : 0; return { id: m.id, event: hasU ? { kind: 'done', usage: { input, output: n(u.output_tokens) } } : { kind: 'done' } }; } if (m.kind === 'error') return { id: m.id, event: { kind: 'error', text: m.text ?? 'error' } }; return null; } catch { return null; }
 }
 export function connectHelper(token: string, onState: (s: HelperState) => void): HelperConnection {
-  let ws: WebSocket | null = null; let stop = false; let timer: ReturnType<typeof setTimeout> | undefined; let n = 0;
-  const pending = new Map<string, (e: SayEvent) => void>(); const scans = new Map<string, (r: ScanResult) => void>(); const stores = new Map<string, (r: StoreResult) => void>(); const picks = new Map<string, (r: PickResult) => void>();
-  const failAll = (text: string) => { for (const [, cb] of pending) cb({ kind: 'error', text }); pending.clear(); for (const [, cb] of scans) cb({ ok: false, error: text }); scans.clear(); for (const [, cb] of stores) cb({ ok: false, error: text }); stores.clear(); for (const [, cb] of picks) cb({ ok: false, error: text }); picks.clear(); };
+  let ws: WebSocket | null = null; let stop = false; let timer: ReturnType<typeof setTimeout> | undefined; let n = 0; let last: HelperState = { status: 'connecting' }; const emit = (s: HelperState) => { last = s; onState(s); };
+  const pending = new Map<string, (e: SayEvent) => void>(); const scans = new Map<string, (r: ScanResult) => void>(); const caps = new Map<string, (r: CaptureResult) => void>(); const writes = new Map<string, (r: PickResult) => void>(); const pools = new Map<string, (r: PoolStatus | null) => void>(); const stores = new Map<string, (r: StoreResult) => void>(); const picks = new Map<string, (r: PickResult) => void>();
+  const failAll = (text: string) => { for (const [, cb] of pending) cb({ kind: 'error', text }); pending.clear(); for (const [, cb] of scans) cb({ ok: false, error: text }); scans.clear(); for (const [, cb] of stores) cb({ ok: false, error: text }); stores.clear(); for (const [, cb] of picks) cb({ ok: false, error: text }); picks.clear(); for (const [, cb] of caps) cb({ ok: false, error: text }); caps.clear(); for (const [, cb] of writes) cb({ ok: false, error: text }); writes.clear(); for (const [, cb] of pools) cb(null); pools.clear(); };
+  let mcpHandler: McpHandler | null = null;
+  const onMcpReq = (data: string): boolean => { try { const m = JSON.parse(data) as { type?: string; id?: unknown; tool?: unknown; args?: unknown }; if (m.type !== 'mcp.req') return false; const id = m.id; const reply = (b: object) => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'mcp.res', id, ...b })); };
+    if (!mcpHandler || typeof m.tool !== 'string') { reply({ ok: false, error: 'the app is not ready for MCP calls' }); return true; } mcpHandler(m.tool, (m.args && typeof m.args === 'object' ? m.args : {}) as Record<string, unknown>).then((result) => reply({ ok: true, result }), (e: unknown) => reply({ ok: false, error: e instanceof Error ? e.message : String(e) })); return true; } catch { return false; } };
   const open = () => {
-    onState({ status: 'connecting' }); ws = new WebSocket(helperUrl(token));
+    emit({ status: 'connecting' }); ws = new WebSocket(helperUrl(token));
     ws.onmessage = (e) => {
-      if (typeof e.data !== 'string') return; const h = parseHello(e.data); if (h) { onState(h); return; }
+      if (typeof e.data !== 'string') return; const h = parseHello(e.data); if (h) { emit(h); ws?.send(JSON.stringify({ type: 'mcp.register' })); return; } // the app is the target of relayed MCP design ops
+      if (onMcpReq(e.data)) return;
+      const cl = parseClaudeStatus(e.data); if (cl) { emit({ ...last, status: 'connected', claudeStatus: cl }); return; }
       const pk = parsePickReply(e.data); if (pk) { const cb = picks.get(pk.id); picks.delete(pk.id); cb?.(pk.result); return; }
       const st = parseStoreReply(e.data); if (st) { const cb = stores.get(st.id); stores.delete(st.id); cb?.(st.result); return; }
+      try { const q = JSON.parse(e.data) as { type?: string; id?: string; running?: number; max?: number; spare?: boolean; availableMb?: number | null; minFreeMb?: number }; if (q.type === 'pool.status' && typeof q.id === 'string') { const cb = pools.get(q.id); pools.delete(q.id); cb?.({ running: Number(q.running ?? 0), max: Number(q.max ?? 0), spare: q.spare === true, availableMb: typeof q.availableMb === 'number' ? q.availableMb : null, minFreeMb: Number(q.minFreeMb ?? 0) }); return; } } catch { /* the other handlers decide */ }
+      try { const w = JSON.parse(e.data) as { type?: string; id?: string; ok?: boolean; path?: string; error?: string }; if (w.type === 'project.write' && typeof w.id === 'string') { const cb = writes.get(w.id); writes.delete(w.id); cb?.(w.ok === true && typeof w.path === 'string' ? { ok: true, path: w.path } : { ok: false, error: w.error ?? 'write failed' }); return; } } catch { /* not JSON: the other handlers decide */ }
+      const cp = parseCaptureReply(e.data); if (cp) { const cb = caps.get(cp.id); caps.delete(cp.id); cb?.(cp.result); return; }
       const sc = parseScanReply(e.data); if (sc) { const cb = scans.get(sc.id); scans.delete(sc.id); cb?.(sc.result); return; }
       const s = parseSayEvent(e.data); if (!s) return; const cb = pending.get(s.id); if (!cb) return; if (s.event.kind !== 'delta') pending.delete(s.id); cb(s.event);
     };
-    ws.onclose = () => { onState({ status: 'offline' }); failAll('helper disconnected'); if (!stop) timer = setTimeout(open, 2000); };
+    ws.onclose = () => { emit({ status: 'offline' }); failAll('helper disconnected'); if (!stop) timer = setTimeout(open, 2000); };
     ws.onerror = () => ws?.close();
   };
   const storeCall = (type: 'store.put' | 'store.get', project: string, data?: string) => new Promise<StoreResult>((resolve) => {
@@ -47,10 +67,15 @@ export function connectHelper(token: string, onState: (s: HelperState) => void):
   open();
   return {
     close: () => { stop = true; if (timer) clearTimeout(timer); ws?.close(); },
+    poolStatus: () => new Promise<PoolStatus | null>((resolve) => { if (!ws || ws.readyState !== WebSocket.OPEN) return resolve(null); const id = `s${++n}`; const t = setTimeout(() => { pools.delete(id); resolve(null); }, 3000); pools.set(id, (r) => { clearTimeout(t); resolve(r); }); ws.send(JSON.stringify({ type: 'pool.status', id })); }),
+    writeRepo: (path, data) => new Promise<PickResult>((resolve) => { if (!ws || ws.readyState !== WebSocket.OPEN) return resolve({ ok: false, error: 'helper offline' }); const id = `w${++n}`; const t = setTimeout(() => { writes.delete(id); resolve({ ok: false, error: 'write timed out' }); }, 15000); writes.set(id, (r) => { clearTimeout(t); resolve(r); }); ws.send(JSON.stringify({ type: 'project.write', id, path, data })); }),
+    captureUrl: (url, size) => new Promise<CaptureResult>((resolve) => { if (!ws || ws.readyState !== WebSocket.OPEN) return resolve({ ok: false, error: 'helper offline' }); const id = `c${++n}`; const t = setTimeout(() => { caps.delete(id); resolve({ ok: false, error: 'capture timed out' }); }, 40000); caps.set(id, (r) => { clearTimeout(t); resolve(r); }); ws.send(JSON.stringify({ type: 'capture.url', id, url, ...(size ? { w: size.w, h: size.h } : {}) })); }),
     scan: (path) => new Promise<ScanResult>((resolve) => { if (!ws || ws.readyState !== WebSocket.OPEN) return resolve({ ok: false, error: 'helper offline' }); const id = `p${++n}`; const t = setTimeout(() => { scans.delete(id); resolve({ ok: false, error: 'scan timed out' }); }, 15000); scans.set(id, (r) => { clearTimeout(t); resolve(r); }); ws.send(JSON.stringify({ type: 'project.scan', id, path })); }),
     pickFolder: () => new Promise<PickResult>((resolve) => { if (!ws || ws.readyState !== WebSocket.OPEN) return resolve({ ok: false, error: 'helper offline' }); const id = `k${++n}`; picks.set(id, resolve); ws.send(JSON.stringify({ type: 'project.pick', id })); }), // the user may take as long as they like
+    setMcpHandler: (h) => { mcpHandler = h; },
     storePut: (project, data) => storeCall('store.put', project, data), storeGet: (project) => storeCall('store.get', project),
+    recheckClaude: () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'claude.status' })); },
     prewarm: () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'prewarm' })); },
-    say: (system, request, onEvent) => { if (!ws || ws.readyState !== WebSocket.OPEN) return onEvent({ kind: 'error', text: 'helper offline' }); const id = `s${++n}`; pending.set(id, onEvent); ws.send(JSON.stringify({ type: 'say', id, system, request })); },
+    say: (system, request, onEvent, images) => { if (!ws || ws.readyState !== WebSocket.OPEN) return onEvent({ kind: 'error', text: 'helper offline' }); const id = `s${++n}`; pending.set(id, onEvent); ws.send(JSON.stringify({ type: 'say', id, system, request, ...(images?.length ? { images } : {}) })); },
   };
 }

@@ -1,0 +1,2 @@
+// cargo run -p swift-canvas-helper --example capture -- http://localhost:5173/ [width height] > page.html   (what Import → Capture does, without the app)
+fn main() { let url = std::env::args().nth(1).expect("usage: capture <http://localhost:PORT/path>"); match helper::capture::capture(&url, helper::capture::clamp_size(std::env::args().nth(2).and_then(|w| w.parse().ok()), std::env::args().nth(3).and_then(|h| h.parse().ok()))) { Ok(h) => print!("{h}"), Err(e) => { eprintln!("{e}"); std::process::exit(1); } } }

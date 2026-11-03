@@ -79,3 +79,10 @@ test('runSay sends the outline and the selected markup when the frame is too big
   const api = { snapshot: async () => big, tree: async () => [node('root', 0), { id: 'deep', depth: 1, tag: 'span', text: 'Deep' }], outer: async (_f: string, el: string) => `<span id="${el}">Deep</span>` } as unknown as CanvasApi;
   await runSay({ api, send: (system, _r, on) => { seen = system; on({ kind: 'done' }); }, frameId: 'f', root: 'root', request: 'x', selected: 'deep' }); expect(seen).toContain('#deep <span> "Deep"'); expect(seen).toContain('<span id="deep">Deep</span>'); expect(seen).not.toContain('x'.repeat(200));
 });
+
+test('usage from done events is summed across the repair turn', async () => {
+  const { api } = fakeApi(); let turn = 0;
+  const send = (_s: string, _r: string, on: (e: SayEvent) => void) => { const first = turn++ === 0; setTimeout(() => { on({ kind: 'delta', text: first ? '{"op":"set","id":"clock","prop":"font size","value":"300px"}\n' : '{"op":"set","id":"clock","prop":"font-size","value":"300px"}\n' }); on({ kind: 'done', usage: { input: first ? 100 : 40, output: first ? 10 : 5 } }); }, 0); };
+  const r = await runSayRepairing({ api, send, frameId: 'tv', root: 'tv', request: 'bigger' });
+  expect(r.usage).toEqual({ input: 140, output: 15 });
+});

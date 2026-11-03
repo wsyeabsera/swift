@@ -51,6 +51,19 @@ pub fn parse_fonts(text: &str, counts: &mut HashMap<String, u32>) {
         if !first.is_empty() && first.len() <= 40 && !first.starts_with("var(") && !first.starts_with('-') && !["inherit", "initial"].contains(&first) { *counts.entry(first.to_string()).or_insert(0) += 1; }
     }
 }
+
+fn is_hex(s: &str) -> bool { matches!(s.len(), 3 | 4 | 6 | 8) && s.bytes().all(|b| b.is_ascii_hexdigit()) }
+fn token_name(raw: &str, prefix: &str) -> Option<String> { let n: String = raw.trim_matches(['\'', '"', ' ']).chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect(); let n = n.trim_matches('-').to_string(); (!n.is_empty() && n.len() <= 30).then(|| format!("--{prefix}{n}")) }
+/// Colours named in JS/TS theme files (Tailwind `colors: { brand: '#0a84ff' }`, token objects) and Kotlin/Compose `val Brand = Color(0xFF0A84FF)`. Names become `--tw-<name>` / `--kt-<name>`; values are #rrggbb.
+pub fn parse_named_colors(text: &str, file: &str, out: &mut Vec<Token>) {
+    let kotlin = file.ends_with(".kt");
+    for line in text.lines() { let l = line.trim();
+        if kotlin { if let Some(rest) = l.strip_prefix("val ").or_else(|| l.strip_prefix("private val ")) { if let (Some(eq), Some(c)) = (rest.find('='), rest.find("Color(0x")) { let name = rest[..eq].trim().split(':').next().unwrap_or("").trim(); let hex: String = rest[c + 8..].chars().take_while(|ch| ch.is_ascii_hexdigit()).collect();
+                if (hex.len() == 6 || hex.len() == 8) && !name.is_empty() { if let Some(n) = token_name(name, "kt-") { out.push(Token { name: n, value: format!("#{}", hex[hex.len() - 6..].to_ascii_lowercase()), file: file.to_string() }); } } } } continue; }
+        // `name: '#hex'` pairs, several per line allowed
+        let b = l.as_bytes(); let mut i = 0; while i < b.len() { if b[i] == b'#' { let mut j = i + 1; while j < b.len() && b[j].is_ascii_hexdigit() { j += 1; } let hex = &l[i + 1..j];
+                if is_hex(hex) && i >= 2 && matches!(b[i - 1], b'\'' | b'"') { let before = l[..i - 1].trim_end(); if let Some(before) = before.strip_suffix(':') { let key = before.trim_end().rsplit(|c: char| c == ',' || c == '{' || c == ' ').next().unwrap_or(""); if let Some(n) = token_name(key, "tw-") { out.push(Token { name: n, value: format!("#{}", if hex.len() <= 4 { hex.chars().take(3).flat_map(|c| [c, c]).collect::<String>() } else { hex[..6].to_string() }.to_ascii_lowercase()), file: file.to_string() }); } } } i = j; } else { i += 1; } } }
+}
 fn top(m: HashMap<String, u32>, n: usize) -> Vec<Count> { let mut v: Vec<_> = m.into_iter().map(|(value, count)| Count { value, count }).collect(); v.sort_by(|a, b| b.count.cmp(&a.count).then(a.value.cmp(&b.value))); v.truncate(n); v }
 pub fn scan_dir(root: &Path) -> io::Result<Scan> {
     let (mut tokens, mut colors, mut fonts, mut files) = (Vec::new(), HashMap::new(), HashMap::new(), 0usize);
@@ -62,10 +75,11 @@ pub fn scan_dir(root: &Path) -> io::Result<Scan> {
             let name = e.file_name().to_string_lossy().into_owned();
             if ft.is_dir() { if depth < MAX_DEPTH && !SKIP_DIRS.contains(&name.as_str()) && !name.starts_with('.') { stack.push((e.path(), depth + 1)); } continue; }
             let path = e.path(); let ext = path.extension().and_then(|x| x.to_str()).unwrap_or("").to_ascii_lowercase();
-            if !EXTS.contains(&ext.as_str()) || files >= MAX_FILES { continue; }
+            let fname = name.to_ascii_lowercase(); let theme_file = fname.starts_with("tailwind.config") || ext == "kt" /* only files whose colour pairs are known to be a palette: arbitrary theme.ts objects give junk names */;
+            if !(EXTS.contains(&ext.as_str()) || theme_file) || files >= MAX_FILES { continue; }
             if e.metadata().map(|m| m.len() > MAX_FILE_BYTES).unwrap_or(true) { continue; }
             let Ok(text) = fs::read_to_string(&path) else { continue }; files += 1; let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().into_owned();
-            parse_tokens(&text, &rel, &mut tokens); parse_colors(&text, &mut colors); parse_fonts(&text, &mut fonts);
+            if theme_file { parse_named_colors(&text, &rel, &mut tokens); } if EXTS.contains(&ext.as_str()) { parse_tokens(&text, &rel, &mut tokens); parse_colors(&text, &mut colors); parse_fonts(&text, &mut fonts); }
         }
     }
     let mut seen = std::collections::HashSet::new(); tokens.retain(|t| seen.insert(t.name.clone())); tokens.truncate(200);
@@ -74,6 +88,10 @@ pub fn scan_dir(root: &Path) -> io::Result<Scan> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn named_colours_from_tailwind_and_compose_files() {
+        let mut o = vec![]; parse_named_colors("module.exports = { theme: { extend: { colors: { brand: '#0A84FF', 'surface-2': \"#1c1c24\", short: '#fa0' }, spacing: { sm: '4px' } } } }\n  ink: '#101010',", "tailwind.config.js", &mut o);
+        let got: Vec<(String, String)> = o.iter().map(|t| (t.name.clone(), t.value.clone())).collect(); assert!(got.contains(&("--tw-brand".into(), "#0a84ff".into())), "{got:?}"); assert!(got.contains(&("--tw-surface-2".into(), "#1c1c24".into()))); assert!(got.contains(&("--tw-short".into(), "#ffaa00".into()))); assert!(got.contains(&("--tw-ink".into(), "#101010".into()))); assert_eq!(got.len(), 4, "{got:?}");
+        let mut k = vec![]; parse_named_colors("val BrandBlue = Color(0xFF0A84FF)\nprivate val Surface: Color = Color(0xFF1C1C24)\nval NotAColor = 12", "ui/Color.kt", &mut k); assert_eq!(k.iter().map(|t| (t.name.as_str(), t.value.as_str())).collect::<Vec<_>>(), vec![("--kt-brandblue", "#0a84ff"), ("--kt-surface", "#1c1c24")]); }
     #[test] fn tokens_are_declarations_not_uses() { let mut o = vec![]; parse_tokens(":root{--ink:#0b0b0f; --blue : #0a84ff !important;}\n.a{color:var(--ink);margin:-- 1px}\n  --font-ui: Inter, sans-serif\n", "a.css", &mut o); assert_eq!(o.iter().map(|t| (t.name.as_str(), t.value.as_str())).collect::<Vec<_>>(), vec![("--ink", "#0b0b0f"), ("--blue", "#0a84ff"), ("--font-ui", "Inter, sans-serif")]); }
     #[test] fn colors_normalise_and_ignore_non_colors() { let mut c = HashMap::new(); parse_colors("#FFF #ffffff #0A84FF #0a84ff #12345 #abcdefg a#fff1 #1c1c24", &mut c); assert_eq!(c["#ffffff"], 2); assert_eq!(c["#0a84ff"], 2); assert_eq!(c["#1c1c24"], 1); assert!(!c.contains_key("#12345") && !c.contains_key("#abcdef")); }
     #[test] fn fonts_take_the_first_family() { let mut f = HashMap::new(); parse_fonts("body{font-family: 'Inter', system-ui; } p{font-family:Inter,sans-serif} <div style=\"font-family: Barlow, sans\"> x{font-family:var(--f)} y{font-family: inherit}", &mut f); assert_eq!(f["Inter"], 2); assert_eq!(f["Barlow"], 1); assert!(!f.contains_key("var(--f)") && !f.contains_key("inherit")); }

@@ -1,0 +1,18 @@
+// Manual check: Frame ▾ → Pulse → Review skills against the REAL local Claude Code through the helper (one Haiku Say; uses a little subscription), with seeded slow + undone telemetry. node e2e/real-refine-ui.mjs
+import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path';
+const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const request = process.argv[2] ?? 'make the clock bigger'; const procs = [];
+const waitHttp = async (url) => { for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('timeout'); };
+try {
+  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' })); await waitHttp('http://localhost:5173/');
+  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...process.env, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-real-')) }, stdio: 'ignore' })); await new Promise(r => setTimeout(r, 800));
+  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto('http://localhost:5173/');
+  await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]').textContent), null, { timeout: 10000 }); await p.waitForTimeout(500);
+  const recs = []; let id = 0; for (const ms of [9000, 11000, 12500, 9500, 14000, 10000]) recs.push({ id: ++id, at: 1, tier: 'claude', skill: 'say', model: 'claude-code', ms, ok: true, undone: id <= 3 });
+  await p.evaluate(([r, auto]) => { localStorage.setItem('swift-canvas.telemetry.v1', JSON.stringify(r)); localStorage.removeItem('swift-canvas.refine.last'); if (auto) localStorage.setItem('swift-canvas.refine.auto', '1'); else localStorage.removeItem('swift-canvas.refine.auto'); }, [recs, process.env.AUTO === '1']); await p.reload(); await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]').textContent), null, { timeout: 10000 }); await p.waitForTimeout(500);
+  await p.getByTestId('frame-menu').click(); const rows = await p.$$eval('[data-testid=pulse-row]', (e) => e.map((x) => x.textContent)); const flagsShown = await p.$$eval('[data-testid=pulse-flag]', (e) => e.map((x) => x.textContent.trim()));
+  if (process.env.AUTO === '1' || process.env.AUTO === '0') { // no click: with the toggle ON it runs by itself, OFF it must not
+    await p.waitForTimeout(process.env.AUTO === '1' ? 30000 : 8000).catch(() => {}); const note = (await p.textContent('[data-testid=refine-note]').catch(() => null))?.trim() ?? ''; console.log(JSON.stringify({ auto: process.env.AUTO, toggleChecked: await p.isChecked('[data-testid=refine-auto]'), note, lastRunStored: await p.evaluate(() => localStorage.getItem('swift-canvas.refine.last') !== null) })); await b.close(); process.exit(0); }
+  const t0 = Date.now(); await p.getByTestId('refine').click(); await p.waitForFunction(() => /proposal|failed/.test(document.querySelector('[data-testid=refine-note]')?.textContent ?? ''), null, { timeout: 90000 });
+  const props = await p.$$eval('[data-testid=proposal]', (e) => e.map((x) => x.textContent.slice(0, 140))); console.log(JSON.stringify({ rows, flagsShown, note: (await p.textContent('[data-testid=refine-note]')).trim(), proposals: props, wallMs: Date.now() - t0 }, null, 1));
+  await p.evaluate(() => window.__swift.fitAll()); await p.screenshot({ path: `${root}/e2e/shot-real-refine-ui.png` }); await b.close();
+} finally { procs.forEach((x) => x.kill()); process.exit(0); }

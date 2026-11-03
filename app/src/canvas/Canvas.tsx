@@ -13,6 +13,7 @@ export type CanvasApi = {
   hit: (frameId: string, x: number, y: number) => Promise<string | null | undefined>;
   snapshot: (frameId: string) => Promise<string>;
   outer: (frameId: string, el: string) => Promise<string>;
+  styled: (frameId: string, el: string, tokens: Record<string, string>) => Promise<string>;
   load: (frameId: string, html: string) => Promise<boolean>;
   text: (frameId: string, el: string, value: string) => Promise<boolean>;
   add: (frameId: string, parent: string, html: string) => Promise<boolean>;
@@ -28,7 +29,7 @@ const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].
 /** Infinite canvas: one transformed world layer, one sandboxed iframe per frame, offscreen frames frozen (display:none, spike #1706).
  *  The viewport lives in a ref and is applied to the DOM directly: panning and zooming never re-render React; React re-renders only when
  *  the set of visible frames changes or the selection changes. Selection is found by hit-testing through the frame bridge. */
-export function Canvas({ frames, selection, onSelect, revision, onReady, onRename, painting, onMove, onResize }: { painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; onSelect: (s: Sel | null) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
+export function Canvas({ frames, selection, extras = [], onSelect, revision, onReady, onRename, painting, onMove, onResize }: { painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; extras?: string[]; onSelect: (s: Sel | null, additive?: boolean) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
   const [editing, setEditing] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null); const worldRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View>({ x: 0, y: 0, s: 1 }); const iframes = useRef(new Map<string, HTMLIFrameElement>());
@@ -60,9 +61,9 @@ export function Canvas({ frames, selection, onSelect, revision, onReady, onRenam
       const r = rect(); const w = screenToWorld(viewRef.current, e.clientX - r.left, e.clientY - r.top);
       for (const f of [...frames].reverse()) {
         if (!visRef.current.has(f.id) || w.x < f.x || w.y < f.y || w.x > f.x + f.w || w.y > f.y + f.h) continue;
-        const reply = await bridges.get(f.id)?.request({ t: 'hit', x: w.x - f.x, y: w.y - f.y }); onSelectRef.current(reply?.ok && reply.id ? { frameId: f.id, el: reply.id } : null); return;
+        const reply = await bridges.get(f.id)?.request({ t: 'hit', x: w.x - f.x, y: w.y - f.y }); onSelectRef.current(reply?.ok && reply.id ? { frameId: f.id, el: reply.id } : null, e.shiftKey); return; // shift-click adds to / removes from the selection
       }
-      onSelectRef.current(null);
+      if (!e.shiftKey) onSelectRef.current(null);
     };
     const onMessage = (e: MessageEvent) => bridges.forEach((b) => b.handle(e)); const onResize = () => sync();
     host.addEventListener('wheel', onWheel, { passive: false }); host.addEventListener('pointerdown', down); host.addEventListener('pointermove', move); host.addEventListener('pointerup', up); host.addEventListener('pointercancel', up);
@@ -78,6 +79,7 @@ export function Canvas({ frames, selection, onSelect, revision, onReady, onRenam
       tree: async (id) => (await bridge(id)?.request({ t: 'tree' }))?.tree ?? [],
       hit: async (id, x, y) => (await bridge(id)?.request({ t: 'hit', x, y }))?.id,
       outer: async (id, el) => (await bridge(id)?.request({ t: 'outer', el }))?.html ?? '',
+      styled: async (id, el, tokens) => (await bridge(id)?.request({ t: 'styled', el, tokens }))?.html ?? '',
       snapshot: async (id) => (await bridge(id)?.request({ t: 'snapshot' }))?.html ?? '',
       load: async (id, html) => !!(await bridge(id)?.request({ t: 'load', html }))?.ok,
       text: async (id, el, value) => !!(await bridge(id)?.request({ t: 'text', el, value }))?.ok,
@@ -93,6 +95,10 @@ export function Canvas({ frames, selection, onSelect, revision, onReady, onRenam
     void bridges.get(selection.frameId)?.request({ t: 'rect', el: selection.el }).then((r) => { if (alive && r.ok && r.rect) setSelRect(r.rect); });
     return () => { alive = false; };
   }, [selection, revision, bridges]);
+  const [xRects, setXRects] = useState<{ x: number; y: number; w: number; h: number }[]>([]); const extrasKey = extras.join(',');
+  useEffect(() => { let alive = true; setXRects([]); if (!selection || extras.length === 0) return; const b = bridges.get(selection.frameId);
+    void Promise.all(extras.map((el) => b?.request({ t: 'rect', el }))).then((rs) => { if (alive) setXRects(rs.flatMap((r) => (r?.ok && r.rect ? [r.rect] : []))); }); return () => { alive = false; };
+  }, [selection, extrasKey, revision, bridges]);
   const selFrame0 = selection ? frames.find((f) => f.id === selection.frameId) : undefined; selBoxRef.current = selFrame0 && selRect ? { x: selFrame0.x + selRect.x, y: selFrame0.y + selRect.y, w: selRect.w, h: selRect.h } : null;
   const selFrame = selection ? frames.find((f) => f.id === selection.frameId) : undefined;
   return (
@@ -108,6 +114,7 @@ export function Canvas({ frames, selection, onSelect, revision, onReady, onRenam
           </div>
         ))}
         {selFrame && selRect && onResize && selection?.el !== selFrame.root && <div className="sel-h" data-testid="resize-handle" style={{ left: selFrame.x + selRect.x + selRect.w, top: selFrame.y + selRect.y + selRect.h }} />}
+        {selFrame && xRects.map((r, i) => <div key={i} className="sel sel-x" data-testid="sel-extra" style={{ left: selFrame.x + r.x, top: selFrame.y + r.y, width: r.w, height: r.h }} />)}
         {selFrame && selRect && <div className="sel" data-testid="sel" style={{ left: selFrame.x + selRect.x, top: selFrame.y + selRect.y, width: selRect.w, height: selRect.h }} />}
       </div>
     </div>

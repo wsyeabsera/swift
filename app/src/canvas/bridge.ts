@@ -10,6 +10,7 @@ export type BridgeRequest =
   | { t: 'hit'; rid: number; x: number; y: number }
   | { t: 'snapshot'; rid: number }
   | { t: 'outer'; rid: number; el: string }
+  | { t: 'styled'; rid: number; el: string; tokens: Record<string, string> }
   | { t: 'text'; rid: number; el: string; value: string }
   | { t: 'add'; rid: number; el: string; html: string }
   | { t: 'remove'; rid: number; el: string }

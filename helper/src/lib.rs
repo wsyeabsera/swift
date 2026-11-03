@@ -4,9 +4,13 @@
 pub mod mem;
 pub mod say;
 pub mod scan;
+pub mod capture;
+pub mod status;
 pub mod store;
+pub mod mcp;
 use say::Pool;
-use std::{io, net::TcpListener, process::Command, sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc}, thread, time::Duration};
+use status::Shared;
+use std::{io, net::TcpListener, sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc}, thread, time::Duration};
 use tungstenite::{accept_hdr, handshake::server::{ErrorResponse, Request, Response}, http, Error as WsError, Message};
 
 pub const DEFAULT_PORT: u16 = 7431;
@@ -51,40 +55,42 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// "ready (2.1.316 (Claude Code))" or "missing". Login state is added later (task: report Claude Code status).
-pub fn claude_status() -> String {
-    match Command::new("claude").arg("--version").output() { Ok(o) if o.status.success() => format!("ready ({})", String::from_utf8_lossy(&o.stdout).trim()), _ => "missing".to_string() }
-}
-
 fn forbidden() -> ErrorResponse { http::Response::builder().status(403).body(Some("forbidden".to_string())).expect("static response") }
 
 /// Accept loop: one thread per connection. Returns only on listener error.
 pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
-    let busy = Arc::new(AtomicUsize::new(0)); let pool = Arc::new(Pool::new(&cfg.claude_bin, &cfg.model)); let picked: Picked = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let busy = Arc::new(AtomicUsize::new(0)); let pool = Arc::new(Pool::new(&cfg.claude_bin, &cfg.model)); let picked: Picked = Arc::new(std::sync::Mutex::new(Vec::new())); let shared = Arc::new(Shared::new(&cfg.claude_bin)); let next_id = Arc::new(AtomicUsize::new(0));
+    let hub = Arc::new(mcp::Hub::default()); if let Err(e) = mcp::write_token_file(&cfg.data_dir, cfg.port, &cfg.token) { eprintln!("cannot write the MCP token file in {}: {e} (`swift-canvas-helper mcp` will not connect)", cfg.data_dir.display()); } // port is the configured one (tests bind port 0 and do not use MCP)
+    { let shared = shared.clone(); let every = Duration::from_millis(std::env::var("SWIFT_STATUS_POLL_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(5000)); thread::spawn(move || loop { thread::sleep(every); if shared.get().state != "ready" { shared.refresh(false); } }); } // re-check only while not ready
     { let pool = pool.clone(); thread::spawn(move || loop { thread::sleep(Duration::from_secs(10)); pool.reap(std::time::Instant::now(), say::SPARE_IDLE); }); }
     for stream in listener.incoming() {
-        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone(); let pool = pool.clone(); let picked = picked.clone();
+        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone(); let pool = pool.clone(); let picked = picked.clone(); let shared = shared.clone(); let cid = next_id.fetch_add(1, Ordering::SeqCst); let hub = hub.clone();
         thread::spawn(move || {
+            let mcp_role = std::cell::Cell::new(false);
             let check = |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
-                let origin = req.headers().get("origin").and_then(|v| v.to_str().ok()).unwrap_or("");
-                let token = query_param(req.uri().query().unwrap_or(""), "token").unwrap_or_default();
-                if origin_allowed(origin, &cfg.allowed) && token_ok(&token, &cfg.token) { Ok(resp) } else { Err(forbidden()) }
+                let origin = req.headers().get("origin").and_then(|v| v.to_str().ok());
+                let query = req.uri().query().unwrap_or(""); let token = query_param(query, "token").unwrap_or_default();
+                if !token_ok(&token, &cfg.token) { return Err(forbidden()); }
+                // the MCP subcommand is a local process, not a web page: it has NO Origin header (a browser always sends one, so no page can take this path) and holds the token from the 0600 file
+                if query_param(query, "role").as_deref() == Some("mcp") && origin.is_none() { mcp_role.set(true); return Ok(resp); }
+                if origin_allowed(origin.unwrap_or(""), &cfg.allowed) { Ok(resp) } else { Err(forbidden()) }
             };
-            let Ok(mut ws) = accept_hdr(stream, check) else { return };
-            let hello = serde_json::json!({ "type": "hello", "version": env!("CARGO_PKG_VERSION"), "claude": claude_status() });
+            let Ok(mut ws) = accept_hdr(stream, check) else { return }; let is_mcp = mcp_role.get();
+            let cs = shared.cached_or_refresh(Duration::from_secs(30)); let hello = serde_json::json!({ "type": "hello", "version": env!("CARGO_PKG_VERSION"), "claude": cs.legacy(), "claudeStatus": { "state": cs.state, "message": cs.message } });
             if ws.send(Message::text(hello.to_string())).is_err() { return; }
-            { let pool = pool.clone(); thread::spawn(move || pool.prewarm()); } // a client is here: have a spare ready for its first Say
+            if !is_mcp { let pool = pool.clone(); thread::spawn(move || pool.prewarm()); } // a client is here: have a spare ready for its first Say
             // Writes from Say worker threads go through a channel; the read loop uses a short timeout so it can flush them.
-            let (tx, rx) = mpsc::channel::<String>(); let _ = ws.get_mut().set_read_timeout(Some(Duration::from_millis(30)));
+            let (tx, rx) = mpsc::channel::<String>(); shared.subscribe(cid, tx.clone()); let _ = ws.get_mut().set_read_timeout(Some(Duration::from_millis(30)));
             loop {
                 while let Ok(m) = rx.try_recv() { if ws.send(Message::text(m)).is_err() { return; } }
                 match ws.read() {
-                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy, &pool, &picked),
+                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy, &pool, &picked, &shared, &hub, cid, is_mcp),
                     Ok(Message::Close(_)) | Err(WsError::ConnectionClosed) | Err(WsError::AlreadyClosed) => break,
                     Err(WsError::Io(e)) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => continue,
                     Err(_) => break, Ok(_) => {}
                 }
             }
+            shared.unsubscribe(cid); hub.unregister_app(cid);
         });
     }
     Ok(())
@@ -100,9 +106,20 @@ fn pick_folder(bin: &str) -> Result<String, String> {
 /// Messages from the app: ping, and say {id, system, request}. Everything is validated; unknown or malformed input is ignored, never executed.
 /// Folders the user chose in the native dialog this run: choosing one is consent to read it, so they count as allowed roots (never anything the client merely names).
 type Picked = Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>;
-fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>, picked: &Picked) {
+fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>, picked: &Picked, shared: &Arc<Shared>, hub: &Arc<mcp::Hub>, cid: usize, is_mcp: bool) {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
+    let ty = v.get("type").and_then(|t| t.as_str());
+    // MCP processes may only call MCP tools (and ping); app connections may not call them
+    if is_mcp && !matches!(ty, Some("mcp.call" | "ping")) { return; }
+    if !is_mcp && ty == Some("mcp.call") { return; }
     match v.get("type").and_then(|t| t.as_str()) {
+        Some("mcp.register") => hub.register_app(cid, tx.clone()), // the app announces itself as the target of relayed design ops
+        Some("mcp.res") => { if let Some(id) = v.get("id").and_then(|x| x.as_str()) { hub.deliver(id, v.clone()); } }
+        Some("mcp.call") => {
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let tool = v.get("tool").and_then(|x| x.as_str()).unwrap_or("").to_string(); let args = v.get("args").cloned().unwrap_or(serde_json::Value::Null);
+            let (tx, hub) = (tx.clone(), hub.clone());
+            thread::spawn(move || { let reply = match mcp::run_tool(&hub, &tool, &args) { Ok(r) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": true, "result": r }), Err(e) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
+        }
         Some("ping") => { let _ = tx.send("{\"type\":\"pong\"}".to_string()); }
         Some("project.scan") => {
             let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let path = v.get("path").and_then(|x| x.as_str()).unwrap_or("").to_string();
@@ -115,21 +132,39 @@ fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<A
         Some(t @ ("store.put" | "store.get")) => {
             let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let project = v.get("project").and_then(|x| x.as_str()).unwrap_or("").to_string(); let data = v.get("data").and_then(|x| x.as_str()).map(str::to_string);
             let (tx, dir, kind) = (tx.clone(), cfg.data_dir.clone(), t.to_string());
-            thread::spawn(move || { let r = if kind == "store.put" { match data { Some(d) => store::put(&dir, &project, &d).map(|_| None), None => Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "no data")) } } else { store::get(&dir, &project) };
-                let reply = match r { Ok(d) => serde_json::json!({ "type": kind, "id": id, "ok": true, "data": d }), Err(e) => serde_json::json!({ "type": kind, "id": id, "ok": false, "error": e.to_string() }) }; let _ = tx.send(reply.to_string()); });
+            // inline, in arrival order: a thread per write let an older save land AFTER a newer one (the undo+redo pair of the e2e lost its last op)
+            (move || { let r = if kind == "store.put" { match data { Some(d) => store::put(&dir, &project, &d).map(|_| None), None => Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "no data")) } } else { store::get(&dir, &project) };
+                let reply = match r { Ok(d) => serde_json::json!({ "type": kind, "id": id, "ok": true, "data": d }), Err(e) => serde_json::json!({ "type": kind, "id": id, "ok": false, "error": e.to_string() }) }; let _ = tx.send(reply.to_string()); })();
+        }
+        Some("project.write") => { // the git-friendly copy inside a folder the user allowed (picked or SWIFT_PROJECT_ROOTS): <folder>/.swift-canvas/project.json
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let path = v.get("path").and_then(|x| x.as_str()).unwrap_or("").to_string(); let data = v.get("data").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let (tx, mut roots) = (tx.clone(), cfg.project_roots.clone()); roots.extend(picked.lock().map(|p| p.clone()).unwrap_or_default());
+            thread::spawn(move || { let reply = match scan::allowed_root(std::path::Path::new(&path), &roots) {
+                None => serde_json::json!({ "type": "project.write", "id": id, "ok": false, "error": "folder not allowed: pick it with Choose… first" }),
+                Some(p) => match store::put_in_repo(&p, &data) { Ok(f) => serde_json::json!({ "type": "project.write", "id": id, "ok": true, "path": f.to_string_lossy() }), Err(e) => serde_json::json!({ "type": "project.write", "id": id, "ok": false, "error": e.to_string() }) } };
+                let _ = tx.send(reply.to_string()); });
         }
         Some("project.pick") => {
             let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let (tx, bin, picked) = (tx.clone(), cfg.picker_bin.clone(), picked.clone());
             thread::spawn(move || { let reply = match pick_folder(&bin) { Ok(p) => { if let Ok(c) = std::fs::canonicalize(&p) { if let Ok(mut g) = picked.lock() { if g.len() < 50 && !g.contains(&c) { g.push(c); } } } serde_json::json!({ "type": "project.pick", "id": id, "ok": true, "path": p }) }, Err(e) => serde_json::json!({ "type": "project.pick", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
         }
+        Some("capture.url") => { // a RUNNING localhost page -> static HTML (Chrome renders it; see capture.rs). Never any other host.
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let url = v.get("url").and_then(|x| x.as_str()).unwrap_or("").to_string(); let tx = tx.clone(); let size = capture::clamp_size(v.get("w").and_then(|x| x.as_u64()), v.get("h").and_then(|x| x.as_u64()));
+            thread::spawn(move || { let reply = match capture::capture(&url, size) { Ok(html) => serde_json::json!({ "type": "capture.url", "id": id, "ok": true, "html": html }), Err(e) => serde_json::json!({ "type": "capture.url", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
+        }
+        Some("pool.status") => { let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); // for the Pulse board: how many Says run, is a warm spare parked, memory left
+            let _ = tx.send(serde_json::json!({ "type": "pool.status", "id": id, "running": busy.load(Ordering::SeqCst), "max": say::MAX_CONCURRENT, "spare": pool.has_spare(), "availableMb": mem::available_mb(), "minFreeMb": cfg.min_free_mb }).to_string()); }
+        Some("claude.status") => { let (tx, shared) = (tx.clone(), shared.clone()); thread::spawn(move || { let s = shared.refresh(true); let _ = tx.send(s.event()); }); }
         Some("prewarm") => { let pool = pool.clone(); thread::spawn(move || pool.prewarm()); }
         Some("say") => {
             let (Some(id), Some(system), Some(request)) = (v.get("id").and_then(|x| x.as_str()), v.get("system").and_then(|x| x.as_str()), v.get("request").and_then(|x| x.as_str())) else { return };
             let id = id.chars().take(64).collect::<String>(); let ev = move |kind: &str, text: &str| serde_json::json!({ "type": "say.event", "id": id, "kind": kind, "text": text }).to_string();
+            let images = match say::parse_images(v.get("images")) { Ok(i) => i, Err(e) => { let _ = tx.send(ev("error", &e)); return; } }; // a bad image is an error event, never a silent drop
             if let Err(e) = mem::check(cfg.min_free_mb, mem::available_mb()) { let _ = tx.send(ev("error", &e)); return; }
             if busy.fetch_add(1, Ordering::SeqCst) >= say::MAX_CONCURRENT { busy.fetch_sub(1, Ordering::SeqCst); let _ = tx.send(ev("error", "too many Says at once")); return; }
-            let (tx, busy, pool, system, request) = (tx.clone(), busy.clone(), pool.clone(), system.to_string(), request.to_string());
-            thread::spawn(move || { say::run_say(&pool, &system, &request, |o| { let _ = tx.send(match o { say::Out::Delta(t) => ev("delta", &t), say::Out::Done => ev("done", ""), say::Out::Error(e) => ev("error", &e) }); }); busy.fetch_sub(1, Ordering::SeqCst); pool.prewarm(); });
+            let (tx, busy, pool, system, request, shared) = (tx.clone(), busy.clone(), pool.clone(), system.to_string(), request.to_string(), shared.clone());
+            thread::spawn(move || { let mut held = true; let release = |held: &mut bool| { if *held { *held = false; busy.fetch_sub(1, Ordering::SeqCst); } }; // the slot frees when the answer is sent, not when claude finishes exiting: the app starts its next Say the moment it sees done
+                say::run_say_images(&pool, &system, &request, &images, |o| { if matches!(o, say::Out::Done(_) | say::Out::Error(_)) { release(&mut held); } let _ = tx.send(match o { say::Out::Delta(t) => ev("delta", &t), say::Out::Done(u) => { shared.say_ok(); let mut m: serde_json::Value = serde_json::from_str(&ev("done", "")).unwrap(); if let Some(u) = u { m["usage"] = u; } m.to_string() } say::Out::Error(e) => { if status::is_limit(&e) { shared.limit_reached(&e); } else { let sh = shared.clone(); thread::spawn(move || { sh.refresh(false); }); } ev("error", &e) } }); }); release(&mut held); pool.prewarm(); });
         }
         _ => {}
     }

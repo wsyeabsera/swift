@@ -43,3 +43,7 @@ image work), and re-measure when a real project exceeds ~100k nodes. `-C target-
 | `cargo test -q` | 0.09 s | 0.65 s |
 | `cargo nextest run` | 0.30 s | 0.87 s |
 For many tiny tests plain `cargo test` (one process, threads) is faster: nextest starts a process per test (~1.5 ms each) and wins only when tests are slow, flaky or need isolation and per-test timing. **Start with `cargo test`; add nextest when the suite has slow tests.** The rebuild after an edit (0.65 s) dominates, so crate granularity matters more than the runner.
+
+## Update 2026-11-03: the crate exists, native only (#1710) and MCP timing (#1712)
+`core/` is a native crate used by the helper (op validation + dry run for MCP); the renderer stays TypeScript, so the gate result above stands. `cargo test -p swift-canvas-core`: 8 unit + 5 proptest (400 cases each) + 1 generated-files drift test.
+MCP, real running app (headless Chromium, `node e2e/mcp.mjs`): a 12-op batch (11 `set` + 1 `text`) through stdio -> helper (dry run) -> app -> applied and confirmed: ~100 ms wall (app-side apply 4 ms), one app Undo restores it. Real Claude Code (Haiku, `claude -p --mcp-config`, one-line prompt "make element clock font-size 300px"): ~7.5 s wall (model time, not the tool path).

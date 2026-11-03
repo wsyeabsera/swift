@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Nightly Say/Spark eval. NOT installed automatically (it spends a little subscription each night and needs the Mac awake and plugged in).
+     Install: cp tools/com.swiftcanvas.nightly-eval.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.swiftcanvas.nightly-eval.plist
+     Remove:  launchctl unload ~/Library/LaunchAgents/com.swiftcanvas.nightly-eval.plist && rm ~/Library/LaunchAgents/com.swiftcanvas.nightly-eval.plist
+     Edit the node path (`which node`) if it differs. Exit 1 in the log = regression, 2 = broken run. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.swiftcanvas.nightly-eval</string>
+  <key>ProgramArguments</key><array><string>/Users/yab/.nvm/versions/node/v24.20.0/bin/node</string><string>e2e/nightly-eval.mjs</string></array>
+  <key>WorkingDirectory</key><string>/Users/yab/Hobby/swift-canvas</string>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>15</integer></dict>
+  <key>StandardOutPath</key><string>/tmp/nightly-eval.log</string><key>StandardErrorPath</key><string>/tmp/nightly-eval.log</string>
+</dict></plist>

@@ -1,0 +1,359 @@
+{
+  "$comment": "GENERATED from core/src/lib.rs",
+  "FlatNode": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The flat element list the app reports (`CanvasApi.tree`).",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "parent": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "tag": {
+        "default": "",
+        "type": "string"
+      },
+      "text": {
+        "default": "",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "title": "FlatNode",
+    "type": "object"
+  },
+  "Node": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One element. `style` holds CSS properties; `html` is opaque markup for nodes the helper only knows from an `add` op.",
+    "properties": {
+      "children": {
+        "default": [],
+        "items": {
+          "$ref": "#"
+        },
+        "type": "array"
+      },
+      "html": {
+        "default": null,
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "id": {
+        "type": "string"
+      },
+      "style": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "default": {},
+        "type": "object"
+      },
+      "tag": {
+        "default": "",
+        "type": "string"
+      },
+      "text": {
+        "default": "",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "title": "Node",
+    "type": "object"
+  },
+  "Op": {
+    "$defs": {
+      "Node": {
+        "description": "One element. `style` holds CSS properties; `html` is opaque markup for nodes the helper only knows from an `add` op.",
+        "properties": {
+          "children": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Node"
+            },
+            "type": "array"
+          },
+          "html": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "style": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "type": "object"
+          },
+          "tag": {
+            "default": "",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A typed op. `set`/`token`/`text`/`add`/`remove` are the external language (same as the Say ops); `insert`/`replace` exist so every op has an exact inverse.\n`value: null` (None) removes a property or token; external ops must carry a string.",
+    "oneOf": [
+      {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "op": {
+            "const": "set",
+            "type": "string"
+          },
+          "prop": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "op",
+          "id",
+          "prop"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "op": {
+            "const": "token",
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "op",
+          "name"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "op": {
+            "const": "text",
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "id",
+          "value"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "html": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "op": {
+            "const": "add",
+            "type": "string"
+          },
+          "parent": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "parent",
+          "id",
+          "html"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "op": {
+            "const": "remove",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "id"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "index": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "node": {
+            "$ref": "#/$defs/Node"
+          },
+          "op": {
+            "const": "insert",
+            "type": "string"
+          },
+          "parent": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "parent",
+          "index",
+          "node"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "node": {
+            "$ref": "#/$defs/Node"
+          },
+          "op": {
+            "const": "replace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "id",
+          "node"
+        ],
+        "type": "object"
+      }
+    ],
+    "title": "Op"
+  },
+  "OpError": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "code": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "code",
+      "message"
+    ],
+    "title": "OpError",
+    "type": "object"
+  },
+  "Tree": {
+    "$defs": {
+      "Node": {
+        "description": "One element. `style` holds CSS properties; `html` is opaque markup for nodes the helper only knows from an `add` op.",
+        "properties": {
+          "children": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Node"
+            },
+            "type": "array"
+          },
+          "html": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "style": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "type": "object"
+          },
+          "tag": {
+            "default": "",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A frame: its root element and its design tokens (CSS custom properties on the root).",
+    "properties": {
+      "root": {
+        "$ref": "#/$defs/Node"
+      },
+      "tokens": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "default": {},
+        "type": "object"
+      }
+    },
+    "required": [
+      "root"
+    ],
+    "title": "Tree",
+    "type": "object"
+  }
+}
