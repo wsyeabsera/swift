@@ -13,8 +13,8 @@ export function Layers({ frameId, selection, extras = [], onSelect, onToggleHidd
   return (
     <aside className="gl isl-panel layers" aria-label="Layers" data-testid="layers">
       <h2>Layers <span className="mono mu">{frameId}</span></h2>
-      <ul>{tree.map((n) => (
-        <li key={n.id} className="lrow"><button className={`rb row${selection?.frameId === frameId && (selection.el === n.id || extras.includes(n.id)) ? ' on' : ''}`} style={{ paddingLeft: 8 + n.depth * 14 }} onClick={(e) => onSelect({ frameId, el: n.id }, e.shiftKey)}>
+      <ul>{tree.map((n, i) => (
+        <li key={`${i}-${n.id}`} className="lrow"><button className={`rb row${selection?.frameId === frameId && (selection.el === n.id || extras.includes(n.id)) ? ' on' : ''}`} style={{ paddingLeft: 8 + n.depth * 14 }} onClick={(e) => onSelect({ frameId, el: n.id }, e.shiftKey)}>
           <span className="mono">{n.id}</span><span className="mu"> {n.text}</span></button>{onToggleHidden && <button className="rb eye" data-testid={`eye-${n.id}`} aria-label={`${n.hidden ? 'Show' : 'Hide'} ${n.id}`} aria-pressed={!!n.hidden} title={n.hidden ? 'Hidden: click to show' : 'Click to hide'} onClick={() => onToggleHidden(n.id, !n.hidden)}>{n.hidden ? '◌' : '●'}</button>}</li>))}</ul>
     </aside>
   );
