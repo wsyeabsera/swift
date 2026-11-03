@@ -5,7 +5,11 @@ export const INSPECT_PROPS = ['left', 'top', 'width', 'height', 'font-size', 'co
 /** Layers: the element tree (elements with ids) of the selected frame; clicking selects on the canvas. */
 export function Layers({ frameId, selection, extras = [], onSelect, onToggleHidden, revision }: { frameId: string; selection: Sel | null; extras?: string[]; onSelect: (s: Sel, additive?: boolean) => void; onToggleHidden?: (el: string, hidden: boolean) => void; revision: number }) {
   const [tree, setTree] = useState<TreeNode[]>([]);
-  useEffect(() => { let alive = true; void window.__swift?.tree(frameId).then((t) => { if (alive) setTree(t); }); return () => { alive = false; }; }, [frameId, revision]);
+  useEffect(() => { // the frame may not have loaded yet (a slow machine): an empty tree is retried for a few seconds instead of staying empty until the next edit
+    let alive = true; let timer: ReturnType<typeof setTimeout> | undefined; let tries = 0;
+    const load = () => { void window.__swift?.tree(frameId).then((t) => { if (!alive) return; setTree(t); if (t.length === 0 && tries++ < 40) timer = setTimeout(load, 250); }); };
+    load(); return () => { alive = false; if (timer) clearTimeout(timer); };
+  }, [frameId, revision]);
   return (
     <aside className="gl isl-panel layers" aria-label="Layers" data-testid="layers">
       <h2>Layers <span className="mono mu">{frameId}</span></h2>
