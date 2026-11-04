@@ -1,0 +1,27 @@
+---
+id: testing
+title: Testing (we are a bit obsessed)
+sidebar_position: 14
+---
+
+## The commands
+
+| Command | Tests |
+|---|---|
+| `npm run typecheck` | tsc 7 |
+| `npm test` | Vitest (unit) |
+| `npm run helper:test` | Rust, including a real WebSocket server |
+| `npm run e2e` | Real unpacked extension + web page + speed budgets |
+| `npm run e2e:contrast` | 48 glass combos |
+| `node e2e/real-say.mjs "<request>"` | One Say against **real** Claude (uses a little subscription) |
+
+## Rules we live by
+
+- **Tests must not call real Claude.** A record/replay fake plays back recorded answers. Real Claude runs only in the nightly eval (19/19 valid last time).
+- **A flake gets investigated, not retried.** One famous flake turned out to be macOS stalling process launches for 20+ seconds under heavy parallel spawning, not a bug in our code. The test wait is now generous and says why.
+- **CI on GitHub** runs typecheck, unit tests and `cargo test`, then e2e. A slow runner scales the timing budgets, but a regression still fails.
+- **Found-by-e2e is a badge of honour**: the header wrapping over the canvas, lost arrow presses on a held key, the toolbar overflowing by 35 px. Each now has a guard.
+
+:::tip Stale processes
+A killed e2e can leave a stale Vite or helper behind, and the next run silently restores *its* frames. `npm run e2e` now exits at once if port 7431 is taken.
+:::

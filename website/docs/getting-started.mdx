@@ -1,0 +1,56 @@
+---
+id: getting-started
+title: Get it running
+sidebar_position: 2
+---
+
+You need: Node, Rust, and the `claude` CLI **logged in** (that is the whole "AI setup"). No API key, ever.
+
+## The 90-second path
+
+```bash
+npm install
+npm run dev                  # the app: http://localhost:5173
+SWIFT_DEV=1 npm run helper   # the helper: 127.0.0.1:7431 (second terminal)
+```
+
+Open the page. The header should say something like `helper · claude ready`. If it does, press <kbd>⌘K</kbd> and be amazing.
+
+:::tip Why two terminals?
+The browser is not allowed to start programs, read your repos or talk to Claude Code. The helper is the friend with the keys. `SWIFT_DEV=1` tells it to trust the dev page; otherwise it is, correctly, a suspicious bouncer.
+:::
+
+## The "real app" path: the Chrome extension
+
+```bash
+npm run build                # writes the extension's app page into extension/app
+```
+
+Then in Chrome: `chrome://extensions` → **Load unpacked** → pick the `extension/` folder.
+
+The helper now has to know your extension by name tag:
+
+```bash
+SWIFT_ALLOWED_ORIGINS=chrome-extension://<your-extension-id> \
+SWIFT_HELPER_TOKEN=<some-long-secret> \
+npm run helper
+```
+
+:::warning Branded Chrome ignores `--load-extension`
+For automated tests use the Playwright-matched Chromium. Regular Chrome politely pretends it did not hear you.
+:::
+
+## What the header tells you
+
+| You see | It means |
+|---|---|
+| `claude ready` | Everything is wired. Go forth. |
+| `claude missing` | The `claude` CLI isn't installed. |
+| `logged out` | Run `claude` once and log in. |
+| `limit reached` | You used your subscription's allowance. Local edits still work! Press **Re-check** later. |
+
+The helper re-checks every 5 seconds while it is not ready, so you rarely need to press the button.
+
+## Where your stuff lives
+
+Project files are saved by the helper in `~/.swift-canvas` (override with `SWIFT_DATA_DIR`). The app also autosaves locally, so even a helper-less browser tab keeps your work.

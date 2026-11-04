@@ -1,0 +1,22 @@
+---
+id: pulse
+title: Pulse (speed telemetry)
+sidebar_position: 11
+---
+
+Speed is the product, so the product watches its own speed. **Frame ▾ → Pulse**.
+
+Every local edit, Say and Spark leaves a tiny record: tier, skill, model, milliseconds, ok or failed, and **whether you undid it**. Records live in `localStorage`, capped at 500. Nothing leaves your device.
+
+Pulse shows p50 / p95 per skill, with ⚑ flags:
+
+| Flag | Fires when |
+|---|---|
+| **slow** | p95 > 50 ms (local) or > 8 s (Claude), with n ≥ 5 |
+| **often undone** | ≥ 30% of results were undone |
+
+"Undone a lot" is a great signal. It means the skill technically worked and you still hated it.
+
+## The weekly review (opt-in)
+
+Click **Review** and Claude reads the flags and proposes prompt/skill tweaks. There's also a checkbox, "Review weekly when flagged", **off by default**: when on, it runs at most once per app load, only if 7 days have passed and something is flagged, and it **only shows proposals**, never applies them. It runs only while the app is open and uses a little subscription.

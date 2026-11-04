@@ -1,0 +1,41 @@
+---
+id: speed
+title: Speed receipts
+sidebar_position: 13
+---
+
+"Fast" without numbers is just a vibe. Here are the receipts. Re-run the spikes before trusting an old number; hardware and batteries have moods.
+
+## Budgets
+
+| What | Budget | Measured |
+|---|---|---|
+| Local (Tier-0) edit | < 16 ms | 8–9 ms |
+| Token swap (re-theme) | p95 < 16 ms | 0.4 ms |
+| Say: first visible change | ≤ 1.5 s | ~0.7–1.3 s (Haiku) |
+| Spark first paint | < 2 s | 1.6–2.3 s |
+| Pan/zoom frame gap | p95 < 34 ms | ~9–11 ms |
+| Contrast, every backdrop | ≥ 4.5:1 | 48/48 |
+
+Budgets live in `e2e/budgets.json`. Break one and the e2e fails naming it: `BUDGET FAILED: <name> measured X >= limit Y`.
+
+## The canvas
+
+- 80 frames pan/zoom at display refresh rate.
+- Memory: ~870 MB Chrome baseline + ~2.5 MB per extra frame.
+- `display:none` for offscreen frames saves 12%.
+- An 8K image frame costs ~100–150 MB and no frame time.
+
+## The model
+
+- Haiku warm session: first op 0.66–1.27 s.
+- 12 parallel Spark sessions: cold 1.5–1.8 s, warm 0.85–1.4 s, ~3 GB RAM total.
+- Local MLX Qwen3-4B router: 97% right (29/30), median 199 ms. Apple's on-device model needs macOS 26, so not on macOS 15.
+
+## Dev loop
+
+`tsc` 7 (native) checks 300 files in 0.25–0.7 s. A single Vitest file is 0.39 s. Full e2e is about 43 s.
+
+:::caution Battery lies
+Laptop on battery? p95s go sideways. The pan p95 failed on battery and passed at 10.8 ms when plugged in. Plug in before you panic.
+:::

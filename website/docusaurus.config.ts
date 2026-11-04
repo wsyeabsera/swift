@@ -2,38 +2,33 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
-// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
-
 const config: Config = {
-  title: 'My Site',
-  tagline: 'Dinosaurs are cool',
-  favicon: 'img/favicon.ico',
+  title: 'Swift Canvas',
+  tagline: 'Talk to your design. It talks back. Faster than you can say "make it pop".',
+  favicon: 'img/favicon.svg',
 
-  // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
-  future: {
-    v4: true, // Improve compatibility with the upcoming Docusaurus v4
-  },
+  future: {v4: true},
 
-  // Set the production url of your site here
-  url: 'https://your-docusaurus-site.example.com',
-  // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
-
-  // GitHub pages deployment config.
-  // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  url: 'https://wsyeabsera.github.io',
+  baseUrl: '/swift/',
+  organizationName: 'wsyeabsera',
+  projectName: 'swift',
+  trailingSlash: false,
 
   onBrokenLinks: 'throw',
-
-  // Even if you don't use internationalization, you can use this field to set
-  // useful metadata like html lang. For example, if your site is Chinese, you
-  // may want to replace "en" with "zh-Hans".
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
+  markdown: {
+    mermaid: true,
+    hooks: {onBrokenMarkdownLinks: 'throw'},
   },
+  themes: [
+    '@docusaurus/theme-mermaid',
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {hashed: true, docsRouteBasePath: '/docs', indexBlog: false, highlightSearchTermsOnTargetPage: true},
+    ],
+  ],
+
+  i18n: {defaultLocale: 'en', locales: ['en']},
 
   presets: [
     [
@@ -41,109 +36,53 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+          editUrl: 'https://github.com/wsyeabsera/swift/tree/main/website/',
         },
-        blog: {
-          showReadingTime: true,
-          feedOptions: {
-            type: ['rss', 'atom'],
-            xslt: true,
-          },
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-          // Useful options to enforce blogging best practices
-          onInlineTags: 'warn',
-          onInlineAuthors: 'warn',
-          onUntruncatedBlogPosts: 'warn',
-        },
-        theme: {
-          customCss: './src/css/custom.css',
-        },
+        blog: false,
+        theme: {customCss: './src/css/custom.css'},
       } satisfies Preset.Options,
     ],
   ],
 
   themeConfig: {
-    // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
-    colorMode: {
-      respectPrefersColorScheme: true,
-    },
+    image: 'img/social-card.svg',
+    colorMode: {defaultMode: 'dark', disableSwitch: false, respectPrefersColorScheme: true},
+    zoom: {selector: '.markdown img, .zoomable', background: {light: 'rgba(255,255,255,.92)', dark: 'rgba(10,10,20,.92)'}},
+    mermaid: {theme: {light: 'neutral', dark: 'dark'}},
     navbar: {
-      title: 'My Site',
-      logo: {
-        alt: 'My Site Logo',
-        src: 'img/logo.svg',
-      },
+      title: 'Swift Canvas',
+      logo: {alt: 'Swift Canvas', src: 'img/logo.svg'},
       items: [
-        {
-          type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
-          position: 'left',
-          label: 'Tutorial',
-        },
-        {to: '/blog', label: 'Blog', position: 'left'},
-        {
-          href: 'https://github.com/facebook/docusaurus',
-          label: 'GitHub',
-          position: 'right',
-        },
+        {type: 'docSidebar', sidebarId: 'main', position: 'left', label: 'The Guide'},
+        {to: '/docs/cheat-sheet', label: 'Cheat sheet', position: 'left'},
+        {to: '/docs/faq', label: 'FAQ', position: 'left'},
+        {href: 'https://github.com/wsyeabsera/swift', label: 'GitHub', position: 'right'},
       ],
     },
     footer: {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
+          title: 'Learn',
           items: [
-            {
-              label: 'Tutorial',
-              to: '/docs/intro',
-            },
+            {label: 'What even is this?', to: '/docs/intro'},
+            {label: 'Get it running', to: '/docs/getting-started'},
+            {label: 'Say & Spark', to: '/docs/say'},
           ],
         },
         {
-          title: 'Community',
+          title: 'Under the hood',
           items: [
-            {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-            },
-            {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
-            },
-            {
-              label: 'X',
-              href: 'https://x.com/docusaurus',
-            },
+            {label: 'How it fits together', to: '/docs/under-the-hood'},
+            {label: 'Speed receipts', to: '/docs/speed'},
+            {label: 'Roadmap', to: '/docs/roadmap'},
           ],
         },
-        {
-          title: 'More',
-          items: [
-            {
-              label: 'Blog',
-              to: '/blog',
-            },
-            {
-              label: 'GitHub',
-              href: 'https://github.com/facebook/docusaurus',
-            },
-          ],
-        },
+        {title: 'Source', items: [{label: 'GitHub', href: 'https://github.com/wsyeabsera/swift'}]},
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
+      copyright: `No pixels were harmed. Built with Docusaurus, caffeine and ${new Date().getFullYear()} opinions.`,
     },
-    prism: {
-      theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
-    },
+    prism: {theme: prismThemes.github, darkTheme: prismThemes.dracula, additionalLanguages: ['bash', 'rust', 'json']},
   } satisfies Preset.ThemeConfig,
 };
 
