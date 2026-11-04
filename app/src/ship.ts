@@ -9,6 +9,6 @@ const KEY = (project: string): string => `swift-canvas.ship.v1.${project}`;
 export function loadShip(project: string): ShipRec[] { try { const raw = localStorage.getItem(KEY(project)); return raw ? sanitizeShip(JSON.parse(raw)) : []; } catch { return []; } }
 export function saveShip(project: string, log: ShipRec[]): void { try { localStorage.setItem(KEY(project), JSON.stringify(log.slice(0, MAX_SHIP))); } catch { /* a convenience: the log is not worth an error */ } }
 /** The export targets a queue can run, in the order they run. `needs` names what must exist, so a queue skips with a reason instead of failing. */
-export const TARGETS = [{ id: 'html', label: 'HTML page (frame)' }, { id: 'react', label: 'React + Tailwind (frame)' }, { id: 'tokens', label: 'Design tokens (DTCG)' }, { id: 'project', label: 'Project file' }, { id: 'glb', label: '3D model (glb)' }, { id: 'mp4', label: 'Motion video (MP4)', needs: 'keyframes' }] as const;
+export const TARGETS = [{ id: 'artifact', label: 'Artifact page (whole project)' }, { id: 'html', label: 'HTML page (frame)' }, { id: 'react', label: 'React + Tailwind (frame)' }, { id: 'tokens', label: 'Design tokens (DTCG)' }, { id: 'project', label: 'Project file' }, { id: 'glb', label: '3D model (glb)' }, { id: 'mp4', label: 'Motion video (MP4)', needs: 'keyframes' }] as const;
 export type TargetId = (typeof TARGETS)[number]['id'];
 export const isTarget = (id: string): id is TargetId => TARGETS.some((t) => t.id === id);

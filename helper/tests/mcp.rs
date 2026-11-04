@@ -12,7 +12,7 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
     let mut be = Fake(vec![], Ok(json!({ "applied": 1 })));
     let r = talk("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"1\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"apply_ops\",\"arguments\":{\"ops\":[]}}}\n", &mut be);
     assert_eq!(r.len(), 3, "the notification gets no reply"); assert_eq!(r[0]["result"]["protocolVersion"], "2024-11-05"); assert_eq!(r[0]["id"], 1);
-    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "undo"]);
+    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "undo"]);
     assert_eq!(r[2]["result"]["content"][0]["text"], "{\"applied\":1}"); assert_eq!(be.0[0].0, "apply_ops");
 }
 #[test] fn protocol_errors_are_reported() {

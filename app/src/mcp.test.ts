@@ -38,3 +38,11 @@ describe('app MCP handler', () => {
     expect(await handleMcp(env, 'undo', {})).toEqual({ undone: true }); await expect(handleMcp(env, 'nope', {})).rejects.toThrow(/unknown tool/);
   });
 });
+describe('artifact_page', () => {
+  it('returns the project as one script-free page, is read-only, and refuses unknown frames', async () => {
+    const { env, recorded, st } = fake(); env.project = 'tvdash'; env.frames = [{ id: 'tv', root: 'tv', title: 'TV', x: 0, y: 0, w: 1920, h: 1080, html: '' }, { id: 'ph', root: 'ph', title: 'Phone', x: 0, y: 0, w: 390, h: 844, html: '<i id="ph"></i>' }];
+    const before = JSON.stringify(st); const r = (await handleMcp(env, 'artifact_page', {})) as { title: string; frames: number; bytes: number; html: string };
+    expect(r.title).toBe('tvdash'); expect(r.frames).toBe(2); expect(r.bytes).toBeGreaterThan(1000); expect(r.html.startsWith('<title>tvdash</title>')).toBe(true); expect(r.html).toContain('attachShadow'); expect((r.html.match(/role="tab"/g) ?? []).length).toBe(2); expect(recorded).toEqual([]); expect(JSON.stringify(st)).toBe(before); // nothing in the design changed
+    expect(((await handleMcp(env, 'artifact_page', { frames: ['ph'] })) as { frames: number }).frames).toBe(1); await expect(handleMcp(env, 'artifact_page', { frames: ['ghost'] })).rejects.toThrow(/unknown frame/);
+  });
+});

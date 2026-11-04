@@ -2,7 +2,7 @@
 // ONE app Undo restores it, bad ops are refused. With --real it also runs the REAL Claude Code (local login, `claude -p --mcp-config ... --strict-mcp-config`, Haiku).
 //   node e2e/mcp.mjs [--real] ["one-line prompt"]
 import { chromium } from 'playwright-core'; import { spawn, spawnSync } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path'; import net from 'node:net';
-import { TEST_URL, viteEnv, TEST } from './env.mjs';
+import { TEST_URL, viteEnv, helperEnv, TEST } from './env.mjs';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const real = process.argv.includes('--real'); const prompt = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'use the swift tools to make element clock font-size 300px';
 const helperBin = `${root}/target/debug/swift-canvas-helper`; const procs = []; const out = { real };
 const waitHttp = async (url) => { for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('timeout ' + url); };
@@ -17,7 +17,7 @@ function mcpClient() {
 }
 try {
   procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, env: viteEnv, stdio: 'ignore' })); await waitHttp(TEST_URL);
-  procs.push(spawn(helperBin, [], { env: { ...process.env, SWIFT_DEV: '1', SWIFT_DATA_DIR: dataDir }, stdio: 'ignore' })); await new Promise(r => setTimeout(r, 800));
+  procs.push(spawn(helperBin, [], { env: { ...helperEnv, SWIFT_DEV: '1', SWIFT_DATA_DIR: dataDir }, stdio: 'ignore' })); await new Promise(r => setTimeout(r, 800));
   const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto(TEST_URL);
   await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]').textContent), null, { timeout: 10000 }); await p.waitForTimeout(500);
   const state = () => p.evaluate(() => Promise.all(['font-size', 'color', 'opacity', 'letter-spacing', 'font-weight', 'line-height', 'padding', 'margin', 'text-shadow', 'width', 'border-radius'].map((k) => window.__swift.get('tv', 'clock', k))).then((a) => JSON.stringify(a)));
@@ -34,6 +34,7 @@ try {
   await undo(); out.oneUndoRestoresBatch = (await state()) === before;
   const bad = await c.call('apply_ops', { ops: [{ op: 'set', id: 'clock', prop: 'color', value: 'red' }, { op: 'add', parent: 'clock', id: 'x1', html: '<img src=x onerror=alert(1)>' }] }); out.badOpRefused = bad.isError && /bad_html/.test(bad.text) && (await state()) === before;
   const unk = await c.call('apply_ops', { ops: [{ op: 'set', id: 'nope', prop: 'color', value: 'red' }] }); out.unknownIdRefused = unk.isError && /unknown_id/.test(unk.text);
+  const art = await c.call('artifact_page', {}); out.artifactPage = { ok: !art.isError, hasTabs: /role="tab"/.test(art.text) || /role=\\"tab\\"/.test(art.text), sandboxed: /attachShadow/.test(art.text) && !/<iframe/.test(art.text), size: art.text.length, designUnchanged: (await state()) === before }; const artBad = await c.call('artifact_page', { frames: ['nope'] }); out.artifactUnknownFrameRefused = artBad.isError && /unknown frame/.test(artBad.text);
   const tok = await c.call('set_token', { name: '--ac', value: '#ff0000' }); out.setToken = !tok.isError; await undo(); out.tokenUndone = (await state()) === before; c.p.kill();
   // ---- real Claude Code
   if (real) {

@@ -22,6 +22,8 @@ pub fn tools() -> Value {
           "inputSchema": { "type": "object", "required": ["ops"], "properties": { "frame": frame, "ops": { "type": "array", "minItems": 1, "maxItems": MAX_OPS, "items": { "type": "object", "required": ["op"], "properties": { "op": { "type": "string", "enum": ["set", "token", "text", "add", "remove"] }, "id": { "type": "string" }, "prop": { "type": "string" }, "name": { "type": "string" }, "value": { "type": "string" }, "parent": { "type": "string" }, "html": { "type": "string" } } } } } } },
         { "name": "set_token", "description": "Set one design token (a CSS custom property such as --ac) on a frame root. One undo step.",
           "inputSchema": { "type": "object", "required": ["name", "value"], "properties": { "frame": frame, "name": { "type": "string", "description": "e.g. --ac" }, "value": { "type": "string" } } } },
+        { "name": "artifact_page", "description": "Build the open Swift Canvas project as ONE self-contained HTML page (a tab per frame, each frame in a sandboxed script-free iframe, light and dark) and return it as `html` with `title`, `frames` and `bytes`. To publish it as a Claude artifact, write `html` to a file and pass that file to your Artifact tool (pass the project's previous artifact `url` to update it in place). Max 2 MB and 24 frames; pass `frames` (ids) to pick some. Read-only: nothing in the design changes.",
+          "inputSchema": { "type": "object", "properties": { "frames": { "type": "array", "items": { "type": "string" }, "maxItems": 24, "description": "Frame ids to include (default: all)." } } } },
         { "name": "undo", "description": "Undo the last step in the app (the same as the Undo button): an apply_ops batch is one step.",
           "inputSchema": { "type": "object", "properties": {} } }
     ])
@@ -89,6 +91,7 @@ pub fn run_tool(hub: &Hub, tool: &str, args: &Value) -> Result<Value, String> {
     match tool {
         "read_subtree" => hub.ask_app("read_subtree", args.clone(), WAIT),
         "undo" => hub.ask_app("undo", json!({}), WAIT),
+        "artifact_page" => hub.ask_app("artifact_page", json!({ "frames": args.get("frames").cloned().filter(|f| f.is_array()) }), WAIT),
         "set_token" => { let ops = json!([{ "op": "token", "name": args.get("name"), "value": args.get("value") }]); apply(hub, &with_frame(json!({ "ops": ops }))) }
         "apply_ops" => apply(hub, args),
         _ => Err(format!("unknown tool {tool}")),

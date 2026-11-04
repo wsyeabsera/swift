@@ -4,7 +4,8 @@ import type { CanvasApi, Sel } from './canvas/Canvas';
 import type { FrameDef } from './canvas/fixtures';
 import { checkLine, type Op as SayOp } from './say/ops';
 import type { Op } from './oplog';
-export type McpEnv = { api: CanvasApi | undefined; frames: FrameDef[]; selection: Sel | null; record: (op: Op) => void; undo: () => Promise<boolean>; bump: () => void };
+import { buildArtifactPage } from './publish';
+export type McpEnv = { project?: string; api: CanvasApi | undefined; frames: FrameDef[]; selection: Sel | null; record: (op: Op) => void; undo: () => Promise<boolean>; bump: () => void };
 export const MCP_MAX_OPS = 200; const MAX_NODES = 400; const MAX_HTML = 6000;
 const isStr = (v: unknown): v is string => typeof v === 'string';
 function pick(env: McpEnv, frame: unknown): FrameDef {
@@ -42,6 +43,10 @@ export async function handleMcp(env: McpEnv, tool: string, args: Record<string, 
       catch (e) { await api.load(f.id, before); throw new Error(`${e instanceof Error ? e.message : 'failed'}; the frame was restored, nothing changed`); } // all or nothing
       const after = await api.snapshot(f.id); if (after !== before) env.record({ kind: 'snap', frame: f.id, before, after }); env.bump();
       return { frame: f.id, applied: ops.length, undoSteps: after === before ? 0 : 1, ms: Math.round(performance.now() - t0) };
+    }
+    case 'artifact_page': { // the whole project (or the frames asked for) as one page; nothing in the design changes
+      const want = Array.isArray(args.frames) ? args.frames.filter(isStr) : null; const list = want ? env.frames.filter((f) => want.includes(f.id)) : env.frames; if (want && list.length !== new Set(want).size) throw new Error(`unknown frame in ${JSON.stringify(want)} (frames: ${env.frames.map((x) => x.id).join(', ')})`);
+      const pageFrames = await Promise.all(list.map(async (f) => ({ id: f.id, title: f.title, w: f.w, h: f.h, html: (await api.snapshot(f.id)) || f.html }))); const r = buildArtifactPage(env.project || 'Swift Canvas project', pageFrames); if (!r.ok) throw new Error(r.error); return { title: env.project || 'Swift Canvas project', frames: r.frames, bytes: r.bytes, html: r.html };
     }
     case 'undo': return { undone: await env.undo() };
     default: throw new Error(`unknown tool ${tool}`);
