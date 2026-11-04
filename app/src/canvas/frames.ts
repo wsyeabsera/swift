@@ -13,8 +13,12 @@ export function duplicateId(frames: FrameDef[], baseId: string): string {
 export function renameFrame(frames: FrameDef[], id: string, title: string): FrameDef[] {
   const t = title.trim().slice(0, 60); const f = frames.find((x) => x.id === id); if (!f || !t || t === f.title) return frames; return frames.map((x) => (x.id === id ? { ...x, title: t } : x));
 }
-export const PRESETS = { phone: { w: 390, h: 844, label: 'Phone 390' }, desktop: { w: 1280, h: 800, label: 'Desktop 1280' }, tv: { w: 1920, h: 1080, label: 'TV 1920' } } as const;
+export const PRESETS = { phone: { w: 390, h: 844, label: 'Phone 390' }, desktop: { w: 1280, h: 800, label: 'Desktop 1280' }, browser: { w: 1440, h: 900, label: 'Browser 1440' }, popup: { w: 360, h: 520, label: 'Popup 360' }, email: { w: 600, h: 800, label: 'Email 600' }, tv: { w: 1920, h: 1080, label: 'TV 1920' } } as const;
 export type PresetKey = keyof typeof PRESETS;
+export type Surface = 'tv' | 'phone' | 'desktop';
+const SURFACE_OF: Record<PresetKey, Surface> = { phone: 'phone', desktop: 'desktop', browser: 'desktop', popup: 'desktop', email: 'desktop', tv: 'tv' }; // a popup is narrow but pointer-driven: desktop rules, not phone
+/** Which device rules apply to a frame: its preset when its id says so (`popup-2`), else a guess from its width (captured pages, imports). */
+export function surfaceOf(f: { id: string; w: number }): Surface { const k = /^([a-z]+)-\d+$/.exec(f.id)?.[1]; if (k && k in SURFACE_OF) return SURFACE_OF[k as PresetKey]; return f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop'; }
 /** A new empty frame of a preset size, right of everything. Ids are `<preset>-<n>` (smallest free n) and double as the root element id, so Say can address it. */
 export function newFrame(frames: FrameDef[], kind: PresetKey): FrameDef {
   const p = PRESETS[kind]; const used = new Set(frames.map((f) => f.id)); let n = 1; while (used.has(`${kind}-${n}`)) n++; const id = `${kind}-${n}`;

@@ -28,7 +28,7 @@ import { pageTokens } from './canvas/capture';
 import { frameSizeFor, readScreenshot, rebuildScreenshot } from './canvas/screenshot';
 import type { CaptureOutcome } from './ImportProject';
 import type { PoolStatus } from './helper';
-import { capturedFrame, duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, type PresetKey } from './canvas/frames';
+import { capturedFrame, duplicateFrame, duplicateId, newFrame, PRESETS, renameFrame, surfaceOf, type PresetKey } from './canvas/frames';
 import { clearDoc, fitLog, loadDoc, loadLog, nextSparkN, parseDoc, parseLog, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { handleMcp, type McpEnv } from './mcp';
@@ -282,20 +282,20 @@ export function App() {
   const whatChanged = async () => { const api = window.__swift; if (!api || !cmp) return; const t0 = performance.now(); const [a, b] = await Promise.all([api.sig(cmp[0]!), api.sig(cmp[1]!)]); if (!a || !b) { setSayStatus('Could not read both frames'); return; } setChanges({ pair: `${cmp[1]} vs ${cmp[0]} · ${(performance.now() - t0).toFixed(0)} ms`, list: diffSigs(a, b) }); };
   const [findings, setFindings] = useState<(Finding & { frame: string })[]>([]); const [checkNote, setCheckNote] = useState(''); const checkedFrame = useRef('');
   const checkFrame = async () => { const f = frames.find((x) => x.id === selection?.frameId) ?? frames[0]; const api = window.__swift; if (!f || !api) return; const t0 = performance.now(); const facts = await api.audit(f.id); if (!facts) { setCheckNote('frame did not answer'); return; }
-    const found = auditFacts(facts, f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop'); checkedFrame.current = f.id; setFindings(found.map((x) => ({ ...x, frame: f.id }))); setCheckNote(`${f.title}: ${found.length} finding${found.length === 1 ? '' : 's'} · ${(performance.now() - t0).toFixed(0)} ms`); };
+    const found = auditFacts(facts, surfaceOf(f)); checkedFrame.current = f.id; setFindings(found.map((x) => ({ ...x, frame: f.id }))); setCheckNote(`${f.title}: ${found.length} finding${found.length === 1 ? '' : 's'} · ${(performance.now() - t0).toFixed(0)} ms`); };
   const [critiquing, setCritiquing] = useState(false);
   const askClaude = async () => { // the local pre-pass first (instant, free), then Claude only for what needs judgment; its findings are validated before they are shown
     const f = frames.find((x) => x.id === selection?.frameId) ?? frames[0]; const api = window.__swift; const c = conn.current; if (!f || !api || !c || critiquing) return;
     if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { setCheckNote(`Claude is not ready: ${helper.claudeStatus.message}`); return; }
-    const facts = await api.audit(f.id); if (!facts) { setCheckNote('frame did not answer'); return; } const surface = f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop'; const local = auditFacts(facts, surface); checkedFrame.current = f.id; setFindings(local.map((x) => ({ ...x, frame: f.id })));
+    const facts = await api.audit(f.id); if (!facts) { setCheckNote('frame did not answer'); return; } const surface = surfaceOf(f); const local = auditFacts(facts, surface); checkedFrame.current = f.id; setFindings(local.map((x) => ({ ...x, frame: f.id })));
     setCritiquing(true); setCheckNote(`${f.title}: ${local.length} local, asking Claude…`); let text = '', err = ''; const t0 = performance.now();
     await new Promise<void>((done) => c.say(CRITIQUE_SYSTEM, critiquePrompt(facts, surface === 'tv' ? 'TV screen' : surface === 'phone' ? 'phone screen' : 'desktop screen', local), (e) => { if (e.kind === 'delta') text += e.text; else { if (e.kind === 'error') err = e.text; done(); } }));
     setCritiquing(false); if (err && !text) { setCheckNote(`Claude failed: ${err}`); return; }
     const r = parseCritique(text, facts.nodes.map((n) => n.id)); setFindings([...local, ...r.findings].map((x) => ({ ...x, frame: f.id }))); setCheckNote(`${f.title}: ${local.length} local + ${r.findings.length} from Claude${r.rejected ? ` · ${r.rejected} rejected` : ''} · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   };
   const checkAll = async () => { const api = window.__swift; if (!api) return; const t0 = performance.now(); const all: (Finding & { frame: string })[] = []; let bad = 0;
-    for (const f of frames) { const facts = await api.audit(f.id); if (!facts) { bad++; continue; } for (const x of auditFacts(facts, f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop')) all.push({ ...x, frame: f.id }); }
-    setFindings(all); setCheckNote(`all ${frames.length} frames: ${all.length} finding${all.length === 1 ? '' : 's'}${bad ? ` · ${bad} did not answer` : ''} · ${(performance.now() - t0).toFixed(0)} ms`); };
+    for (const f of frames) { const facts = await api.audit(f.id); if (!facts) { bad++; continue; } for (const x of auditFacts(facts, surfaceOf(f))) all.push({ ...x, frame: f.id }); }
+    setFindings(all); const by: Record<string, number> = {}; for (const x of all) { const f = frames.find((q) => q.id === x.frame); if (f) by[surfaceOf(f)] = (by[surfaceOf(f)] ?? 0) + 1; } const per = Object.entries(by).map(([k, v]) => `${k} ${v}`).join(', '); setCheckNote(`all ${frames.length} frames: ${all.length} finding${all.length === 1 ? '' : 's'}${per ? ` (${per})` : ''}${bad ? ` · ${bad} did not answer` : ''} · ${(performance.now() - t0).toFixed(0)} ms`); };
   const fixFinding = async (f: Finding & { frame: string }) => { if (!f.fix) return; await edit(f.frame, f.el, f.fix.prop, f.fix.value); setFindings((l) => l.filter((x) => x !== f)); }; // an ordinary edit: undoable, same op log
   const [brandTick, setBrandTick] = useState(0); const [pool, setPool] = useState<PoolStatus | null>(null); const [cmpId, setCmpId] = useState(''); const cmpKit = useMemo(() => (cmpId ? loadBrand(undefined, cmpId) : null), [cmpId, brand, brandTick]); // Brand board: the other project's kit, read-only until a token is shared
   const shareTokenTo = useCallback((name: string) => {
