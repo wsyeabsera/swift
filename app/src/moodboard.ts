@@ -45,3 +45,12 @@ export function dominantColors(px: Uint8ClampedArray, k: number): string[] {
   for (const e of [...b.values()].sort((x, y) => y.n - x.n)) { const c = { r: Math.round(e.r / e.n), g: Math.round(e.g / e.n), b: Math.round(e.b / e.n) }; if (out.every((o) => Math.abs(o.r - c.r) + Math.abs(o.g - c.g) + Math.abs(o.b - c.b) > 48)) out.push(c); if (out.length >= Math.floor(k)) break; }
   return out.map((c) => `#${hex(c.r)}${hex(c.g)}${hex(c.b)}`);
 }
+export const TYPE_SYSTEM = 'You are a typography-aware designer. Answer in one or two short plain sentences, nothing else.';
+export const TYPE_PROMPT = 'Describe only the typography of this reference image so a designer can reproduce its feel: typeface style (serif, grotesque, mono, rounded...), weight, size contrast, letter-spacing, case. No colours, no layout, no markdown. Under 200 characters.';
+/** Claude's answer -> a note: markdown and quotes stripped, whitespace collapsed, cut at the last full sentence inside 200 chars; null when empty. */
+export function parseTypeCue(text: string): string | null {
+  const t = text.replace(/[`*_#>]/g, '').replace(/^["'“”]+|["'“”]+$/g, '').replace(/\s+/g, ' ').trim(); if (!t) return null; if (t.length <= 200) return t;
+  const cut = t.slice(0, 200); const dot = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('; ')); return (dot > 60 ? cut.slice(0, dot + 1) : cut.replace(/\s+\S*$/, '') + '…').trim();
+}
+/** Set (or replace) one reference's note; returns the same board when the ref is gone. */
+export const setNote = (board: Moodboard, id: string, note: string): Moodboard => (board.some((r) => r.id === id) ? board.map((r) => (r.id === id ? { ...r, note: note.slice(0, MAX_NOTE) } : r)) : board);

@@ -27,3 +27,11 @@ test('dominantColors: frequency order, merges near shades, ignores transparent, 
   expect(dominantColors(pixels, 3)).toEqual(['#fa0000', '#0000fa']); expect(dominantColors(pixels, 1)).toEqual(['#fa0000']);
   expect(dominantColors(new Uint8ClampedArray(0), 4)).toEqual([]); expect(dominantColors(pixels, 0)).toEqual([]); expect(dominantColors(px([255, 255, 255, 0]), 2)).toEqual([]);
 });
+import { parseTypeCue, setNote } from './moodboard';
+test('type cues: markdown and quotes stripped, long answers cut at a sentence, empty is null', () => {
+  expect(parseTypeCue('  **A grotesque sans**, `light` weight,\nwide tracking.  ')).toBe('A grotesque sans, light weight, wide tracking.'); expect(parseTypeCue('"Mono, all caps."')).toBe('Mono, all caps.'); expect(parseTypeCue('  ')).toBeNull();
+  const long = 'A high-contrast serif with sharp hairlines and tight leading. ' + 'It pairs with a neutral grotesque for captions and labels across the page and more words follow. '.repeat(3); const cue = parseTypeCue(long)!; expect(cue.length).toBeLessThanOrEqual(201); expect(cue.endsWith('.')).toBe(true); expect(parseTypeCue('x'.repeat(300))!.length).toBeLessThanOrEqual(201);
+});
+test('setNote changes one ref and leaves the rest; an unknown id changes nothing', () => {
+  const b = [{ id: 'a', name: 'a', colors: [] }, { id: 'b', name: 'b', colors: [] }]; expect(setNote(b, 'b', 'Mono')).toEqual([b[0], { ...b[1], note: 'Mono' }]); expect(setNote(b, 'zz', 'x')).toBe(b); expect(setNote(b, 'a', 'y'.repeat(999))[0]!.note!.length).toBe(300);
+});
