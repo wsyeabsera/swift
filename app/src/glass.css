@@ -65,3 +65,9 @@ button:disabled{opacity:.45;cursor:default}
 .speed .helpertxt{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kit-top{flex-wrap:nowrap}
 
 .dropcover { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; font-size: 15px; color: var(--fg, #fff); background: color-mix(in srgb, var(--ac, #0a84ff) 18%, transparent); border: 2px dashed var(--ac, #0a84ff); }
+
+/* Device chrome (canvas decoration only, never part of the design or its exports): a bezel per surface, toggled in the Frame menu */
+.world[data-chrome="1"] .fr[data-surface=phone]{border-radius:56px;box-shadow:0 0 0 14px #0b0b0f,0 0 0 15px rgba(255,255,255,.28),0 30px 70px rgba(0,0,0,.45)}.world[data-chrome="1"] .fr[data-surface=phone] iframe{border-radius:42px}
+.world[data-chrome="1"] .fr[data-surface=phone]::after{content:"";position:absolute;left:50%;top:12px;width:34%;height:32px;margin-left:-17%;border-radius:20px;background:#0b0b0f;pointer-events:none}
+.world[data-chrome="1"] .fr[data-surface=tv]{border-radius:6px;box-shadow:0 0 0 18px #0b0b0f,0 0 0 20px rgba(255,255,255,.22),0 40px 90px rgba(0,0,0,.5)}.world[data-chrome="1"] .fr[data-surface=tv] iframe{border-radius:4px}
+.world[data-chrome="1"] .fr[data-surface=desktop]{border-radius:14px;box-shadow:0 0 0 2px #2b2b33,0 0 0 3px rgba(255,255,255,.2),0 26px 70px rgba(0,0,0,.4)}.world[data-chrome="1"] .fr[data-surface=desktop] iframe{border-radius:12px}

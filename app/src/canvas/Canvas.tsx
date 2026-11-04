@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { surfaceOf } from './frames';
 import { frameDoc, FrameBridge, type TreeNode, type AuditFacts, type ElSig } from './bridge';
 import type { FrameDef } from './fixtures';
 import { fit, isVisible, panBy, screenToWorld, transformCss, zoomAt, type View } from './viewport';
@@ -32,7 +33,7 @@ const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].
 /** Infinite canvas: one transformed world layer, one sandboxed iframe per frame, offscreen frames frozen (display:none, spike #1706).
  *  The viewport lives in a ref and is applied to the DOM directly: panning and zooming never re-render React; React re-renders only when
  *  the set of visible frames changes or the selection changes. Selection is found by hit-testing through the frame bridge. */
-export function Canvas({ frames, selection, extras = [], onSelect, revision, onReady, onRename, painting, onMove, onResize }: { painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; extras?: string[]; onSelect: (s: Sel | null, additive?: boolean) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
+export function Canvas({ frames, selection, extras = [], onSelect, revision, onReady, onRename, painting, onMove, onResize, chrome }: { chrome?: boolean; painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; extras?: string[]; onSelect: (s: Sel | null, additive?: boolean) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
   const [editing, setEditing] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null); const worldRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View>({ x: 0, y: 0, s: 1 }); const iframes = useRef(new Map<string, HTMLIFrameElement>());
@@ -109,9 +110,9 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
   const selFrame = selection ? frames.find((f) => f.id === selection.frameId) : undefined;
   return (
     <div ref={hostRef} className="canvas" data-testid="canvas">
-      <div ref={worldRef} className="world">
+      <div ref={worldRef} className="world" data-chrome={chrome ? '1' : '0'}>
         {frames.map((f) => (
-          <div key={f.id} className="fr" style={{ left: f.x, top: f.y, width: f.w, height: f.h, display: visible.has(f.id) ? 'block' : 'none' }}>
+          <div key={f.id} className="fr" data-surface={surfaceOf(f)} data-testid="frame-tile" style={{ left: f.x, top: f.y, width: f.w, height: f.h, display: visible.has(f.id) ? 'block' : 'none' }}>
             <iframe ref={(el) => { if (el) iframes.current.set(f.id, el); else iframes.current.delete(f.id); }} title={f.title} sandbox="allow-scripts" {...(EXT_FRAME ? { src: EXT_FRAME, onLoad: () => { void bridges.get(f.id)?.request({ t: 'load', html: f.html }); } } : { srcDoc: frameDoc(f.html) })} width={f.w} height={f.h} style={{ border: 0, display: 'block', pointerEvents: 'none' }} />
             {painting?.has(f.id) && <div className="fr-busy" data-testid="frame-busy" aria-label="Claude is painting this take" />}
             {editing === f.id
