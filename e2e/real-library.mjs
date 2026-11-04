@@ -1,14 +1,15 @@
 // #1680 on REAL UIs: a research-radar element saved to the shared library, inserted into the auto-label project: re-themed in one step, timed.
 // node e2e/real-library.mjs   (needs ../research-radar/extension/dist and ../auto-label/web/dist built; no Claude calls)
 import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path';
+import { TEST_URL, viteEnv, helperEnv } from './env.mjs';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const hobby = path.resolve(root, '..'); const procs = []; const out = {};
 setTimeout(() => { console.error('TIMEOUT'); procs.forEach((x) => x.kill()); process.exit(2); }, 200000);
 const waitHttp = async (url) => { for (let i = 0; i < 80; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise((r) => setTimeout(r, 250)); } throw new Error(`timeout ${url}`); };
 try {
   procs.push(spawn('python3', ['-m', 'http.server', '8913', '--directory', `${hobby}/research-radar/extension/dist`], { stdio: 'ignore' })); procs.push(spawn('python3', ['-m', 'http.server', '8912', '--directory', `${hobby}/auto-label/web/dist`], { stdio: 'ignore' }));
-  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' })); await waitHttp('http://localhost:5173/'); await waitHttp('http://localhost:8913/radar.html');
-  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...process.env, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-lib-')) }, stdio: 'ignore' })); await new Promise((r) => setTimeout(r, 800));
-  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto('http://localhost:5173/');
+  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, env: viteEnv, stdio: 'ignore' })); await waitHttp(TEST_URL); await waitHttp('http://localhost:8913/radar.html');
+  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...helperEnv, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-lib-')) }, stdio: 'ignore' })); await new Promise((r) => setTimeout(r, 800));
+  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto(TEST_URL);
   const ready = async () => { await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]')?.textContent ?? ''), null, { timeout: 15000 }); await p.waitForTimeout(600); };
   const asProject = async (url, frameId) => { await p.getByTestId('project-button').click(); await p.waitForSelector('[data-testid=import]'); await p.getByTestId('capture-url').fill(url); await p.getByTestId('capture-project').click(); await p.waitForFunction((f) => window.__swift && window.__swift.frames.length === 1 && window.__swift.frames[0] === f, frameId, { timeout: 40000 }); await p.waitForTimeout(800); };
   await ready(); await asProject('http://localhost:8913/radar.html', 'page-1'); await ready(); out.radarProject = (await p.textContent('[data-testid=project-button] b'))?.trim();

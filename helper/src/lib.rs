@@ -25,7 +25,7 @@ pub struct Config { pub port: u16, pub token: String, pub allowed: Vec<String>, 
 pub fn config_from(get: impl Fn(&str) -> Option<String>, random_token: impl Fn() -> String) -> Config {
     let dev = get("SWIFT_DEV").as_deref() == Some("1");
     let mut allowed: Vec<String> = get("SWIFT_ALLOWED_ORIGINS").unwrap_or_default().split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
-    if dev { allowed.push(DEV_ORIGIN.to_string()); }
+    if dev { allowed.push(get("SWIFT_DEV_ORIGIN").filter(|o| o.starts_with("http://localhost:") || o.starts_with("http://127.0.0.1:")).unwrap_or_else(|| DEV_ORIGIN.to_string())); } // tests run their dev page on another port (SWIFT_DEV_ORIGIN); only a local http origin is accepted
     let token = get("SWIFT_HELPER_TOKEN").filter(|t| !t.is_empty()).unwrap_or_else(|| if dev { "dev-token".to_string() } else { random_token() });
     let port = get("SWIFT_HELPER_PORT").and_then(|p| p.parse().ok()).unwrap_or(DEFAULT_PORT);
     Config { port, token, allowed, claude_bin: get("SWIFT_CLAUDE_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "claude".to_string()), model: get("SWIFT_CLAUDE_MODEL").filter(|m| !m.is_empty()).unwrap_or_else(|| "haiku".to_string()), project_roots: get("SWIFT_PROJECT_ROOTS").unwrap_or_default().split(':').filter(|s| !s.is_empty()).map(std::path::PathBuf::from).collect(), min_free_mb: get("SWIFT_MIN_FREE_MB").and_then(|v| v.parse().ok()).unwrap_or(mem::DEFAULT_MIN_FREE_MB), picker_bin: get("SWIFT_PICKER_BIN").filter(|b| !b.is_empty()).unwrap_or_else(|| "osascript".to_string()), data_dir: get("SWIFT_DATA_DIR").filter(|d| !d.is_empty()).map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from(get("HOME").unwrap_or_else(|| ".".to_string())).join(".swift-canvas")) }
@@ -210,7 +210,7 @@ mod tests {
     #[test] fn query_parsing() { assert_eq!(query_param("a=1&token=a%20b+c", "token").as_deref(), Some("a b c")); assert_eq!(query_param("a=1", "token"), None); assert_eq!(query_param("token=%zz", "token").as_deref(), Some("%zz")); }
     #[test] fn config_defaults_are_closed() {
         let c = config_from(|_| None, || "rnd".into()); assert!(c.allowed.is_empty()); assert_eq!(c.token, "rnd"); assert_eq!(c.port, DEFAULT_PORT);
-        let d = config_from(|k| (k == "SWIFT_DEV").then(|| "1".to_string()), || "rnd".into()); assert_eq!(d.allowed, vec![DEV_ORIGIN.to_string()]); assert_eq!(d.token, "dev-token");
+        let d = config_from(|k| (k == "SWIFT_DEV").then(|| "1".to_string()), || "rnd".into()); assert_eq!(d.allowed, vec![DEV_ORIGIN.to_string()]); assert_eq!(d.token, "dev-token"); let t = config_from(|k| match k { "SWIFT_DEV" => Some("1".into()), "SWIFT_DEV_ORIGIN" => Some("http://localhost:5273".into()), _ => None }, || "rnd".into()); assert_eq!(t.allowed, vec!["http://localhost:5273".to_string()], "a test helper allows its own dev page"); let bad = config_from(|k| match k { "SWIFT_DEV" => Some("1".into()), "SWIFT_DEV_ORIGIN" => Some("https://evil.example".into()), _ => None }, || "rnd".into()); assert_eq!(bad.allowed, vec![DEV_ORIGIN.to_string()], "a non-local dev origin is ignored");
         let e = config_from(|k| (k == "SWIFT_ALLOWED_ORIGINS").then(|| "chrome-extension://a, chrome-extension://b".to_string()), || "rnd".into()); assert_eq!(e.allowed.len(), 2);
     }
 }

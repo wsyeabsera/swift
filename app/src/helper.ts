@@ -1,6 +1,7 @@
 // Client for the local helper: an authenticated WebSocket on 127.0.0.1. The helper checks the Origin and the token (see helper/src/lib.rs).
 import type { SayEvent, SayTransport } from './say/say';
-export const HELPER_PORT = 7431;
+/** The helper's port: 7431 for work; a test build is told another one (`VITE_HELPER_PORT`) so tests never talk to the helper in daily use. */
+export const HELPER_PORT = Number((import.meta as { env?: Record<string, string> }).env?.VITE_HELPER_PORT) || 7431;
 export type ClaudeState = 'missing' | 'logged_out' | 'ready' | 'limit_reached';
 export type ClaudeStatus = { state: ClaudeState; message: string };
 export type HelperState = { status: 'connecting' | 'connected' | 'offline'; claude?: string; version?: string; claudeStatus?: ClaudeStatus };

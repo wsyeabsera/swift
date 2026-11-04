@@ -2,10 +2,11 @@
 // ONE app Undo restores it, bad ops are refused. With --real it also runs the REAL Claude Code (local login, `claude -p --mcp-config ... --strict-mcp-config`, Haiku).
 //   node e2e/mcp.mjs [--real] ["one-line prompt"]
 import { chromium } from 'playwright-core'; import { spawn, spawnSync } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path'; import net from 'node:net';
+import { TEST_URL, viteEnv, TEST } from './env.mjs';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const real = process.argv.includes('--real'); const prompt = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'use the swift tools to make element clock font-size 300px';
 const helperBin = `${root}/target/debug/swift-canvas-helper`; const procs = []; const out = { real };
 const waitHttp = async (url) => { for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('timeout ' + url); };
-const taken = await new Promise((res) => { const s = net.connect(7431, '127.0.0.1'); s.on('connect', () => { s.destroy(); res(true); }); s.on('error', () => res(false)); }); if (taken) { console.log('port 7431 is taken (a stale helper?): kill it first'); process.exit(2); }
+const taken = await new Promise((res) => { const s = net.connect(TEST.helperPort, '127.0.0.1'); s.on('connect', () => { s.destroy(); res(true); }); s.on('error', () => res(false)); }); if (taken) { console.log('port TEST.helperPort is taken (a stale helper?): kill it first'); process.exit(2); }
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-mcp-e2e-'));
 /** A minimal MCP client: newline-delimited JSON-RPC over the child's stdio. */
 function mcpClient() {
@@ -15,9 +16,9 @@ function mcpClient() {
   return { rpc, call: async (name, args) => { const r = await rpc('tools/call', { name, arguments: args }); return { isError: !!r.result?.isError, text: r.result?.content?.[0]?.text ?? JSON.stringify(r.error), rpcError: r.error }; }, p };
 }
 try {
-  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' })); await waitHttp('http://localhost:5173/');
+  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, env: viteEnv, stdio: 'ignore' })); await waitHttp(TEST_URL);
   procs.push(spawn(helperBin, [], { env: { ...process.env, SWIFT_DEV: '1', SWIFT_DATA_DIR: dataDir }, stdio: 'ignore' })); await new Promise(r => setTimeout(r, 800));
-  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto('http://localhost:5173/');
+  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto(TEST_URL);
   await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]').textContent), null, { timeout: 10000 }); await p.waitForTimeout(500);
   const state = () => p.evaluate(() => Promise.all(['font-size', 'color', 'opacity', 'letter-spacing', 'font-weight', 'line-height', 'padding', 'margin', 'text-shadow', 'width', 'border-radius'].map((k) => window.__swift.get('tv', 'clock', k))).then((a) => JSON.stringify(a)));
   await p.evaluate(() => window.__swift.fitAll()); await p.waitForTimeout(200);

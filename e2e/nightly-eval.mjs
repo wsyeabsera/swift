@@ -1,6 +1,7 @@
 // Nightly eval of Say/Spark on the REAL local Claude Code (uses subscription; never part of `npm run e2e`).
 // node e2e/nightly-eval.mjs   (LIMIT=6 to cap requests; REPORT=path to override output). Exit 1 on regression, 2 on a broken run.
 import { chromium } from 'playwright-core'; import { spawn, execSync } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path';
+import { TEST_URL, viteEnv, helperEnv } from './env.mjs';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const reportPath = process.env.REPORT ?? `${root}/e2e/nightly-report.json`; const procs = [];
 const reqs = JSON.parse(fs.readFileSync(process.env.REQUESTS ?? `${root}/e2e/nightly-requests.json`, 'utf8')); const LIMIT = Number(process.env.LIMIT ?? reqs.length);
 const list = reqs.slice(0, LIMIT).sort((a, b) => (a.project === 'blank') - (b.project === 'blank')); // tvdash first, blank project last (switching reloads)
@@ -13,9 +14,9 @@ const diversity = (hs, base) => { if (hs.length < 2) return null; const bb = bag
   let sum = 0, n = 0; for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++) { const u = new Set([...b[i], ...b[j]]).size; const x = [...b[i]].filter((v) => b[j].has(v)).length; sum += u ? 1 - x / u : 0; n++; } return Math.round((sum / n) * 100) / 100; };
 const rows = []; let fatal = null;
 try {
-  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' })); await waitHttp('http://localhost:5173/');
-  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...process.env, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-nightly-')), SWIFT_PROJECT_ROOTS: root }, stdio: 'ignore' })); await new Promise(r => setTimeout(r, 800));
-  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto('http://localhost:5173/');
+  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, env: viteEnv, stdio: 'ignore' })); await waitHttp(TEST_URL);
+  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...helperEnv, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-nightly-')), SWIFT_PROJECT_ROOTS: root }, stdio: 'ignore' })); await new Promise(r => setTimeout(r, 800));
+  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto(TEST_URL);
   const ready = async () => { await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]')?.textContent ?? ''), null, { timeout: 15000 }); await p.getByTestId('say-input').focus(); await p.waitForTimeout(2500); };
   await ready(); let onBlank = false;
   for (const r of list) {

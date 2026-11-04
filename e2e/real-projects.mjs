@@ -1,6 +1,7 @@
 // Gate 1 / Gate 2 evidence on REAL example UIs: tvdash + research-radar + auto-label open together (the last two captured from their built apps with real Chrome).
 // node e2e/real-projects.mjs   (needs ../research-radar/extension/dist and ../auto-label/web/dist built; no Claude calls; plug in the Mac for the frame-time number)
 import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path';
+import { TEST_URL, viteEnv, helperEnv } from './env.mjs';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const hobby = path.resolve(root, '..'); const procs = []; const out = { checks: {} };
 const waitHttp = async (url) => { for (let i = 0; i < 80; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise((r) => setTimeout(r, 250)); } throw new Error(`timeout ${url}`); };
 const serve = (dir, port) => { procs.push(spawn('python3', ['-m', 'http.server', String(port), '--directory', dir], { stdio: 'ignore' })); };
@@ -8,9 +9,9 @@ const pct = (xs, q) => { const s = [...xs].sort((a, b) => a - b); return s[Math.
 setTimeout(() => { console.error('TIMEOUT'); procs.forEach((x) => x.kill()); process.exit(2); }, 240000); const log = (m) => console.error(`[${new Date().toISOString().slice(11, 19)}] ${m}`);
 try {
   serve(`${hobby}/research-radar/extension/dist`, 8913); serve(`${hobby}/auto-label/web/dist`, 8912);
-  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' })); await waitHttp('http://localhost:5173/'); await waitHttp('http://localhost:8913/radar.html');
-  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...process.env, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-real-')) }, stdio: 'ignore' })); await new Promise((r) => setTimeout(r, 800));
-  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto('http://localhost:5173/');
+  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, env: viteEnv, stdio: 'ignore' })); await waitHttp(TEST_URL); await waitHttp('http://localhost:8913/radar.html');
+  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...helperEnv, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-real-')) }, stdio: 'ignore' })); await new Promise((r) => setTimeout(r, 800));
+  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto(TEST_URL);
   await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]')?.textContent ?? ''), null, { timeout: 15000 }); await p.waitForTimeout(500);
   const capture = async (url, use = false) => { await p.getByTestId('project-button').click(); await p.waitForSelector('[data-testid=import]'); await p.getByTestId('capture-url').fill(url); await p.getByTestId('capture-go').click(); await p.waitForFunction(() => /Added|cannot|only|timed/.test(document.querySelector('[data-testid=capture-status]').textContent), null, { timeout: 40000 }); const st = (await p.textContent('[data-testid=capture-status]')).trim(); if (await p.getByTestId('capture-use').count()) { out.kitTokens = (out.kitTokens ?? []).concat(await p.getByTestId('capture-use').textContent()); if (use) { await p.getByTestId('capture-use').click(); await p.waitForTimeout(300); } } await p.keyboard.press('Escape'); await p.waitForTimeout(400); return st; };
   log('captured app ready'); out.capture = [await capture('http://localhost:8913/radar.html', true)]; log('radar'); 

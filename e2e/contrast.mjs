@@ -2,9 +2,10 @@
 // the Frame menu popover, the shortcuts sheet) plus the frame labels that sit straight on the canvas: hide the text, screenshot the surface, take the worst-case background luminance
 // (light text -> brightest 90th percentile, dark text -> darkest 10th) and check WCAG >= 4.5 for --tx and --mu. Run it after ANY theme or glass change.
 import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import path from 'node:path';
+import { TEST_URL, viteEnv } from './env.mjs';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const MIN = 4.5;
 const waitHttp = async (url) => { for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('timeout'); };
-const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' });
+const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, env: viteEnv, stdio: 'ignore' });
 // Groups of surfaces: a selector for the glass whose text we check. `open` says what has to be on screen first.
 const GROUPS = [
   { name: 'top islands', sel: '.kit-top .gl' }, { name: 'panels', sel: '[data-testid=layers], [data-testid=inspector]' }, { name: 'say + tools', sel: 'form.say, footer.tools' },
@@ -12,9 +13,9 @@ const GROUPS = [
   { name: 'frame labels (on the canvas)', sel: '[data-testid=frame-label]', labels: true },
 ];
 try {
-  await waitHttp('http://localhost:5173/');
+  await waitHttp(TEST_URL);
   const b = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true }); const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
-  await p.goto('http://localhost:5173/'); await p.waitForFunction(() => window.__theme && window.__swift); await p.waitForTimeout(600); const rows = [];
+  await p.goto(TEST_URL); await p.waitForFunction(() => window.__theme && window.__swift); await p.waitForTimeout(600); const rows = [];
   const measure = async (sel, labels) => { // [worst luminance quantile list] per rect, text hidden while the screenshot is taken
     const rects = await p.evaluate(({ sel, labels }) => { const st = document.createElement('style'); st.id = 'hide'; st.textContent = '.gl *,.fr-label{color:transparent!important;fill:transparent!important;text-shadow:none!important}'; document.head.appendChild(st);
       return [...document.querySelectorAll(sel)].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 8 && r.height > 8 && r.bottom > 0 && r.right > 0 && r.left < innerWidth && r.top < innerHeight; }).slice(0, labels ? 4 : 8).map((e) => { const r = e.getBoundingClientRect(); return { x: Math.max(0, r.x), y: Math.max(0, r.y), width: Math.min(r.width, innerWidth - Math.max(0, r.x)), height: Math.min(r.height, innerHeight - Math.max(0, r.y)) }; }); }, { sel, labels });

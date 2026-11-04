@@ -1,15 +1,16 @@
 // Error scenarios on a fake Claude Code, driving the REAL app (Vite + Rust helper + Chromium). No real Claude. node e2e/fake-errors.mjs
-// Prints one JSON line per scenario {name, pass, detail}; exits 1 if any fails (2 if port 7431 is taken). Needs: cargo build, Playwright's Chromium.
+// Prints one JSON line per scenario {name, pass, detail}; exits 1 if any fails (2 if port TEST.helperPort is taken). Needs: cargo build, Playwright's Chromium.
 import { chromium } from 'playwright-core'; import { spawn } from 'node:child_process'; import os from 'node:os'; import fs from 'node:fs'; import path from 'node:path'; import net from 'node:net';
+import { TEST_URL, viteEnv, helperEnv, TEST } from './env.mjs';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'); const procs = []; const results = [];
 const waitHttp = async (url) => { for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('timeout ' + url); };
 const inUse = (port) => new Promise((res) => { const c = net.connect(port, '127.0.0.1'); c.on('connect', () => { c.destroy(); res(true); }); c.on('error', () => res(false)); });
-if (await inUse(7431)) { console.error('port 7431 is already in use: stop the other helper first'); process.exit(2); }
+if (await inUse(TEST.helperPort)) { console.error('port TEST.helperPort is already in use: stop the other helper first'); process.exit(2); }
 const modeFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-fe-')), 'mode.json'); const setMode = (mode) => fs.writeFileSync(modeFile, JSON.stringify({ mode, n: 0 })); setMode('ok');
 try {
-  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, stdio: 'ignore' })); await waitHttp('http://localhost:5173/');
-  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...process.env, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-fe-data-')), SWIFT_CLAUDE_BIN: `${root}/e2e/fixtures/fake-claude-errors.mjs`, FAKE_MODE_FILE: modeFile }, stdio: 'ignore' })); await new Promise(r => setTimeout(r, 800));
-  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto('http://localhost:5173/');
+  procs.push(spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'vite.config.ts'], { cwd: root, env: viteEnv, stdio: 'ignore' })); await waitHttp(TEST_URL);
+  procs.push(spawn(`${root}/target/debug/swift-canvas-helper`, [], { env: { ...helperEnv, SWIFT_DEV: '1', SWIFT_DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-fe-data-')), SWIFT_CLAUDE_BIN: `${root}/e2e/fixtures/fake-claude-errors.mjs`, FAKE_MODE_FILE: modeFile }, stdio: 'ignore' })); await new Promise(r => setTimeout(r, 800));
+  const b = await chromium.launch({ headless: true }); const p = await (await b.newContext({ viewport: { width: 1280, height: 720 } })).newPage(); await p.goto(TEST_URL);
   await p.waitForFunction(() => window.__swift && /claude/.test(document.querySelector('[data-testid=helper-status]').textContent), null, { timeout: 10000 }); await p.waitForTimeout(500);
   const fs0 = () => p.evaluate(() => window.__swift.get('tv', 'clock', 'font-size')); const start = await fs0();
   const say = async (mode, text) => { setMode(mode); if (await p.getByTestId('claude-recheck').count()) { await p.getByTestId('claude-recheck').click(); await p.waitForFunction(() => !document.querySelector('[data-testid=claude-recheck]'), null, { timeout: 8000 }); } /* the previous scenario may have left 'limit reached': re-check like a user would */ await p.evaluate(() => window.__swift.fitAll()); await p.getByTestId('say-input').fill(text); await p.getByTestId('say-button').click();
