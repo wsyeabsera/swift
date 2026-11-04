@@ -10,3 +10,4 @@ e2e/shot-real-*.png
 e2e/shot-*import*.png
 e2e/*-report.json
 !docs/say-regression.json
+e2e/gate3-*.png
