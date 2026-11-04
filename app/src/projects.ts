@@ -27,3 +27,17 @@ export const baseName = (path: string): string => path.replace(/\/+$/, '').split
 export function uniqueName(list: Project[], name: string): string {
   const base = name.trim().slice(0, 56); const used = new Set(list.map((p) => p.id)); if (!used.has(slug(base))) return base; let n = 2; while (used.has(slug(`${base} ${n}`))) n++; return `${base} ${n}`;
 }
+
+/** Quick switcher ranking: the projects that match `query` (name or id), best first: exact start, then a word start, then anywhere, then letters in order; ties and the empty query go by how recently each was opened (`recent`: ids, newest first), then by name. Pure. */
+export function rankProjects(list: Project[], query: string, recent: string[]): Project[] {
+  const q = query.trim().toLowerCase(); const rec = (id: string): number => { const i = recent.indexOf(id); return i < 0 ? 1e6 : i; };
+  const score = (p: Project): number => {
+    if (!q) return 0; const n = p.name.toLowerCase(); if (n.startsWith(q)) return 1; if (n.split(/[^a-z0-9]+/).some((w) => w.startsWith(q))) return 2; if (n.includes(q) || p.id.includes(q)) return 3;
+    let i = 0; for (const ch of n) if (ch === q[i]) i++; return i === q.length ? 4 : 99;
+  };
+  return list.map((p) => ({ p, s: score(p) })).filter((x) => x.s < 99).sort((a, b) => a.s - b.s || rec(a.p.id) - rec(b.p.id) || a.p.name.localeCompare(b.p.name)).map((x) => x.p);
+}
+const RECENT_KEY = 'swift-canvas.recent-projects.v1';
+export const touchRecent = (recent: string[], id: string): string[] => [id, ...recent.filter((x) => x !== id)].slice(0, 20);
+export function loadRecent(storage: Pick<Store, 'getItem'> | undefined = safe()): string[] { try { const raw = storage?.getItem(RECENT_KEY); const a = raw ? JSON.parse(raw) : []; return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string').slice(0, 20) : []; } catch { return []; } }
+export function saveRecent(recent: string[], storage: Pick<Store, 'setItem'> | undefined = safe()): void { try { storage?.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 20))); } catch { /* a convenience: not worth an error */ } }

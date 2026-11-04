@@ -169,3 +169,12 @@ nav.lens{z-index:40} /* above the menu scrim: switching lenses works while a len
 
 /* Brand lens panel (brand kit, moodboard, crew): docked right like Pulse, the Inspector hides while it is open */
 .brandpanel{position:fixed;right:16px;top:76px;z-index:5;width:400px;max-height:calc(100vh - 180px);overflow-y:auto}
+
+/* quick project switcher (⌘P) */
+.switcher-wrap{position:fixed;inset:0;z-index:60;display:grid;justify-items:center;align-content:start;padding-top:14vh;background:rgba(0,0,0,.2)}
+.switcher{width:min(520px,calc(100vw - 32px));border-radius:24px;padding:10px;display:grid;gap:8px;animation:lgIn .3s cubic-bezier(.34,1.3,.64,1) both}
+.switcher-in{height:44px;border-radius:16px;padding:0 16px;font:15px system-ui,sans-serif;color:var(--tx);background:color-mix(in srgb,var(--tx) 7%,transparent);border:1px solid var(--bd);box-shadow:inset 0 1px 3px rgba(0,0,0,.22);outline:none}
+.switcher-in:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.switcher-list{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:min(50vh,360px);overflow-y:auto}
+.switcher-row{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;height:40px;padding:0 14px;border-radius:12px;font-size:14px}
+.switcher-row.on{background:linear-gradient(165deg,color-mix(in srgb,var(--ac) 22%,transparent),color-mix(in srgb,var(--ac) 10%,transparent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ac) 50%,transparent)}.switcher-empty{padding:10px 14px}

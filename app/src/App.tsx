@@ -19,6 +19,7 @@ import { starterFrames } from './canvas/starter';
 import { retheme } from './retheme';
 import { DEFAULT_CREW } from './crew/defaults';
 import { MotionStrip } from './MotionStrip';
+import { ProjectSwitcher } from './ProjectSwitcher';
 import { CritiquePanel } from './CritiquePanel';
 import { ShipBoard } from './ShipBoard';
 import { buildArtifactPage, isArtifactUrl, loadArtifact, saveArtifact, type ArtifactRec } from './publish';
@@ -43,7 +44,7 @@ import { connectHelper, type HelperConnection, type HelperState } from './helper
 import { handleMcp, type McpEnv } from './mcp';
 import { runSayRepairing } from './say/say';
 import { compareKits, isColorValue, kitColors, loadBrand, replaceColor, saveBrand, shareToken, toBrandTokens } from './brand';
-import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
+import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, loadRecent, saveRecent, touchRecent, type Registry } from './projects';
 import { loadScene, saveScene, type Scene3D } from './studio3d/scene';
 import { Studio3D } from './studio3d/Studio3D';
 import { altKey, count as altCount, cycle as altCycle, keepOne, saveVariant, type Alts } from './alternates';
@@ -158,6 +159,7 @@ export function App() {
   useEffect(() => { if (!playFlow) return; const k = (e: KeyboardEvent) => { if (e.key === 'Escape') { setPlayFlow(false); setSayStatus('Stopped playing'); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [playFlow]);
   const setMotion = useCallback((tl: Timeline) => { setMotionState(tl); const err = saveTimeline(project.id, tl); if (err) setSayStatus(`Motion not saved: ${err}`); }, [project.id]);
   const sparkN = useRef(nextSparkN(frames)); const [sparkStatus, setSparkStatus] = useState(''); const sparkAbort = useRef<AbortController | null>(null); const takesRunning = useRef(new Map<string, AbortController>()); const [painting, setPainting] = useState<Set<string>>(new Set()); const [sparking, setSparking] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false); const [recent] = useState<string[]>(() => loadRecent()); useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'p') { e.preventDefault(); setSwitcherOpen((o) => !o); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []); // ⌘P / Ctrl+P: the quick project switcher
   const [theme, setTheme] = useState<ThemeChoice>(() => loadTheme()); const [appearanceOpen, setAppearanceOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const pjRef = useRef<HTMLButtonElement>(null); const swatchRef = useRef<HTMLButtonElement>(null); const [shortcutsOpen, setShortcutsOpen] = useState(false); const [frameMenuOpen, setFrameMenuOpen] = useState(false); const fmRef = useRef<HTMLButtonElement>(null); const fileRef = useRef<HTMLInputElement>(null); const kbRef = useRef<HTMLButtonElement>(null);
   const { mode, vars } = useMemo(() => computeTheme(theme), [theme]);
   useEffect(() => saveTheme(theme), [theme]);
@@ -690,6 +692,7 @@ export function App() {
         <button className="rb ib ib-ac" aria-label="Spark 4 takes" title="Spark: 4 takes of the selection" disabled={sparking} onClick={() => void spark(4)} data-testid="tool-spark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
       </div>
       {lens === 'Critique' && <CritiquePanel findings={findings} note={checkNote} busy={critiquing} onRun={() => void checkFrame()} onSelect={(f) => { setSelection({ frameId: f.frame, el: f.el }); window.__swift?.fitTo([f.frame]); }} onFix={(f) => void fixFinding(f)} />}
+      {switcherOpen && <ProjectSwitcher projects={reg.list} active={project.id} recent={recent} onClose={() => setSwitcherOpen(false)} onPick={(id) => { setSwitcherOpen(false); if (id !== project.id) { saveRecent(touchRecent(recent, id)); void goTo(switchProject(reg, id)); } }} onCreate={(name) => { setSwitcherOpen(false); const next = addProject(reg, name); if (next) { saveRecent(touchRecent(recent, next.active)); void goTo(next); } else setSayStatus('Could not create that project (name needs letters or digits, or the limit of 50 is reached)'); }} />}
       {shipDone && <ShipBoard run={summarizeRun(shipLog, shipDone.since, shipDone.ms)} artifactUrl={artifact?.url} onAgain={() => { setShipDone(null); void runShip(); }} onClose={() => setShipDone(null)} />}
       {lens === 'Pulse' && (
         <aside className="gl isl-panel pulsepanel" aria-label="Pulse" data-testid="pulse-panel">

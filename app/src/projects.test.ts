@@ -18,3 +18,11 @@ test('persistence: round trip, corrupt, throwing storage', () => {
 });
 test('slug and baseName', () => { expect(slug('My App_2!')).toBe('my-app-2'); expect(baseName('/Users/yab/Hobby/hearth/')).toBe('hearth'); expect(baseName('/')).toBe(''); });
 test('uniqueName never collides with an existing project', () => { const l = addProject(addProject(fresh(), 'Radar')!, 'Radar 2')!.list; expect(uniqueName(l, 'New')).toBe('New'); expect(uniqueName(l, 'tvdash')).toBe('tvdash 2'); expect(uniqueName(l, 'Radar')).toBe('Radar 3'); });
+
+test('rankProjects: empty query is recent first; start beats word start beats substring beats letters in order; non-matches drop out', async () => {
+  const { rankProjects, touchRecent } = await import('./projects'); const list = [{ id: 'alpha', name: 'Alpha' }, { id: 'tv-dash', name: 'TV dash' }, { id: 'research-radar', name: 'Research radar' }, { id: 'auto-label', name: 'Auto label' }];
+  expect(rankProjects(list, '', ['auto-label', 'alpha']).map((p) => p.id)).toEqual(['auto-label', 'alpha', 'research-radar', 'tv-dash']);
+  expect(rankProjects(list, 'ra', []).map((p) => p.id)).toEqual(['research-radar']);
+  expect(rankProjects(list, 'dash', []).map((p) => p.id)).toEqual(['tv-dash']); expect(rankProjects(list, 'lab', []).map((p) => p.id)).toEqual(['auto-label']); expect(rankProjects(list, 'atl', []).map((p) => p.id)).toEqual(['auto-label']); expect(rankProjects(list, 'zzz', [])).toEqual([]);
+  expect(touchRecent(['a', 'b', 'c'], 'c')).toEqual(['c', 'a', 'b']); expect(touchRecent([], 'x')).toEqual(['x']);
+});
