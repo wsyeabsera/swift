@@ -20,8 +20,9 @@ import { retheme } from './retheme';
 import { DEFAULT_CREW } from './crew/defaults';
 import { MotionStrip } from './MotionStrip';
 import { CritiquePanel } from './CritiquePanel';
+import { ShipBoard } from './ShipBoard';
 import { buildArtifactPage, isArtifactUrl, loadArtifact, saveArtifact, type ArtifactRec } from './publish';
-import { isTarget, loadShip, pushShip, saveShip, TARGETS, type ShipRec, type TargetId } from './ship';
+import { isTarget, loadShip, pushShip, saveShip, summarizeRun, TARGETS, type ShipRec, type TargetId } from './ship';
 import { loadCrew, type CrewFile } from './crew/sheet';
 import { loadCrewFiles, saveCrewFiles } from './crew/store';
 import { dtcgString, fromDtcg, toDtcg } from './dtcg';
@@ -385,9 +386,10 @@ export function App() {
     try { const m = await import('./studio3d/engine'); const c = document.createElement('canvas'); c.width = 256; c.height = 256; const eng = await m.createEngine(c); try { await eng.setScene(scene3d, null); const buf = await eng.exportGlb(); const name = `${exportName(project.name).replace(/\.html$/, '')}.glb`; const url = URL.createObjectURL(new Blob([buf], { type: 'model/gltf-binary' })); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); logShip('glb', name, `${(buf.byteLength / 1024).toFixed(0)} KB, ${scene3d.objects.length} objects`); } finally { eng.dispose(); } }
     catch (e) { logShip('glb', '3D model', e instanceof Error ? e.message : 'failed', false); }
   };
+  const [shipDone, setShipDone] = useState<{ since: number; ms: number } | null>(null);
   const runShip = async (): Promise<void> => { // the selected targets one after the other, with progress; a target that cannot run is skipped with its reason, never silently
     const run: Record<TargetId, () => Promise<void> | void> = { artifact: () => exportArtifact(), html: () => exportFrame(), react: () => exportReact(true), tokens: () => exportDtcg(), project: () => exportProject(), glb: () => exportGlbHeadless(), mp4: async () => { if (!motion.tracks.length) { logShip('mp4', 'Motion video', 'skipped: no keyframes yet (Frame menu → Motion)', false); return; } await renderMotion(); } };
-    const list = TARGETS.filter((t) => shipSel.includes(t.id)); for (let i = 0; i < list.length; i++) { const t = list[i]!; setShipRun({ i: i + 1, n: list.length, label: t.label }); try { await run[t.id](); } catch (e) { logShip(t.id, t.label, e instanceof Error ? e.message : 'failed', false); } } setShipRun(null);
+    const t0 = Date.now(); const list = TARGETS.filter((t) => shipSel.includes(t.id)); for (let i = 0; i < list.length; i++) { const t = list[i]!; setShipRun({ i: i + 1, n: list.length, label: t.label }); try { await run[t.id](); } catch (e) { logShip(t.id, t.label, e instanceof Error ? e.message : 'failed', false); } } setShipRun(null); setShipDone({ since: t0, ms: Date.now() - t0 });
   };
   const [changes, setChanges] = useState<{ pair: string; list: Change[] } | null>(null);
   const whatChanged = async () => { const api = window.__swift; if (!api || !cmp) return; const t0 = performance.now(); const [a, b] = await Promise.all([api.sig(cmp[0]!), api.sig(cmp[1]!)]); if (!a || !b) { setSayStatus('Could not read both frames'); return; } setChanges({ pair: `${cmp[1]} vs ${cmp[0]} · ${(performance.now() - t0).toFixed(0)} ms`, list: diffSigs(a, b) }); };
@@ -711,6 +713,7 @@ export function App() {
         <button className="rb ib ib-ac" aria-label="Spark 4 takes" title="Spark: 4 takes of the selection" disabled={sparking} onClick={() => void spark(4)} data-testid="tool-spark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
       </div>
       {lens === 'Critique' && <CritiquePanel findings={findings} note={checkNote} busy={critiquing} onRun={() => void checkFrame()} onSelect={(f) => { setSelection({ frameId: f.frame, el: f.el }); window.__swift?.fitTo([f.frame]); }} onFix={(f) => void fixFinding(f)} />}
+      {shipDone && <ShipBoard run={summarizeRun(shipLog, shipDone.since, shipDone.ms)} artifactUrl={artifact?.url} onAgain={() => { setShipDone(null); void runShip(); }} onClose={() => setShipDone(null)} />}
       {lens === 'Motion' && <MotionStrip motion={motion} t={mt} playing={playing} onScrub={(ms) => void scrub(ms)} onPlay={() => { if (mt >= motion.duration) setMt(0); setPlaying((p) => !p); }} onRender={() => void renderMotion()} />}
       <footer className="gl isl tools" aria-label="Canvas tools">
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>

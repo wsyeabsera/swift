@@ -12,3 +12,8 @@ export function saveShip(project: string, log: ShipRec[]): void { try { localSto
 export const TARGETS = [{ id: 'artifact', label: 'Artifact page (whole project)' }, { id: 'html', label: 'HTML page (frame)' }, { id: 'react', label: 'React + Tailwind (frame)' }, { id: 'tokens', label: 'Design tokens (DTCG)' }, { id: 'project', label: 'Project file' }, { id: 'glb', label: '3D model (glb)' }, { id: 'mp4', label: 'Motion video (MP4)', needs: 'keyframes' }] as const;
 export type TargetId = (typeof TARGETS)[number]['id'];
 export const isTarget = (id: string): id is TargetId => TARGETS.some((t) => t.id === id);
+/** What one queue run produced: the log entries written since `since` (oldest first), how many worked, failed or were skipped with a reason ("skipped: ..." is not a failure), and the wall time. Pure. */
+export function summarizeRun(log: ShipRec[], since: number, ms: number): { rows: ShipRec[]; ok: number; failed: number; skipped: number; ms: number } {
+  const rows = log.filter((r) => r.at >= since).sort((a, b) => a.at - b.at); const skipped = rows.filter((r) => !r.ok && /^skipped/i.test(r.detail)).length; const ok = rows.filter((r) => r.ok).length;
+  return { rows, ok, skipped, failed: rows.length - ok - skipped, ms };
+}

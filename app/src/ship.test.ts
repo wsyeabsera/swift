@@ -4,3 +4,8 @@ const rec = (n: number): ShipRec => ({ at: n, kind: 'html', name: `f${n}.html`, 
 test('newest first, capped', () => { let l: ShipRec[] = []; for (let i = 0; i < MAX_SHIP + 5; i++) l = pushShip(l, rec(i)); expect(l).toHaveLength(MAX_SHIP); expect(l[0]!.at).toBe(MAX_SHIP + 4); });
 test('stored data is untrusted: bad rows are dropped, long text is cut', () => { const r = sanitizeShip([rec(1), { at: 'x' }, null, 5, { ...rec(2), name: 'n'.repeat(500), ok: 'yes' }, { ...rec(3), detail: 'd'.repeat(500) }]); expect(r.map((x) => x.at)).toEqual([1, 3]); expect(r[1]!.detail).toHaveLength(160); expect(sanitizeShip('nope')).toEqual([]); });
 test('targets are known ids, in run order, and every id is a target', () => { expect(TARGETS.map((t) => t.id)).toEqual(['artifact', 'html', 'react', 'tokens', 'project', 'glb', 'mp4']); expect(isTarget('glb')).toBe(true); expect(isTarget('rm -rf')).toBe(false); });
+
+test('summarizeRun keeps only entries since the run started, oldest first, and counts ok and failed', async () => {
+  const { summarizeRun } = await import('./ship'); const log = [{ at: 30, kind: 'mp4', name: 'a.mp4', detail: 'boom', ok: false }, { at: 25, kind: 'glb', name: 'b', detail: 'skipped: no scene', ok: false }, { at: 20, kind: 'html', name: 'a.html', detail: '', ok: true }, { at: 5, kind: 'old', name: 'x', detail: '', ok: true }];
+  const s = summarizeRun(log, 10, 1234); expect(s.rows.map((r) => r.kind)).toEqual(['html', 'glb', 'mp4']); expect(s.ok).toBe(1); expect(s.failed).toBe(1); expect(s.skipped).toBe(1); expect(s.ms).toBe(1234); expect(summarizeRun([], 0, 0).rows).toEqual([]);
+});
