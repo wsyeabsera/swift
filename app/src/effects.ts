@@ -26,3 +26,24 @@ export function suggest(stack: Effect[], d: Device): { stack: Effect[]; text: st
   }
   return meter(cur, d).over ? null : { stack: cur, text: `Try ${steps.join(', ')}: ${meter(cur, d).frameMs.toFixed(0)} ms per update` };
 }
+
+/** An effect layer as real frame markup: a non-interactive full-frame element carrying its settings in data attributes, so the meter can read them back from the frame itself.
+ *  Update rate is real (a stepped animation: `steps(n)` limits repaints to `fps` per second); render scale is an intent the layer is drawn for (a smaller raster scaled up) and is what the meter charges for. */
+export type FxKind = Effect['kind'];
+const LOOP_S = 12;
+const FX_STYLE: Record<FxKind, (scale: number) => string> = {
+  gradient: () => 'background:radial-gradient(60% 50% at 20% 30%,rgba(124,240,208,.55),transparent 70%),radial-gradient(50% 60% at 80% 70%,rgba(120,80,255,.5),transparent 70%),radial-gradient(40% 40% at 60% 20%,rgba(10,132,255,.45),transparent 70%)',
+  blur: () => 'backdrop-filter:blur(24px);background:rgba(255,255,255,.04)',
+  noise: () => "background-image:repeating-conic-gradient(rgba(255,255,255,.05) 0 25%,transparent 0 50%);background-size:4px 4px",
+};
+export function fxHtml(id: string, e: Effect): string {
+  const steps = Math.max(1, Math.round(LOOP_S * e.fps)); const s = Math.min(1, Math.max(0.05, e.scale));
+  return `<div id="${id}" data-fx="${e.kind}" data-fx-scale="${s}" data-fx-fps="${e.fps}" style="position:absolute;left:0;top:0;width:${(100 * s).toFixed(2)}%;height:${(100 * s).toFixed(2)}%;transform:scale(${(1 / s).toFixed(3)});transform-origin:0 0;pointer-events:none;will-change:transform;${FX_STYLE[e.kind](s)};animation:${id}-a ${LOOP_S}s steps(${steps}) infinite"><style>@keyframes ${id}-a{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}</style></div>`;
+}
+/** The effect layers in a frame's markup, in order (what the meter charges for). */
+export function parseFx(html: string): { id: string; effect: Effect }[] {
+  const out: { id: string; effect: Effect }[] = []; for (const m of html.matchAll(/<div id="([^"]+)" data-fx="(gradient|blur|noise)" data-fx-scale="([\d.]+)" data-fx-fps="(\d+)"/g)) { const scale = Number(m[3]), fps = Number(m[4]); if (scale > 0 && scale <= 1 && fps > 0 && fps <= 60) out.push({ id: m[1]!, effect: { kind: m[2] as FxKind, scale, fps } }); } return out;
+}
+/** The next free `fx-<kind>-<n>` id among the ids already in the frame. */
+export function fxId(html: string, kind: FxKind): string { let n = 1; while (html.includes(`id="fx-${kind}-${n}"`)) n++; return `fx-${kind}-${n}`; }
+export const FX_PRESETS: Record<'aurora' | 'heavy' | 'grain', Effect[]> = { aurora: AURORA, heavy: [{ kind: 'gradient', scale: 1, fps: 30 }, { kind: 'blur', scale: 0.5, fps: 30 }], grain: [{ kind: 'noise', scale: 0.5, fps: 10 }] };
