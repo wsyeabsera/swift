@@ -134,3 +134,4 @@ nav.lens{z-index:40} /* above the menu scrim: switching lenses works while a len
 .rb.seg.on{background:linear-gradient(165deg,color-mix(in srgb,var(--ac) 16%,transparent),color-mix(in srgb,var(--ac) 16%,transparent));box-shadow:inset 1px 1px 0 -.5px rgba(255,255,255,.55),0 0 0 1px color-mix(in srgb,var(--ac) 55%,transparent)}
 .fld input:not([type=color]):not([type=range]),.say input{background:color-mix(in srgb,var(--tx) 7%,transparent);box-shadow:inset 0 1px 3px rgba(0,0,0,.22),inset 0 -1px 0 rgba(255,255,255,calc(.12*var(--rim,1)));border:1px solid var(--bd)}
 .fld input:focus-visible,.rb:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.say input{border-radius:18px;padding:0 14px}.fld input:not([type=color]):not([type=range]){border-radius:9px}
