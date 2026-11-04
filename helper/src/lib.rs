@@ -8,6 +8,7 @@ pub mod capture;
 pub mod status;
 pub mod store;
 pub mod mcp;
+pub mod repo;
 use say::Pool;
 use status::Shared;
 use std::{io, net::TcpListener, sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc}, thread, time::Duration};
@@ -142,6 +143,16 @@ fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<A
             thread::spawn(move || { let reply = match scan::allowed_root(std::path::Path::new(&path), &roots) {
                 None => serde_json::json!({ "type": "project.write", "id": id, "ok": false, "error": "folder not allowed: pick it with Choose… first" }),
                 Some(p) => match store::put_in_repo(&p, &data) { Ok(f) => serde_json::json!({ "type": "project.write", "id": id, "ok": true, "path": f.to_string_lossy() }), Err(e) => serde_json::json!({ "type": "project.write", "id": id, "ok": false, "error": e.to_string() }) } };
+                let _ = tx.send(reply.to_string()); });
+        }
+        Some(kind @ ("repo.plan" | "repo.export")) => { // a branch in a folder the user allowed: plan = preview, export = commit on a NEW branch (never the current one, never over uncommitted work)
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let kind = kind.to_string(); let path = v.get("path").and_then(|x| x.as_str()).unwrap_or("").to_string(); let name = v.get("name").and_then(|x| x.as_str()).unwrap_or("export").chars().take(60).collect::<String>();
+            let files: Vec<(String, String)> = v.get("files").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|f| Some((f.get("path")?.as_str()?.to_string(), f.get("content")?.as_str()?.to_string()))).take(200).collect()).unwrap_or_default();
+            let (tx, mut roots) = (tx.clone(), cfg.project_roots.clone()); roots.extend(picked.lock().map(|p| p.clone()).unwrap_or_default());
+            thread::spawn(move || { let reply = match scan::allowed_root(std::path::Path::new(&path), &roots) {
+                None => serde_json::json!({ "type": kind, "id": id, "ok": false, "error": "folder not allowed: pick it with Choose… first" }),
+                Some(p) => if kind == "repo.plan" { match repo::plan(&p, &name, &files) { Ok(pl) => serde_json::json!({ "type": kind, "id": id, "ok": true, "branch": pl.branch, "entries": pl.entries.iter().map(|e| serde_json::json!({ "path": e.path, "status": e.status })).collect::<Vec<_>>() }), Err(e) => serde_json::json!({ "type": kind, "id": id, "ok": false, "error": e.to_string() }) } }
+                    else { match repo::export(&p, &name, &files) { Ok(b) => serde_json::json!({ "type": kind, "id": id, "ok": true, "branch": b }), Err(e) => serde_json::json!({ "type": kind, "id": id, "ok": false, "error": e.to_string() }) } } };
                 let _ = tx.send(reply.to_string()); });
         }
         Some("project.pick") => {
