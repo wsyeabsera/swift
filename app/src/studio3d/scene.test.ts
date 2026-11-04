@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { addLight, addObject, cameraPosition, DEFAULT_CAMERA, LIMITS, parseScene, removeItem, setCamera, starterScene, updateLight, updateObject } from './scene';
+import { MATERIALS, addLight, addObject, cameraPosition, DEFAULT_CAMERA, LIMITS, parseScene, removeItem, setCamera, starterScene, updateLight, updateObject } from './scene';
 test('the starter scene is valid and survives its own parser', () => { const s = starterScene(); expect(s.objects).toHaveLength(3); expect(s.lights).toHaveLength(2); expect(parseScene(JSON.parse(JSON.stringify(s)))).toEqual(s); });
 test('adding objects gives unique ids, readable names, and stops at the limit', () => {
   let s = starterScene(); const a = addObject(s, 'box'); if (!a.ok) throw new Error(a.error); expect(a.id).toBe('box-2'); expect(a.scene.objects.at(-1)!.name).toBe('Box 2'); s = a.scene; const t = addObject(s, 'torus'); expect(t.ok && t.id).toBe('torus-1');
@@ -28,4 +28,9 @@ test('parseScene keeps what is valid and drops the rest: junk objects, duplicate
 test('camera presets move only the viewpoint and stay within limits', async () => {
   const m = await import('./scene'); const base = m.starterScene();
   for (const p of Object.keys(m.CAMERA_PRESETS) as (keyof typeof m.CAMERA_PRESETS)[]) { const r = m.applyPreset(base, p); expect(r.camera.fov).toBe(base.camera.fov); expect(r.camera.target).toEqual(base.camera.target); expect(r.camera.elevation).toBeLessThanOrEqual(85); expect(r.camera.elevation).toBeGreaterThanOrEqual(-85); expect(r.camera.azimuth).toBe(m.CAMERA_PRESETS[p].azimuth); expect(r.camera.distance).toBe(m.CAMERA_PRESETS[p].distance); }
+});
+
+test('material swatches are valid patches: every one applies without error and sets exactly its values', () => {
+  const base = starterScene(); const id = base.objects[0]!.id;
+  for (const [name, m] of Object.entries(MATERIALS)) { const r = updateObject(base, id, m); expect(r.ok, name).toBe(true); if (r.ok) expect(r.scene.objects.find((o) => o.id === id)).toMatchObject(m); }
 });

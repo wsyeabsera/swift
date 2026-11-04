@@ -61,3 +61,7 @@ export function saveScene(project: string, sc: Scene3D): string | null { try { l
 export const CAMERA_PRESETS = { Hero: { azimuth: 35, elevation: 18, distance: 9 }, Front: { azimuth: 0, elevation: 0, distance: 10 }, Low: { azimuth: 20, elevation: -12, distance: 8 }, Top: { azimuth: 0, elevation: 85, distance: 12 }, Orbit: { azimuth: 135, elevation: 25, distance: 11 } } as const;
 export type CameraPreset = keyof typeof CAMERA_PRESETS;
 export const applyPreset = (sc: Scene3D, p: CameraPreset): Scene3D => setCamera(sc, CAMERA_PRESETS[p]);
+
+/** The board's material swatches: a colour plus metalness and roughness, applied through updateObject (so every value is clamped and validated there). */
+export const MATERIALS = { Obsidian: { color: '#14161c', metalness: 0.2, roughness: 0.15 }, Aluminium: { color: '#c9ced6', metalness: 1, roughness: 0.35 }, Walnut: { color: '#5b3a24', metalness: 0, roughness: 0.7 }, White: { color: '#f2f2f0', metalness: 0, roughness: 0.5 } } as const;
+export type MaterialName = keyof typeof MATERIALS;

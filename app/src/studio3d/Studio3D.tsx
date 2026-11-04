@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Engine } from './engine';
-import { addLight, addObject, applyPreset, CAMERA_PRESETS, type CameraPreset, removeItem, setCamera, SHAPES, LIGHTS, updateLight, updateObject, type Scene3D, type Vec3 } from './scene';
+import { MATERIALS, type MaterialName, addLight, addObject, applyPreset, CAMERA_PRESETS, type CameraPreset, removeItem, setCamera, SHAPES, LIGHTS, updateLight, updateObject, type Scene3D, type Vec3 } from './scene';
 /** The 3D lens: a viewport (orbit by dragging, zoom with the wheel, click to select), an outline of objects and lights, a properties panel, and export (glb, a still as an image layer in a frame, png).
  *  The scene is the document (`Scene3D`); this component only edits it and asks the engine to draw it. */
 export function Studio3D({ scene, onScene, onInsertStill, onStatus, fileName, onShip }: { onShip?: (kind: string, name: string, detail: string) => void; scene: Scene3D; onScene: (s: Scene3D) => void; onInsertStill: (dataUrl: string) => void; onStatus: (t: string) => void; fileName: string }) {
@@ -41,6 +41,7 @@ export function Studio3D({ scene, onScene, onInsertStill, onStatus, fileName, on
         {obj && <>
           <label className="fld"><span className="mu">name</span><input aria-label="name" data-testid="p-name" value={obj.name} onChange={(e) => apply(updateObject(scene, obj.id, { name: e.target.value }))} /></label>
           {vecRow('position', obj.position, (v) => apply(updateObject(scene, obj.id, { position: v })), 0.1)}{vecRow('rotation', obj.rotation, (v) => apply(updateObject(scene, obj.id, { rotation: v })), 5)}{vecRow('scale', obj.scale, (v) => apply(updateObject(scene, obj.id, { scale: v })), 0.1)}
+          <div className="projs" data-testid="materials">{(Object.keys(MATERIALS) as MaterialName[]).map((m) => (<button key={m} className="rb btn" title={`${m}: ${MATERIALS[m].color}`} onClick={() => apply(updateObject(scene, obj.id, MATERIALS[m]))} data-testid={`mat-${m}`}><span aria-hidden="true" style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 5, marginRight: 6, background: MATERIALS[m].color, border: '1px solid var(--bd)' }} />{m}</button>))}</div>
           <label className="fld"><span className="mu">colour</span><input type="color" aria-label="colour" data-testid="p-color" value={obj.color} onChange={(e) => apply(updateObject(scene, obj.id, { color: e.target.value }))} /></label>
           <label className="fld"><span className="mu">metalness</span><input type="range" min={0} max={1} step={0.05} aria-label="metalness" data-testid="p-metal" value={obj.metalness} onChange={(e) => apply(updateObject(scene, obj.id, { metalness: Number(e.target.value) }))} /></label>
           <label className="fld"><span className="mu">roughness</span><input type="range" min={0} max={1} step={0.05} aria-label="roughness" data-testid="p-rough" value={obj.roughness} onChange={(e) => apply(updateObject(scene, obj.id, { roughness: Number(e.target.value) }))} /></label>
