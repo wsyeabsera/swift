@@ -83,3 +83,8 @@ button:disabled{opacity:.45;cursor:default}
 .studio-outline{left:16px}.studio-outline ul{list-style:none;margin:0 0 8px;padding:0}.studio-outline li{display:block}.studio-outline .row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;height:30px;border-radius:10px;white-space:nowrap;overflow:hidden}.studio-outline .row.on{background:rgba(255,255,255,.16)}.studio-outline .sw{display:inline-block;width:12px;height:12px;border-radius:6px;box-shadow:0 0 0 1px rgba(255,255,255,.35)}
 .studio-props{right:16px;width:290px}.studio-props .vec{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.studio-props .fld{grid-template-columns:78px 1fr}.studio-props input[type=color]{padding:0;width:44px;cursor:pointer}.studio-props .vec input{width:100%;min-width:0;padding:0 4px}
 .studio-bar{position:fixed;left:50%;bottom:132px;transform:translateX(-50%);z-index:5;gap:8px;padding:0 14px}
+
+/* Top islands as designed (Canvas board): project + branch + chevron, and latency + tier + sparkline */
+.pj-sub{display:flex;gap:8px;align-items:baseline}.pj-branch{color:var(--ac);opacity:1}.chev{opacity:.6;font-size:16px;margin-left:-4px;pointer-events:none}
+.speed .lat{display:flex;flex-direction:column;line-height:1.15;min-width:84px}.speed .lat b{font-size:15px;font-weight:600}.speed .lat .mu{font-size:11px;white-space:nowrap}.speed .spark{color:var(--ac);opacity:.9;flex:none}
+.speed .helpertxt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap} /* still in the page for screen readers and tests; the dot, latency and tier say it visually */
