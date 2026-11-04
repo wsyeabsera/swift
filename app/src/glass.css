@@ -112,3 +112,4 @@ button:disabled{opacity:.45;cursor:default}
 /* corner islands: zoom + X-ray, branch, compare */
 .corner{position:fixed;z-index:5;display:flex;align-items:center;gap:8px;padding:0 12px;height:52px;border-radius:26px}.corner.br{right:16px;bottom:16px}.corner.bl{left:16px;bottom:16px}.corner.cmp{right:16px;bottom:84px;height:auto;padding:10px 12px;flex-wrap:wrap;max-width:340px}.corner .seg{height:34px;padding:0 12px;border-radius:17px}.corner .zoomv{min-width:54px;text-align:center}
 @media (max-width:1500px){.corner.br .xlabel{display:none}} /* on narrower windows the island shrinks to a checkbox so it never reaches the tools bar */
+nav.lens{z-index:40} /* above the menu scrim: switching lenses works while a lens menu is open */
