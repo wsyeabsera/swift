@@ -34,3 +34,9 @@ test('material swatches are valid patches: every one applies without error and s
   const base = starterScene(); const id = base.objects[0]!.id;
   for (const [name, m] of Object.entries(MATERIALS)) { const r = updateObject(base, id, m); expect(r.ok, name).toBe(true); if (r.ok) expect(r.scene.objects.find((o) => o.id === id)).toMatchObject(m); }
 });
+
+test('hidden objects and lights that are off stay in the scene and survive save and load', () => {
+  const base = starterScene(); const a = updateObject(base, 'box-1', { hidden: true }); const b = updateLight(base, 'light-2', { off: true }); expect(a.ok && b.ok).toBe(true); if (!a.ok || !b.ok) return;
+  const both = { ...a.scene, lights: b.scene.lights }; const back = parseScene(JSON.parse(JSON.stringify(both)))!; expect(back.objects.find((o) => o.id === 'box-1')?.hidden).toBe(true); expect(back.lights.find((l) => l.id === 'light-2')?.off).toBe(true);
+  expect(back.objects.length).toBe(base.objects.length); expect(starterScene().objects[0]!.hidden).toBeUndefined();
+});
