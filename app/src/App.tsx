@@ -13,6 +13,7 @@ import { moveEdits, moveStart, type MoveStart, nudge, resizedSize } from './canv
 import { firstChild, parentOf } from './canvas/tree';
 import { compareSet, diffSigs, type Change } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
+import { componentName, frameToTsx } from './canvas/exportReact';
 import type { RepoEntry, RepoFile } from './helper';
 import { starterFrames } from './canvas/starter';
 import { retheme } from './retheme';
@@ -329,7 +330,7 @@ export function App() {
   const planRepoExport = async () => { // pick a folder, then PREVIEW the paths before anything is written; the branch is only made on the second click
     const c = conn.current; if (!c || !window.__swift) { setSayStatus('The helper is offline'); return; } const pick = await c.pickFolder(); if (!pick.ok) { if (pick.error !== 'cancelled') setSayStatus(`Not exported: ${pick.error}`); return; }
     const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const used = new Set<string>();
-    const files: RepoFile[] = snaps.map((f) => { let n = exportName(f.title); for (let i = 2; used.has(n); i++) n = exportName(f.title).replace(/\.html$/, `-${i}.html`); used.add(n); return { path: `swift-canvas/${n}`, content: exportDoc(f.title, f.html) }; }); files.push({ path: 'swift-canvas/project.json', content: serializeProject(project.name, snaps, brand, logRef.current, motion) });
+    const files: RepoFile[] = snaps.map((f) => { let n = exportName(f.title); for (let i = 2; used.has(n); i++) n = exportName(f.title).replace(/\.html$/, `-${i}.html`); used.add(n); return { path: `swift-canvas/${n}`, content: exportDoc(f.title, f.html) }; }); for (const f of snaps) { let n = componentName(f.title); for (let i = 2; used.has(`${n}.tsx`); i++) n = `${componentName(f.title)}${i}`; used.add(`${n}.tsx`); files.push({ path: `swift-canvas/${n}.tsx`, content: frameToTsx(f.title, f.html) }); } files.push({ path: 'swift-canvas/project.json', content: serializeProject(project.name, snaps, brand, logRef.current, motion) });
     const r = await c.repoCall('plan', pick.path, project.name, files); if (!r.ok) { setSayStatus(`Not exported: ${r.error}`); return; } setRepoPlan({ path: pick.path, files, branch: r.branch, entries: r.entries ?? [] });
   };
   const confirmRepoExport = async () => { const pl = repoPlan; const c = conn.current; if (!pl || !c) return; const r = await c.repoCall('export', pl.path, project.name, pl.files); setRepoPlan(null); setSayStatus(r.ok ? `Committed ${pl.files.length} files on branch ${r.branch}; your current branch is untouched (undo: git branch -D ${r.branch})` : `Not exported: ${r.error}`); };
@@ -350,6 +351,10 @@ export function App() {
     recordOp({ kind: 'snap', frame: f.id, before: snapshot, after: await api.snapshot(f.id) }); setRevision((n) => n + 1); setSayStatus(`Inserted ${item.name} (from ${item.origin}) into ${f.title}${rt.mapped ? ` · re-themed ${rt.mapped} colour${rt.mapped === 1 ? '' : 's'} in ${reMs.toFixed(1)} ms` : ''}`);
   }, [frames, selection, project.name, brand]);
   // Export the selected frame (or the TV frame when nothing is selected) as a standalone HTML file.
+  const exportReact = useCallback(async () => {
+    const f = frames.find((x) => x.id === (selection?.frameId ?? frames[0]?.id ?? '')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
+    const url = URL.createObjectURL(new Blob([frameToTsx(f.title, html)], { type: 'text/plain' })); const link = document.createElement('a'); link.href = url; link.download = `${componentName(f.title)}.tsx`; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download} (inline styles; Tailwind classes are not generated)`);
+  }, [frames, selection]);
   const exportFrame = useCallback(async () => {
     const f = frames.find((x) => x.id === (selection?.frameId ?? frames[0]?.id ?? '')) ?? frames[0]; if (!f || !window.__swift) return; const html = await window.__swift.snapshot(f.id); if (!html) { setSayStatus('Could not export: frame not ready'); return; }
     const url = URL.createObjectURL(new Blob([exportDoc(f.title, html)], { type: 'text/html' })); const link = document.createElement('a'); link.href = url; link.download = exportName(f.title); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
@@ -441,7 +446,7 @@ export function App() {
             <div className="projs">
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); if (cmp) window.__swift?.fitTo(cmp); }} disabled={!cmp} data-testid="compare" title="Show the selected take or copy next to its original">Compare with original</button>
               <button className="rb btn" onClick={() => void whatChanged()} disabled={!cmp} data-testid="what-changed" title="List the elements and properties that differ from the original">What changed</button>
-              <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportFrame(); }} data-testid="export">Export HTML</button>
+              <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportFrame(); }} data-testid="export">Export HTML</button><button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportReact(); }} data-testid="export-react" title="The selected frame as a React component (TSX), element ids kept">Export React</button>
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void deleteFrame(); }} disabled={!selection} data-testid="delete-frame" title="Delete the selected frame (undoable)">Delete frame</button>
             </div>
             <h2>Library <span className="mono mu">shared across projects</span></h2>
