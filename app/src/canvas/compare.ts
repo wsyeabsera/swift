@@ -16,3 +16,15 @@ export function diffSigs(a: Record<string, ElSig>, b: Record<string, ElSig>): Ch
   for (const el of Object.keys(b)) if (!(el in a)) out.push({ el, kind: 'added', props: [] });
   return out;
 }
+export type MixEdit = { el: string; prop: string; value: string } | { el: string; text: string };
+/** Mix two takes of the same original, no model: start from `a` and add what `b` changed that `a` left alone. Where both changed the same thing, `a` wins and it is counted. Elements `b` added or removed are not mixed (counted as skipped). */
+export function mixEdits(orig: Record<string, ElSig>, a: Record<string, ElSig>, b: Record<string, ElSig>): { edits: MixEdit[]; conflicts: number; skipped: number } {
+  const edits: MixEdit[] = []; let conflicts = 0, skipped = 0;
+  for (const [el, o] of Object.entries(orig)) {
+    const x = a[el], y = b[el]; if (!y || !x) { if (!y) skipped++; continue; } const do_ = decl(o.style), da = decl(x.style), db = decl(y.style);
+    for (const k of new Set([...do_.keys(), ...db.keys()])) { if (db.get(k) === do_.get(k)) continue; if (da.get(k) !== do_.get(k)) { if (da.get(k) !== db.get(k)) conflicts++; continue; } edits.push({ el, prop: k, value: db.get(k) ?? '' }); }
+    if (y.text !== o.text) { if (x.text !== o.text) { if (x.text !== y.text) conflicts++; } else edits.push({ el, text: y.text }); }
+  }
+  for (const el of Object.keys(b)) if (!(el in orig)) skipped++;
+  return { edits, conflicts, skipped };
+}
