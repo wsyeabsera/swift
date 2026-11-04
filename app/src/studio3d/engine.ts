@@ -11,6 +11,8 @@ export type Engine = {
   still(width: number, mime: 'image/png' | 'image/jpeg'): Promise<string>;
   /** Pixel under the canvas centre, for tests and the "is it blank" check. */
   centerPixel(): Promise<[number, number, number]>;
+  /** Milliseconds the last draw took to submit (CPU side; the GPU may still be working). 0 before the first draw. */
+  lastRenderMs(): number;
   dispose(): void;
 };
 export async function createEngine(canvas: HTMLCanvasElement): Promise<Engine> {
@@ -21,7 +23,7 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<Engine> {
   const disposeGroup = (g: InstanceType<typeof THREE.Group>): void => { for (const c of [...g.children]) { g.remove(c); const m = c as InstanceType<typeof THREE.Mesh>; m.geometry?.dispose(); const mat = m.material as { dispose?: () => void } | undefined; mat?.dispose?.(); } };
   const geometry = (shape: string): InstanceType<typeof THREE.BufferGeometry<import('three/webgpu').NormalBufferAttributes>> => { switch (shape) { case 'sphere': return new THREE.SphereGeometry(0.5, 48, 32); case 'torus': return new THREE.TorusGeometry(0.5, 0.18, 24, 64); case 'cylinder': return new THREE.CylinderGeometry(0.5, 0.5, 1, 48); case 'plane': return new THREE.PlaneGeometry(1, 1); default: return new THREE.BoxGeometry(1, 1, 1); } };
   let selBox: InstanceType<typeof THREE.BoxHelper> | null = null; const fit = (): void => { const w = Math.max(2, canvas.clientWidth), h = Math.max(2, canvas.clientHeight); renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
-  const draw = async (): Promise<void> => { renderer.render(scene, camera); }; // after `await renderer.init()` a plain render is enough
+  let renderMs = 0; const draw = async (): Promise<void> => { const t0 = performance.now(); renderer.render(scene, camera); renderMs = performance.now() - t0; }; // after `await renderer.init()` a plain render is enough
   return {
     backend,
     async setScene(sc, selectedId) {
@@ -35,6 +37,7 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<Engine> {
     async exportGlb() { const r = await new GLTFExporter().parseAsync(content, { binary: true }); if (!(r instanceof ArrayBuffer)) throw new Error('the exporter did not return a binary glb'); return r; },
     async still(width, mime) { await draw(); await new Promise((res) => requestAnimationFrame(res)); await draw(); const h = Math.round((canvas.height / canvas.width) * width); const c = document.createElement('canvas'); c.width = width; c.height = h; const g = c.getContext('2d')!; g.drawImage(canvas, 0, 0, width, h); return c.toDataURL(mime, 0.85); },
     async centerPixel() { await draw(); await new Promise((res) => requestAnimationFrame(res)); await draw(); const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; const g = c.getContext('2d', { willReadFrequently: true })!; g.drawImage(canvas, 0, 0); const d = g.getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data; return [d[0]!, d[1]!, d[2]!]; },
+    lastRenderMs: () => renderMs,
     dispose() { disposeGroup(content); renderer.dispose(); },
   };
 }
