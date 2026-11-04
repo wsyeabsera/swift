@@ -28,9 +28,15 @@ function colour(v: string): Rgba | null {
 const round = (x: number): number => Math.round(x * 1000) / 1000;
 /** Between two values at progress p (already eased). Same-unit numbers and colours blend; otherwise the first value holds until p reaches 1. */
 export function mix(a: string, b: string, p: number): string {
+  const ta = tokens(a), tb = tokens(b); if (ta.length > 1 && ta.length === tb.length) { const parts = ta.map((t, i) => mixOne(t, tb[i]!, p)); if (parts.every((x) => x !== null)) return parts.join(' '); } // "400px 0px" (translate, scale, padding...): each part on its own
+  return mixOne(a, b, p) ?? (p >= 1 ? b : a);
+}
+/** Whitespace-separated parts, not splitting inside parentheses ("rgb(1, 2, 3) 4px" is two). */
+function tokens(v: string): string[] { const out: string[] = []; let cur = '', d = 0; for (const ch of v.trim()) { if (ch === '(') d++; else if (ch === ')') d--; if (/\s/.test(ch) && d === 0) { if (cur) out.push(cur); cur = ''; } else cur += ch; } if (cur) out.push(cur); return out; }
+function mixOne(a: string, b: string, p: number): string | null {
   const x = num(a), y = num(b); if (x && y && (x.unit === y.unit)) return `${round(x.n + (y.n - x.n) * p)}${x.unit}`;
   const c = colour(a), d = colour(b); if (c && d) { const k = c.map((v, i) => v + (d[i]! - v) * p) as Rgba; return `rgba(${Math.round(k[0])}, ${Math.round(k[1])}, ${Math.round(k[2])}, ${round(k[3])})`; }
-  return p >= 1 ? b : a;
+  return null;
 }
 /** The value of a track at time t (ms): before the first key it is the first value, after the last key the last. */
 export function valueAt(tr: Track, t: number): string | null {
