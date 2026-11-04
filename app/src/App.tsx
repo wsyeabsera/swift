@@ -617,7 +617,7 @@ export function App() {
       <form className="gl isl say" aria-label="Say" onSubmit={(e) => { e.preventDefault(); void say(); }}>
         <input ref={sayRef} data-testid="say-input" aria-label="Say what to change" title="⌘K" placeholder={pendingAsk ? `Claude asks: ${pendingAsk.question}` : selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => { setSayText(e.target.value); histPos.current = sayHist.current.length; }} onKeyDown={(e) => { if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return; const h = sayHist.current; if (h.length === 0) return; e.preventDefault(); if (histPos.current >= h.length) draft.current = sayText; const r = step(h, histPos.current, e.key === 'ArrowUp' ? -1 : 1, draft.current); histPos.current = r.pos; setSayText(r.text); }} onFocus={() => conn.current?.prewarm()} disabled={saying} />
         <button type="submit" className="rb btn say-go" data-testid="say-button" disabled={saying || !sayText.trim()}>Say</button>
-        <span className="mono mu say-status" data-testid="say-status" role="status">{sayStatus}</span>
+        <span key={sayStatus} className="mono mu say-status morph" data-testid="say-status" role="status">{sayStatus}</span>
       </form>
       <footer className="gl isl tools" aria-label="Canvas tools">
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>

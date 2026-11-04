@@ -29,10 +29,12 @@ export function Inspector({ selection, revision, onEdit }: { selection: Sel | nu
   }, [selection, revision]);
   return (
     <aside className="gl isl-panel inspector" aria-label="Inspector" data-testid="inspector">
+      <div key={selection ? `${selection.frameId}/${selection.el}` : 'none'} className="morph"> {/* a new selection re-plays the glass morph, so the island changes state instead of snapping */}
       <h2>Inspector <span className="mono mu" data-testid="inspector-id">{selection?.el ?? 'nothing selected'}</span></h2>
       {selection && INSPECT_PROPS.map((p) => (
         <label key={p} className="fld"><span className="mu">{p}</span>
           <input aria-label={p} value={draft[p] ?? ''} onChange={(e) => setDraft({ ...draft, [p]: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && draft[p] !== undefined && draft[p] !== values[p]) onEdit(p, draft[p]); }} /></label>))}
+      </div>
     </aside>
   );
 }
