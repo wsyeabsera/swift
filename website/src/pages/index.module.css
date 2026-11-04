@@ -1,23 +1,6 @@
-/**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
- */
-
-.heroBanner {
-  padding: 4rem 0;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
-  }
-}
-
-.buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.hero { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2.5rem; padding: 4rem 1.5rem 2rem; background: radial-gradient(900px 400px at 20% 0%, rgba(109, 76, 255, 0.28), transparent), radial-gradient(700px 400px at 90% 20%, rgba(34, 211, 238, 0.2), transparent); }
+.heroText { flex: 1 1 380px; max-width: 560px; }
+.heroText h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1.1; background: linear-gradient(90deg, #8b70ff, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.heroText p { font-size: 1.15rem; }
+.heroImg { flex: 1 1 380px; max-width: 560px; width: 100%; filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.35)); }
+.buttons { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 1.5rem; }

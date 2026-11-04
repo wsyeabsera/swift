@@ -1,0 +1,33 @@
+---
+id: history
+title: Undo, history & branches
+sidebar_position: 8
+---
+
+## Everything is an operation
+
+Every change (a drag, a Say result, a rename) is recorded as a **typed operation with an exact inverse**. That's what makes undo trustworthy: undo is not "restore a screenshot", it's "run the inverse".
+
+The `core/` Rust crate defines the operations (`set`, `token`, `text`, `add`, `remove`, plus `insert`/`replace`) and has property-based tests: apply any random sequence of ops, then their inverses, and the tree comes back **exactly**.
+
+## The op log
+
+The app keeps an **op log** with groups (a Say answer with 12 ops is *one* undo step), forks and replay. It's saved in:
+
+- the local design save,
+- the exported project file (an optional `log` key; a damaged log is dropped, not fatal),
+- the helper's durable backup.
+
+Reload the page, restore from the helper, open a project file: your undo history comes with you. (e2e verifies the undo count survives all three.)
+
+## Compare with original
+
+**Frame ▾ → Compare with original** puts the selected take or copy next to the frame it came from, both filling the view.
+
+## Merging: the maths is ready
+
+Core has a **3-way merge** with per-property last-writer-wins: edits to *different* properties merge cleanly, same-property clashes are conflicts. It's deterministic, idempotent and commutes for disjoint edits (proptest-verified).
+
+:::note 🚧 Not in the UI yet
+Named branches ("try-warm-room"), the visual Compare view with onion-skin, and merge-with-conflicts UI are still on the roadmap. The design is in `docs/oplog-design.md`; the foundation is built.
+:::

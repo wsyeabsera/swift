@@ -1,0 +1,28 @@
+---
+id: looks
+title: Liquid Glass & themes
+sidebar_position: 7
+---
+
+The UI is Apple-style **Liquid Glass**: translucent panels with a bright top-left rim, a soft sheen, and a refractive blur over whatever is behind. It looks like it costs $4,000.
+
+## Appearance popover
+
+| Knob | Options |
+|---|---|
+| **Backdrop** | 8 of them, including a mesh gradient |
+| **Mode** | Dark or light |
+| **Accent** | Your pick |
+| **Glass thickness** | Thin, regular, thick |
+
+Everything persists.
+
+## The contrast promise
+
+Glass over a photo is a classic way to make text unreadable. So there's a rule: **text and muted text must have WCAG contrast ≥ 4.5:1 on every backdrop, in both modes, at every thickness.**
+
+That's 8 backdrops × dark/light × thin/regular/thick = **48 combos**, checked in the *real app* (`npm run e2e:contrast`). The in-app check passes 48/48. When it first ran against the real thing it found two failures that the design-folder check had missed, because the mesh backdrop was never covered there. Moral: test the real thing.
+
+## Popover etiquette (rule H7)
+
+Popovers sit on a scrim, <kbd>Esc</kbd> closes them, and focus returns to the button that opened them. Boring, correct, accessible.

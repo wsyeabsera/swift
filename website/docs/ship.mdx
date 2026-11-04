@@ -1,0 +1,51 @@
+---
+id: ship
+title: Ship it
+sidebar_position: 10
+---
+
+Designs only matter when they land somewhere real.
+
+## Export a frame as HTML
+
+**Export** downloads the selected frame as a standalone HTML file. Open it anywhere, email it, put it on a fridge.
+
+## Export to a repo branch
+
+**Frame ▾ → Export to repo branch…**
+
+```mermaid
+sequenceDiagram
+  participant You
+  participant App
+  participant Helper
+  You->>App: Pick a repo folder
+  App->>Helper: repo.plan
+  Helper-->>App: Every path: new / changed / same
+  You->>App: Looks right. Go.
+  App->>Helper: repo.write
+  Helper->>Helper: Commit on swift-canvas/&lt;project&gt;
+  Helper-->>You: Done. Your branch is untouched.
+```
+
+The safety rules:
+
+- You see a **preview of every path** first (new / changed / same).
+- It commits on a **new branch** named `swift-canvas/<project>`. Your current branch is never touched.
+- A **dirty working tree is refused**. It won't mix your uncommitted work with generated files.
+
+## Let Claude Code drive the canvas (MCP)
+
+The helper doubles as an MCP server, so a Claude Code session can edit your design:
+
+```bash
+claude mcp add swift -- swift-canvas-helper mcp
+```
+
+Tools: `read_subtree`, `apply_ops` (batch of up to 200, validated and dry-run by core, applied as **one** undo step), `set_token`, `undo`. The helper must be running with the app open.
+
+How does the MCP process get in? The helper writes `mcp.json` (`{port, token}`, mode 0600). The MCP process connects with that token and **no Origin header**. Browsers *always* send an Origin, so a web page can't take this route, and it may only send `mcp.call` and `ping` anyway.
+
+## 🚧 On the roadmap
+
+Frame → React + Tailwind components with source-mapped ids, MP4 and glb exports, and one-click publishing to a Claude artifact with rollback.

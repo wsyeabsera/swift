@@ -1,0 +1,35 @@
+---
+id: faq
+title: FAQ & "it broke"
+sidebar_position: 17
+---
+
+### Do I need an API key?
+No. Never. It uses your local Claude Code login.
+
+### Does it cost money?
+Local edits are free. Say and Spark use a bit of your Claude subscription. Spark's tooltip shows an estimate first.
+
+### Say says "limit reached".
+You've used your allowance. Local-tier edits keep working. Press **Re-check** later.
+
+### The header says `helper offline`.
+Is `npm run helper` running? In dev it needs `SWIFT_DEV=1`. For the extension it needs `SWIFT_ALLOWED_ORIGINS=chrome-extension://<id>` and a token.
+
+### My extension won't load from regular Chrome automation.
+Branded Chrome ignores `--load-extension`. Use Playwright's Chromium.
+
+### A Spark was refused because of memory.
+Your Mac is low on RAM (threshold `SWIFT_MIN_FREE_MB`, default 1200). Close a few of those 83 tabs.
+
+### The drag doesn't work on an element.
+Only positioned elements (with `left`/`top`) drag. Nudges work on static ones via `translate`.
+
+### I clicked Reset and now I'm sad.
+Reset is undoable. <kbd>⌘Z</kbd>.
+
+### Where are my files?
+`~/.swift-canvas` (or `SWIFT_DATA_DIR`), plus the browser's local autosave.
+
+### Can I trust the speed claims?
+Re-run the spikes. We put the commands in the repo so you don't have to trust us. See [Speed](/docs/speed).
