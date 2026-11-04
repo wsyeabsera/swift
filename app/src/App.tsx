@@ -54,6 +54,7 @@ import { canMerge, merge as mergeBranch, type Choice, type Conflict } from './me
 import { pushHistory, step } from './say/history';
 import { auditFacts, type Finding } from './canvas/audit';
 import { CRITIQUE_SYSTEM, critiquePrompt, parseCritique } from './canvas/critique';
+import { parseSceneReply, scenePrompt, SCENE_SYSTEM } from './studio3d/sceneSay';
 import { fxHtml, fxId, FX_PRESETS, meter as fxMeter, parseFx, suggest as fxSuggest, type Device, type Effect } from './effects';
 import { localEdits, propTokenRequest, themeRequest, easeRequest, tokenRequest } from './say/local';
 import { suggestions, type SuggestProps } from './say/suggest';
@@ -399,6 +400,10 @@ export function App() {
   const checkFrame = async () => { const f = frames.find((x) => x.id === selection?.frameId) ?? frames[0]; const api = window.__swift; if (!f || !api) return; const t0 = performance.now(); const facts = await api.audit(f.id); if (!facts) { setCheckNote('frame did not answer'); return; }
     const found = auditFacts(facts, surfaceOf(f)); checkedFrame.current = f.id; setFindings(found.map((x) => ({ ...x, frame: f.id }))); setCheckNote(`${f.title}: ${found.length} finding${found.length === 1 ? '' : 's'} · ${(performance.now() - t0).toFixed(0)} ms`); };
   const [critiquing, setCritiquing] = useState(false);
+  const sayScene = (request: string, selectedId: string | null) => new Promise<ReturnType<typeof parseSceneReply>>((resolve) => { // Say in the 3D lens: the scene goes to Claude as JSON, the answer is parsed strictly before it replaces anything
+    const c = conn.current; if (!c) { resolve({ ok: false, error: 'helper offline' }); return; } if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { resolve({ ok: false, error: `Claude is not ready: ${helper.claudeStatus.message}` }); return; }
+    let text = '', err = ''; c.say(SCENE_SYSTEM, scenePrompt(scene3d, request, selectedId), (e) => { if (e.kind === 'delta') text += e.text; else { if (e.kind === 'error') err = e.text; resolve(err && !text ? { ok: false, error: err } : parseSceneReply(text, scene3d)); } });
+  });
   const askClaude = async () => { // the local pre-pass first (instant, free), then Claude only for what needs judgment; its findings are validated before they are shown
     const f = frames.find((x) => x.id === selection?.frameId) ?? frames[0]; const api = window.__swift; const c = conn.current; if (!f || !api || !c || critiquing) return;
     if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { setCheckNote(`Claude is not ready: ${helper.claudeStatus.message}`); return; }
@@ -668,13 +673,13 @@ export function App() {
       <Canvas chip={patchChip} hotspots={playFlow || showHot || xray ? [...(playFlow || showHot ? links.map((l) => ({ frameId: l.frame, el: l.el })) : []), ...xrayEls] : undefined} diff={cmpOutline || onion ? { frameId: (cmpOutline ?? onion)!.frame, els: cmpOutline?.els ?? [], ghost: onion ? { html: onion.html, mix: onion.mix / 100 } : undefined } : undefined} chrome={chrome} onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => { const next = renameFrame(frames, id, t); if (next === frames) return; const before = frames.find((f) => f.id === id)?.title ?? ''; const after = next.find((f) => f.id === id)?.title ?? ''; recordOp({ kind: 'rename', frame: id, before, after }); setFrames(next); }} frames={frames} selection={selection} extras={extras} onSelect={pickElement} revision={revision} onReady={() => setRevision((n) => n + 1)} />
       {lens !== '3D' && lens !== 'Motion' && lens !== 'Critique' && <Layers locked={locked} onToggleLock={(el) => toggleLock(selection?.frameId ?? frames[0]?.id ?? '', el)} onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} extras={extras} onSelect={(sel, add) => void pickElement(sel, add, true)} revision={revision} />}
       {lens !== '3D' && lens !== 'Pulse' && lens !== 'Brand' && <Inspector tokens={brand} selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />}
-      {lens === '3D' && <Studio3D scene={scene3d} onScene={setScene3d} onInsertStill={(url) => void insertStill(url)} onStatus={setSayStatus} onShip={(k, n, d) => logShip(k, n, d)} fileName={exportName(project.name).replace(/\.html$/, '')} />}
+      {lens === '3D' && <Studio3D onSay={helper.status === 'connected' ? sayScene : undefined} scene={scene3d} onScene={setScene3d} onInsertStill={(url) => void insertStill(url)} onStatus={setSayStatus} onShip={(k, n, d) => logShip(k, n, d)} fileName={exportName(project.name).replace(/\.html$/, '')} />}
       {chips.length > 0 && !saying && !sayText && !pendingAsk && (
-        <div className="gl isl chips" role="group" aria-label="Suggestions" data-testid="chips">
+        <div className="gl isl chips" role="group" aria-label="Suggestions" hidden={lens === '3D'} data-testid="chips">
           {chips.map((c) => <button key={c.label} className="rb btn chip" onClick={() => void say(c.text)} data-testid="chip">{c.label}</button>)}
         </div>
       )}
-      <form className="gl isl say" aria-label="Say" onSubmit={(e) => { e.preventDefault(); void say(); }}>
+      <form className="gl isl say" aria-label="Say" hidden={lens === '3D'} onSubmit={(e) => { e.preventDefault(); void say(); }}>
         <button type="button" className="rb say-chip" data-testid="say-target" aria-label={selection ? `Saying about ${selection.el}: click to talk about the whole screen` : 'Saying about the whole screen'} title={selection ? 'Click to talk about the whole screen instead' : 'Select an element to aim at it'} onClick={() => setSelection(null)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg><span className="mono">{selection ? selection.el : 'Whole screen'}</span></button>
         {!sayText && lastSay && <span className="say-quote" data-testid="say-quote" title="Your last request">“{lastSay}”</span>}
         <input ref={sayRef} data-testid="say-input" aria-label="Say what to change" title="⌘K" placeholder={pendingAsk ? `Claude asks: ${pendingAsk.question}` : selection ? `Say what to change about #${selection.el}…` : 'Say what to change…'} value={sayText} onChange={(e) => { setSayText(e.target.value); histPos.current = sayHist.current.length; }} onKeyDown={(e) => { if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return; const h = sayHist.current; if (h.length === 0) return; e.preventDefault(); if (histPos.current >= h.length) draft.current = sayText; const r = step(h, histPos.current, e.key === 'ArrowUp' ? -1 : 1, draft.current); histPos.current = r.pos; setSayText(r.text); }} onFocus={() => conn.current?.prewarm()} disabled={saying} />
