@@ -11,7 +11,9 @@ pub const SPARE_IDLE: Duration = Duration::from_secs(120);
 pub enum Out { Delta(String), Done(Option<Value>), Error(String) }
 
 pub fn claude_args(model: &str) -> Vec<String> {
-    ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--include-partial-messages", "--verbose", "--model", model, "--no-session-persistence", "--tools", "", "--disable-slash-commands", "--strict-mcp-config", "--setting-sources", "project"].iter().map(|s| s.to_string()).collect()
+    let mut a: Vec<String> = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--include-partial-messages", "--verbose", "--model", model, "--no-session-persistence", "--tools", "", "--disable-slash-commands", "--strict-mcp-config", "--setting-sources", "project"].iter().map(|s| s.to_string()).collect();
+    if let Ok(e) = std::env::var("SWIFT_CLAUDE_EFFORT") { if matches!(e.as_str(), "low" | "medium" | "high") { a.push("--effort".into()); a.push(e); } } // opt-in experiment: a lower effort level (measured in docs/handoff.md before any default changes)
+    a
 }
 /// An image sent with a Say (a screenshot to rebuild): validated, never trusted.
 #[derive(Debug, Clone, PartialEq)]
