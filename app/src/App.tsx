@@ -569,8 +569,8 @@ export function App() {
         <input ref={moodFile} type="file" accept="image/*" hidden data-testid="mood-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void addMoodImage(f); }} />
         <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="project-file-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { setFrameMenuOpen(false); void openProjectFile(f); } }} />
         {frameMenuOpen && (<>
-          <div className="scrim" onClick={() => { setFrameMenuOpen(false); fmRef.current?.focus(); }} aria-hidden="true" />
-          <div className="gl pop framemenu" role="dialog" aria-label="Frame" data-testid="frame-popover" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFrameMenuOpen(false); fmRef.current?.focus(); } }}>
+          {lens === 'Design' && <div className="scrim" onClick={() => { setFrameMenuOpen(false); fmRef.current?.focus(); }} aria-hidden="true" />}
+          <div className={`gl pop framemenu${lens === 'Design' ? '' : ' lenspanel'}`} data-lens={lens} role="dialog" aria-label="Frame" data-testid="frame-popover" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFrameMenuOpen(false); fmRef.current?.focus(); } }}>
             {lens === 'Design' && <>
             <h2>New frame</h2>
             <div className="projs">{(Object.keys(PRESETS) as PresetKey[]).map((k) => <button key={k} className="rb btn" onClick={() => { addFrame(k); setFrameMenuOpen(false); }} data-testid={`add-${k}`} title={`New ${PRESETS[k].label} frame`}>+ {k}</button>)}</div>
