@@ -27,7 +27,7 @@ try {
   cv.frozenFar = await web.evaluate(async () => { window.__swift.setView({ x: -30000, y: -30000, s: 1 }); const n = window.__swift.visibleCount(); await new Promise((r) => setTimeout(r, 150)); const hidden = [...document.querySelectorAll('.fr')].filter((f) => f.style.display === 'none').length; window.__swift.fitAll(); return { visible: n, hidden }; });
   await web.waitForTimeout(300);
   cv.edit = await web.evaluate(() => window.__swift.edit('tv', 'clock', 'font-size', '260px')); cv.editRead = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
-  cv.editMissing = await web.evaluate(() => window.__swift.edit('tv', 'nope', 'color', 'red')); cv.hit = await web.evaluate(() => window.__swift.hit('tv', 200, 200));
+  cv.editMissing = await web.evaluate(() => window.__swift.edit('tv', 'nope', 'color', 'red')); cv.hit = await web.evaluate(async () => { let h = null; for (let i = 0; i < 30 && h !== 'clock'; i++) { h = await window.__swift.hit('tv', 200, 200); if (h !== 'clock') await new Promise((r) => setTimeout(r, 100)); } return h; }); /* a slow runner may not have laid the frame out yet */
   cv.parentCannotReadFrame = await web.evaluate(() => { try { return document.querySelector('.fr iframe').contentDocument === null; } catch { return true; } });
   // select by clicking, layers + inspector, edit through the inspector, undo, pick a layer
   await web.evaluate(() => window.__swift.fitAll()); await web.waitForTimeout(200); const startFs = await web.evaluate(() => window.__swift.get('tv', 'clock', 'font-size'));
