@@ -136,3 +136,14 @@ nav.lens{z-index:40} /* above the menu scrim: switching lenses works while a len
 .fld input:focus-visible,.rb:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .say input{border-radius:18px;padding:0 14px}.fld input:not([type=color]):not([type=range]){border-radius:9px}
 .pubbtn{color:var(--acInk);font-weight:600} /* glass button with accent text: a filled accent button inside the island would read as a bright backdrop to the contrast check, and to the eye as a second Spark */
+
+/* Motion timeline strip: docked bottom-left above the corner island, never over the Say bar */
+.mstrip{position:fixed;left:16px;bottom:212px;z-index:5;width:min(560px,calc(50vw - 40px));padding:10px 12px 12px;border-radius:24px;display:grid;gap:8px}
+.mstrip-top{display:flex;align-items:center;gap:10px}.mstrip-top .ib{width:36px;height:36px;border-radius:999px;display:grid;place-items:center;background:var(--ac);color:#06201a;font-size:12px}
+.mstrip-grid{display:grid;grid-template-columns:128px 1fr;gap:8px;max-height:220px;overflow:auto}
+.mstrip-names{display:grid;grid-auto-rows:36px}.mstrip-h{height:22px}.mstrip-name{display:flex;flex-direction:column;justify-content:center;min-width:0;font-size:12px}.mstrip-name b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mstrip-name span{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mstrip-lane{position:relative;min-width:0}.mstrip-ruler{position:relative;height:22px;cursor:col-resize;border-bottom:1px solid var(--bd)}.mstrip-ruler span{position:absolute;top:2px;transform:translateX(-50%);font-size:10px}.mstrip-ruler span:first-child{transform:none}
+.mstrip-row{position:relative;height:36px;border-bottom:1px solid color-mix(in srgb,var(--bd) 50%,transparent);cursor:col-resize}
+.mstrip-bar{position:absolute;top:11px;height:14px;border-radius:7px;background:linear-gradient(165deg,color-mix(in srgb,var(--ac) 55%,transparent),color-mix(in srgb,var(--ac) 25%,transparent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ac) 60%,transparent)}
+.mstrip-key{position:absolute;top:13px;width:10px;height:10px;margin-left:-5px;background:var(--tx);transform:rotate(45deg);border-radius:2px;box-shadow:0 0 0 2px color-mix(in srgb,var(--ac) 70%,transparent)}
+.mstrip-head{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--ac);box-shadow:0 0 10px var(--ac);pointer-events:none}.mstrip-empty{margin:10px 4px}

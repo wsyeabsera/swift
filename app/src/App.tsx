@@ -18,6 +18,7 @@ import type { RepoEntry, RepoFile } from './helper';
 import { starterFrames } from './canvas/starter';
 import { retheme } from './retheme';
 import { DEFAULT_CREW } from './crew/defaults';
+import { MotionStrip } from './MotionStrip';
 import { buildArtifactPage, isArtifactUrl, loadArtifact, saveArtifact, type ArtifactRec } from './publish';
 import { isTarget, loadShip, pushShip, saveShip, TARGETS, type ShipRec, type TargetId } from './ship';
 import { loadCrew, type CrewFile } from './crew/sheet';
@@ -684,7 +685,7 @@ export function App() {
         </div>
       </header>
       <Canvas chip={patchChip} hotspots={playFlow || showHot || xray ? [...(playFlow || showHot ? links.map((l) => ({ frameId: l.frame, el: l.el })) : []), ...xrayEls] : undefined} diff={cmpOutline || onion ? { frameId: (cmpOutline ?? onion)!.frame, els: cmpOutline?.els ?? [], ghost: onion ? { html: onion.html, mix: onion.mix / 100 } : undefined } : undefined} chrome={chrome} onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => { const next = renameFrame(frames, id, t); if (next === frames) return; const before = frames.find((f) => f.id === id)?.title ?? ''; const after = next.find((f) => f.id === id)?.title ?? ''; recordOp({ kind: 'rename', frame: id, before, after }); setFrames(next); }} frames={frames} selection={selection} extras={extras} onSelect={pickElement} revision={revision} onReady={() => setRevision((n) => n + 1)} />
-      {lens !== '3D' && <Layers locked={locked} onToggleLock={(el) => toggleLock(selection?.frameId ?? frames[0]?.id ?? '', el)} onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} extras={extras} onSelect={(sel, add) => void pickElement(sel, add, true)} revision={revision} />}
+      {lens !== '3D' && lens !== 'Motion' && <Layers locked={locked} onToggleLock={(el) => toggleLock(selection?.frameId ?? frames[0]?.id ?? '', el)} onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} extras={extras} onSelect={(sel, add) => void pickElement(sel, add, true)} revision={revision} />}
       {lens !== '3D' && <Inspector tokens={brand} selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />}
       {lens === '3D' && <Studio3D scene={scene3d} onScene={setScene3d} onInsertStill={(url) => void insertStill(url)} onStatus={setSayStatus} onShip={(k, n, d) => logShip(k, n, d)} fileName={exportName(project.name).replace(/\.html$/, '')} />}
       {chips.length > 0 && !saying && !sayText && !pendingAsk && (
@@ -709,6 +710,7 @@ export function App() {
         <span className="pal-sep" aria-hidden="true" />
         <button className="rb ib ib-ac" aria-label="Spark 4 takes" title="Spark: 4 takes of the selection" disabled={sparking} onClick={() => void spark(4)} data-testid="tool-spark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
       </div>
+      {lens === 'Motion' && <MotionStrip motion={motion} t={mt} playing={playing} onScrub={(ms) => void scrub(ms)} onPlay={() => { if (mt >= motion.duration) setMt(0); setPlaying((p) => !p); }} onRender={() => void renderMotion()} />}
       <footer className="gl isl tools" aria-label="Canvas tools">
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
         {sparking ? <>{selection && takesRunning.current.has(selection.frameId) && <button className="rb btn" onClick={() => takesRunning.current.get(selection.frameId)?.abort()} data-testid="cancel-take">Cancel this take</button>}<button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button></> : <button className="rb btn" onClick={() => void spark(4)} data-testid="spark-button" title={`Spark ×4 costs about ${tokensShort((e => e.input + e.output)(estimateSpark(usage, 4)))} tokens (from your recent requests, cached input included)`}>Spark ×4</button>}
