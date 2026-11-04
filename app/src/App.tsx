@@ -77,6 +77,10 @@ export function App() {
   };
   const [shipLog, setShipLog] = useState<ShipRec[]>(() => loadShip(project.id)); const logShip = useCallback((kind: string, name: string, detail: string, ok = true) => setShipLog((l) => { const n = pushShip(l, { at: Date.now(), kind, name, detail, ok }); saveShip(project.id, n); return n; }), [project.id]);
   const lastRec = recs[recs.length - 1]; const sparkPoints = (() => { const xs = recs.slice(-24).map((r) => r.ms); if (xs.length < 2) return '0,20 64,20'; const hi = Math.max(...xs.map((v) => Math.sqrt(v)), 1); return xs.map((v, i) => `${((i / (xs.length - 1)) * 64).toFixed(1)},${(20 - (Math.sqrt(v) / hi) * 17).toFixed(1)}`).join(' '); })(); // sqrt scale: one slow Claude call does not flatten the local ones
+  const lockedRef = useRef<string[]>([]); 
+  const [locked, setLockedState] = useState<string[]>(() => { try { const r = JSON.parse(localStorage.getItem(`swift-canvas.locked.v1.${project.id}`) ?? '[]') as unknown; return Array.isArray(r) ? r.filter((x): x is string => typeof x === 'string').slice(0, 500) : []; } catch { return []; } });
+  lockedRef.current = locked;
+  const toggleLock = (frameId: string, el: string): void => setLockedState((l) => { const k = `${frameId}/${el}`; const n = l.includes(k) ? l.filter((x) => x !== k) : [...l, k]; try { localStorage.setItem(`swift-canvas.locked.v1.${project.id}`, JSON.stringify(n)); } catch { /* a per-viewer convenience */ } return n; });
   const [shipSel, setShipSel] = useState<TargetId[]>(['html', 'react', 'tokens']); const [shipRun, setShipRun] = useState<{ i: number; n: number; label: string } | null>(null);
   const dtcgFile = useRef<HTMLInputElement>(null);
   const exportDtcg = () => { const { skipped } = toDtcg(brand); const url = URL.createObjectURL(new Blob([dtcgString(brand)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'tokens.json'; logShip('tokens', 'tokens.json', `${Object.keys(brand).length - skipped.length} tokens`); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported tokens.json (${Object.keys(brand).length - skipped.length} tokens${skipped.length ? `, ${skipped.length} not exportable: ${skipped.map((x) => x.name).join(', ')}` : ''})`); };
@@ -491,7 +495,8 @@ export function App() {
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, extras, edit, recordOp]);
   // Click selects one element; shift-click adds or removes one in the same frame (the primary is the first).
-  const pickElement = useCallback(async (s: Sel | null, additive?: boolean) => {
+  const pickElement = useCallback(async (s: Sel | null, additive?: boolean, fromLayers = false) => {
+    if (s && !fromLayers && lockedRef.current.includes(`${s.frameId}/${s.el}`)) { setSayStatus(`${s.el} is locked (unlock it in Layers to pick it here)`); return; }
     if (playFlow && s) { const api = window.__swift; const tree = api ? await api.tree(s.frameId) : []; const chain = [s.el]; for (let p = parentOf(tree, s.el); p; p = parentOf(tree, p)) chain.push(p); const hit = follow(links, s.frameId, chain); if (hit && api) { flowBack.current.push(s.frameId); void api.glideTo([hit.to]); setSayStatus(`→ ${frames.find((f) => f.id === hit.to)?.title ?? hit.to}`); } else setSayStatus('No link here'); return; } // Play: clicks follow links, nothing is selected
     if (!additive || !s || !selection || s.frameId !== selection.frameId) { if (!additive || s) setSelection(s); return; }
     const all = [selection.el, ...extras]; const next = all.includes(s.el) ? all.filter((e) => e !== s.el) : [...all, s.el]; const [first, ...rest] = next;
@@ -641,7 +646,7 @@ export function App() {
         </div>
       </header>
       <Canvas hotspots={playFlow || showHot ? links.map((l) => ({ frameId: l.frame, el: l.el })) : undefined} diff={cmpOutline || onion ? { frameId: (cmpOutline ?? onion)!.frame, els: cmpOutline?.els ?? [], ghost: onion ? { html: onion.html, mix: onion.mix / 100 } : undefined } : undefined} chrome={chrome} onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => { const next = renameFrame(frames, id, t); if (next === frames) return; const before = frames.find((f) => f.id === id)?.title ?? ''; const after = next.find((f) => f.id === id)?.title ?? ''; recordOp({ kind: 'rename', frame: id, before, after }); setFrames(next); }} frames={frames} selection={selection} extras={extras} onSelect={pickElement} revision={revision} onReady={() => setRevision((n) => n + 1)} />
-      {lens !== '3D' && <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} extras={extras} onSelect={pickElement} revision={revision} />}
+      {lens !== '3D' && <Layers locked={locked} onToggleLock={(el) => toggleLock(selection?.frameId ?? frames[0]?.id ?? '', el)} onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} extras={extras} onSelect={(sel, add) => void pickElement(sel, add, true)} revision={revision} />}
       {lens !== '3D' && <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />}
       {lens === '3D' && <Studio3D scene={scene3d} onScene={setScene3d} onInsertStill={(url) => void insertStill(url)} onStatus={setSayStatus} onShip={(k, n, d) => logShip(k, n, d)} fileName={exportName(project.name).replace(/\.html$/, '')} />}
       {chips.length > 0 && !saying && !sayText && !pendingAsk && (

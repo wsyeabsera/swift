@@ -88,3 +88,9 @@ button:disabled{opacity:.45;cursor:default}
 .pj-sub{display:flex;gap:8px;align-items:baseline}.pj-branch{color:var(--ac);opacity:1}.chev{opacity:.6;font-size:16px;margin-left:-4px;pointer-events:none}
 .speed .lat{display:flex;flex-direction:column;line-height:1.15;min-width:84px}.speed .lat b{font-size:15px;font-weight:600}.speed .lat .mu{font-size:11px;white-space:nowrap}.speed .spark{color:var(--ac);opacity:.9;flex:none}
 .speed .helpertxt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap} /* still in the page for screen readers and tests; the dot, latency and tier say it visually */
+
+/* Layers as designed */
+.layers .lrow{display:flex;align-items:center;gap:2px}.layers .lrow .row{flex:1;min-width:0;display:flex;align-items:center;gap:7px;height:32px}.layers .row .lico{flex:none;opacity:.75}.layers .row.on{background:color-mix(in srgb,var(--ac) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ac) 55%,transparent)}
+.layers .say-tag{margin-left:auto;flex:none;font:600 10px 'JetBrains Mono',monospace;letter-spacing:.06em;padding:2px 7px;border-radius:9px;background:var(--ac);color:#06201a}
+.layers .eye,.layers .lock{flex:none;width:28px;height:28px;border-radius:9px;display:inline-grid;place-items:center;opacity:.65}.layers .eye:hover,.layers .lock:hover,.layers .lock[aria-pressed=true],.layers .eye[aria-pressed=true]{opacity:1}.layers .locked .row{opacity:.6}
+.layers h2{display:flex;align-items:center;gap:8px}.layers .collapse{margin-left:auto;width:26px;height:26px;border-radius:9px;font-size:18px;line-height:1}.layers.collapsed{padding-bottom:10px}
