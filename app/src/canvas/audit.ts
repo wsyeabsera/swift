@@ -1,7 +1,7 @@
 // Local critique pre-pass: the objective checks (contrast, clipped text, tap targets, 10-foot legibility) judged from the facts the frame reports.
 // Instant and free; Claude is only asked about what needs judgment. Each finding names its element and, where there is one safe change, a fix (an ordinary edit).
 import type { AuditFacts, AuditNode, Rgb } from './bridge';
-export type Finding = { el: string; kind: 'contrast' | 'safe' | 'clipped' | 'offscreen' | 'tap' | 'legibility'; message: string; fix?: { prop: string; value: string } };
+export type Finding = { el: string; kind: 'contrast' | 'safe' | 'critique' | 'clipped' | 'offscreen' | 'tap' | 'legibility'; message: string; fix?: { prop: string; value: string } };
 export type Surface = 'tv' | 'phone' | 'desktop';
 const lin = (c: number): number => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
 const lum = (c: Rgb): number => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);

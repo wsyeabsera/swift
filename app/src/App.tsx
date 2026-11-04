@@ -40,6 +40,7 @@ import { EASES, emptyTimeline, loadTimeline, sample as motionSample, saveTimelin
 import { canMerge, merge as mergeBranch, type Choice, type Conflict } from './merge';
 import { pushHistory, step } from './say/history';
 import { auditFacts, type Finding } from './canvas/audit';
+import { CRITIQUE_SYSTEM, critiquePrompt, parseCritique } from './canvas/critique';
 import { AURORA, meter as fxMeter, suggest as fxSuggest, type Device, type Effect } from './effects';
 import { localEdits, propTokenRequest, themeRequest, easeRequest, tokenRequest } from './say/local';
 import { suggestions, type SuggestProps } from './say/suggest';
@@ -282,6 +283,16 @@ export function App() {
   const [findings, setFindings] = useState<(Finding & { frame: string })[]>([]); const [checkNote, setCheckNote] = useState(''); const checkedFrame = useRef('');
   const checkFrame = async () => { const f = frames.find((x) => x.id === selection?.frameId) ?? frames[0]; const api = window.__swift; if (!f || !api) return; const t0 = performance.now(); const facts = await api.audit(f.id); if (!facts) { setCheckNote('frame did not answer'); return; }
     const found = auditFacts(facts, f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop'); checkedFrame.current = f.id; setFindings(found.map((x) => ({ ...x, frame: f.id }))); setCheckNote(`${f.title}: ${found.length} finding${found.length === 1 ? '' : 's'} · ${(performance.now() - t0).toFixed(0)} ms`); };
+  const [critiquing, setCritiquing] = useState(false);
+  const askClaude = async () => { // the local pre-pass first (instant, free), then Claude only for what needs judgment; its findings are validated before they are shown
+    const f = frames.find((x) => x.id === selection?.frameId) ?? frames[0]; const api = window.__swift; const c = conn.current; if (!f || !api || !c || critiquing) return;
+    if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { setCheckNote(`Claude is not ready: ${helper.claudeStatus.message}`); return; }
+    const facts = await api.audit(f.id); if (!facts) { setCheckNote('frame did not answer'); return; } const surface = f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop'; const local = auditFacts(facts, surface); checkedFrame.current = f.id; setFindings(local.map((x) => ({ ...x, frame: f.id })));
+    setCritiquing(true); setCheckNote(`${f.title}: ${local.length} local, asking Claude…`); let text = '', err = ''; const t0 = performance.now();
+    await new Promise<void>((done) => c.say(CRITIQUE_SYSTEM, critiquePrompt(facts, surface === 'tv' ? 'TV screen' : surface === 'phone' ? 'phone screen' : 'desktop screen', local), (e) => { if (e.kind === 'delta') text += e.text; else { if (e.kind === 'error') err = e.text; done(); } }));
+    setCritiquing(false); if (err && !text) { setCheckNote(`Claude failed: ${err}`); return; }
+    const r = parseCritique(text, facts.nodes.map((n) => n.id)); setFindings([...local, ...r.findings].map((x) => ({ ...x, frame: f.id }))); setCheckNote(`${f.title}: ${local.length} local + ${r.findings.length} from Claude${r.rejected ? ` · ${r.rejected} rejected` : ''} · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+  };
   const checkAll = async () => { const api = window.__swift; if (!api) return; const t0 = performance.now(); const all: (Finding & { frame: string })[] = []; let bad = 0;
     for (const f of frames) { const facts = await api.audit(f.id); if (!facts) { bad++; continue; } for (const x of auditFacts(facts, f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop')) all.push({ ...x, frame: f.id }); }
     setFindings(all); setCheckNote(`all ${frames.length} frames: ${all.length} finding${all.length === 1 ? '' : 's'}${bad ? ` · ${bad} did not answer` : ''} · ${(performance.now() - t0).toFixed(0)} ms`); };
@@ -494,8 +505,8 @@ export function App() {
             <p className="mono mu" data-testid="fx-meter" data-over={fxM.over}>{fxM.frameMs.toFixed(0)} ms per update · {Math.round(fxM.load * 100)}% GPU{fxM.over ? ` · OVER: ${fxM.reason}` : ' · within budget'}</p>
             {fxS && <div className="projs"><span className="mono mu" data-testid="fx-suggest">{fxS.text}</span><button className="rb btn" data-testid="fx-apply" onClick={() => setFxStack(fxS.stack)}>Apply</button></div>}
             <h2>Check <span className="mono mu">{checkNote || 'contrast, clipping, taps'}</span></h2>
-            <div className="projs"><button className="rb btn" onClick={() => void checkFrame()} data-testid="check" title="Instant local checks on the selected frame (or the first one)">Check frame</button><button className="rb btn" onClick={() => void checkAll()} data-testid="check-all" title="Check every frame of this project">Check all frames</button></div>
-            <ul className="liblist" data-testid="findings">{findings.map((f, i) => (<li key={`${f.el}-${f.kind}-${i}`} className="libitem" data-testid="finding" data-kind={f.kind}><span className="mono">{f.frame}/{f.el}</span> <span className="mu">{f.message}</span>{f.fix && <button className="rb btn" onClick={() => void fixFinding(f)} data-testid="finding-fix">Fix: {f.fix.prop} {f.fix.value}</button>}</li>))}</ul>
+            <div className="projs"><button className="rb btn" onClick={() => void checkFrame()} data-testid="check" title="Instant local checks on the selected frame (or the first one)">Check frame</button><button className="rb btn" onClick={() => void checkAll()} data-testid="check-all" title="Check every frame of this project">Check all frames</button><button className="rb btn" onClick={() => void askClaude()} disabled={critiquing || helper.status !== 'connected'} data-testid="critique" title="Local checks first, then Claude judges hierarchy, spacing and copy (uses a little subscription)">{critiquing ? 'Asking…' : 'Ask Claude'}</button></div>
+            <ul className="liblist" data-testid="findings">{findings.map((f, i) => (<li key={`${f.el}-${f.kind}-${i}`} className="libitem" data-testid="finding" data-kind={f.kind}><button className="rb btn mono" onClick={() => { setSelection({ frameId: f.frame, el: f.el }); window.__swift?.fitTo([f.frame]); }} data-testid="finding-select" title="Select this element">{f.frame}/{f.el}</button> <span className="mu">{f.message}</span>{f.fix && <button className="rb btn" onClick={() => void fixFinding(f)} data-testid="finding-fix">Fix: {f.fix.prop} {f.fix.value}</button>}</li>))}</ul>
             <h2>History <span className="mono mu">Says on this device</span></h2>
             <ul className="liblist" data-testid="history">{recs.filter((r) => r.prompt).slice(-12).reverse().map((r) => (<li key={r.id} className="mono" data-testid="history-row">“{r.prompt}” <span className="mu">· {r.tier}{r.firstMs != null ? ` · first ${r.firstMs.toFixed(0)} ms` : ''} · {r.ms.toFixed(0)} ms{r.rejected ? ` · ${r.rejected} rejected` : ''}{!r.ok ? ' · failed' : ''}{r.undone ? ' · undone' : ''}</span></li>))}</ul>
             <h2>Pulse <span className="mono mu">this device, last {recs.length}</span></h2>
