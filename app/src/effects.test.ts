@@ -15,7 +15,7 @@ test('an impossible stack returns no suggestion instead of looping', () => expec
 import { fxHtml, fxId, parseFx, FX_PRESETS } from './effects';
 test('an effect layer round-trips through its markup, so the meter reads the real frame', () => {
   const e: Effect = { kind: 'gradient', scale: 0.25, fps: 15 }; const h = fxHtml('fx-gradient-1', e); expect(h).toContain('pointer-events:none'); expect(h).toContain('steps(180)'); expect(h).toContain('width:25.00%'); expect(h).toContain('scale(4.000)');
-  expect(parseFx(`<div id="tv">${h}${fxHtml('fx-blur-1', { kind: 'blur', scale: 1, fps: 30 })}</div>`)).toEqual([{ id: 'fx-gradient-1', effect: e }, { id: 'fx-blur-1', effect: { kind: 'blur', scale: 1, fps: 30 } }]);
+  expect(parseFx(`<div id="tv">${h}${fxHtml('fx-blur-1', { kind: 'blur', scale: 1, fps: 30 })}</div>`)).toEqual([{ id: 'fx-gradient-1', effect: e, on: true }, { id: 'fx-blur-1', effect: { kind: 'blur', scale: 1, fps: 30 }, on: true }]);
   expect(parseFx('<div id="x" data-fx="gradient" data-fx-scale="9" data-fx-fps="15">')).toEqual([]); expect(parseFx('<div id="tv"></div>')).toEqual([]);
 });
 test('a frame with the shipped aurora preset is within the TV budget; the heavy preset is not', () => {
@@ -24,4 +24,9 @@ test('a frame with the shipped aurora preset is within the TV budget; the heavy 
 });
 test('fxId picks the next free id and the settings are clamped to a sane scale', () => {
   expect(fxId('', 'noise')).toBe('fx-noise-1'); expect(fxId('<i id="fx-noise-1"></i><i id="fx-noise-2"></i>', 'noise')).toBe('fx-noise-3'); expect(fxHtml('a', { kind: 'noise', scale: 0, fps: 10 })).toContain('data-fx-scale="0.05"');
+});
+
+test('parseFx marks a layer switched off (display:none) and keeps it in the list', async () => {
+  const { fxHtml, parseFx } = await import('./effects'); const on = fxHtml('fx-gradient-1', { kind: 'gradient', scale: 0.5, fps: 15 }); const off = fxHtml('fx-noise-1', { kind: 'noise', scale: 0.5, fps: 15 }).replace('style="', 'style="display:none;');
+  const r = parseFx(`<div id="x">${on}${off}</div>`); expect(r.map((x) => [x.id, x.on])).toEqual([['fx-gradient-1', true], ['fx-noise-1', false]]);
 });

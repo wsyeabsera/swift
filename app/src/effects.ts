@@ -40,9 +40,9 @@ export function fxHtml(id: string, e: Effect): string {
   const steps = Math.max(1, Math.round(LOOP_S * e.fps)); const s = Math.min(1, Math.max(0.05, e.scale));
   return `<div id="${id}" data-fx="${e.kind}" data-fx-scale="${s}" data-fx-fps="${e.fps}" style="position:absolute;left:0;top:0;width:${(100 * s).toFixed(2)}%;height:${(100 * s).toFixed(2)}%;transform:scale(${(1 / s).toFixed(3)});transform-origin:0 0;pointer-events:none;will-change:transform;${FX_STYLE[e.kind](s)};animation:${id}-a ${LOOP_S}s steps(${steps}) infinite"><style>@keyframes ${id}-a{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}</style></div>`;
 }
-/** The effect layers in a frame's markup, in order (what the meter charges for). */
-export function parseFx(html: string): { id: string; effect: Effect }[] {
-  const out: { id: string; effect: Effect }[] = []; for (const m of html.matchAll(/<div id="([^"]+)" data-fx="(gradient|blur|noise)" data-fx-scale="([\d.]+)" data-fx-fps="(\d+)"/g)) { const scale = Number(m[3]), fps = Number(m[4]); if (scale > 0 && scale <= 1 && fps > 0 && fps <= 60) out.push({ id: m[1]!, effect: { kind: m[2] as FxKind, scale, fps } }); } return out;
+/** The effect layers in a frame's markup, in order (what the meter charges for). `on` is false for a layer switched off (its style says display:none): it stays in the frame, the meter does not charge for it. */
+export function parseFx(html: string): { id: string; effect: Effect; on: boolean }[] {
+  const out: { id: string; effect: Effect; on: boolean }[] = []; for (const m of html.matchAll(/<div id="([^"]+)" data-fx="(gradient|blur|noise)" data-fx-scale="([\d.]+)" data-fx-fps="(\d+)"[^>]*>/g)) { const scale = Number(m[3]), fps = Number(m[4]); if (scale > 0 && scale <= 1 && fps > 0 && fps <= 60) out.push({ id: m[1]!, effect: { kind: m[2] as FxKind, scale, fps }, on: !/display:\s*none/i.test(m[0]) }); } return out;
 }
 /** The next free `fx-<kind>-<n>` id among the ids already in the frame. */
 export function fxId(html: string, kind: FxKind): string { let n = 1; while (html.includes(`id="fx-${kind}-${n}"`)) n++; return `fx-${kind}-${n}`; }
