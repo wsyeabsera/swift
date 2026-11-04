@@ -24,8 +24,7 @@ jobs:
       - run: npm test
       - run: cargo test -q
 
-  e2e:
-    needs: checks
+  e2e: # runs beside `checks`, not after it: wall time is the slower of the two
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -38,6 +37,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: npm ci
       # Playwright-matched Chromium: branded Chrome ignores --load-extension (see CLAUDE.md).
+      - uses: actions/cache@v4
+        id: pw
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright-core install chromium
       # NOTE: e2e/budgets.json panGapP95Ms is hardware-sensitive (measured on an M2 Pro on AC power).
       # Shared CI runners are slower and noisier, so a pan-gap failure here may be the runner, not a
