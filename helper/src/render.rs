@@ -16,17 +16,59 @@ fn shot(chrome: &str, doc: &Path, png: &Path, w: u32, h: u32) -> Result<(), Stri
     let mut child = Command::new(chrome).args(["--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--force-device-scale-factor=1", &format!("--window-size={w},{h}"), &format!("--screenshot={}", png.display()), &format!("file://{}", doc.display())]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|e| format!("cannot start the browser ({chrome}): {e}"))?;
     let t0 = Instant::now(); loop { match child.try_wait() { Ok(Some(s)) => { return if s.success() && png.exists() { Ok(()) } else { Err(format!("the browser failed on a frame ({s})")) }; } Ok(None) if t0.elapsed() > PER_FRAME => { let _ = child.kill(); let _ = child.wait(); return Err("the browser hung on a frame".into()); } Ok(None) => thread::sleep(Duration::from_millis(15)), Err(e) => return Err(e.to_string()) } }
 }
-/// Returns the MP4 bytes. `chrome` and `ffmpeg` are executables; `workers` frames are rasterized at once.
+
+/// Standard base64 decoder (Chrome returns screenshots as base64 text).
+pub fn unb64(s: &str) -> Option<Vec<u8>> { let mut out = Vec::with_capacity(s.len() / 4 * 3); let (mut acc, mut bits) = (0u32, 0); for c in s.bytes() { let v = match c { b'A'..=b'Z' => c - b'A', b'a'..=b'z' => c - b'a' + 26, b'0'..=b'9' => c - b'0' + 52, b'+' => 62, b'/' => 63, b'=' | b'\n' | b'\r' => continue, _ => return None }; acc = acc << 6 | v as u32; bits += 6; if bits >= 8 { bits -= 8; out.push((acc >> bits) as u8); acc &= (1 << bits) - 1; } } Some(out) }
+/// One headless Chrome kept open, driven over the DevTools Protocol: each frame is `Page.setDocumentContent` + `Page.captureScreenshot` (~tens of ms) instead of a browser launch per frame.
+struct Cdp { ws: tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>, id: u64, session: String, child: std::process::Child }
+impl Cdp {
+    fn call(&mut self, method: &str, params: serde_json::Value, session: bool) -> Result<serde_json::Value, String> {
+        self.id += 1; let id = self.id; let mut m = serde_json::json!({ "id": id, "method": method, "params": params }); if session { m["sessionId"] = self.session.clone().into(); }
+        self.ws.send(tungstenite::Message::text(m.to_string())).map_err(|e| format!("{method}: {e}"))?;
+        loop { match self.ws.read().map_err(|e| format!("{method}: {e}"))? { tungstenite::Message::Text(t) => { let v: serde_json::Value = serde_json::from_str(t.as_str()).map_err(|e| e.to_string())?; if v.get("id").and_then(|x| x.as_u64()) == Some(id) { return match v.get("error") { Some(e) => Err(format!("{method}: {}", e.get("message").and_then(|x| x.as_str()).unwrap_or("error"))), None => Ok(v["result"].clone()) }; } } tungstenite::Message::Close(_) => return Err(format!("{method}: the browser closed the connection")), _ => {} } }
+    }
+    fn open(chrome: &str, prof: &Path, w: u32, h: u32) -> Result<Cdp, String> {
+        let child = Command::new(chrome).args(["--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--remote-debugging-port=0", &format!("--user-data-dir={}", prof.display()), &format!("--window-size={w},{h}"), "about:blank"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|e| format!("cannot start the browser ({chrome}): {e}"))?;
+        let mut guard = Cdp::placeholder(child); let t0 = Instant::now(); let (port, path) = loop { if let Ok(t) = fs::read_to_string(prof.join("DevToolsActivePort")) { let mut l = t.lines(); if let (Some(p), Some(q)) = (l.next(), l.next()) { break (p.trim().to_string(), q.trim().to_string()); } } if t0.elapsed() > Duration::from_secs(15) { return Err("the browser did not open its debugging port".into()); } thread::sleep(Duration::from_millis(30)); };
+        let (ws, _) = tungstenite::connect(format!("ws://127.0.0.1:{port}{path}")).map_err(|e| format!("cannot connect to the browser: {e}"))?; guard.ws = Some(ws); let mut c = guard.into_cdp();
+        let t = c.call("Target.createTarget", serde_json::json!({ "url": "about:blank" }), false)?; let tid = t["targetId"].as_str().ok_or("no target")?.to_string();
+        let a = c.call("Target.attachToTarget", serde_json::json!({ "targetId": tid, "flatten": true }), false)?; c.session = a["sessionId"].as_str().ok_or("no session")?.to_string();
+        c.call("Emulation.setDeviceMetricsOverride", serde_json::json!({ "width": w, "height": h, "deviceScaleFactor": 1, "mobile": false }), true)?; c.call("Page.enable", serde_json::json!({}), true)?; Ok(c)
+    }
+    fn placeholder(child: std::process::Child) -> Guard { Guard { child: Some(child), ws: None } }
+    fn shot(&mut self, doc: &str) -> Result<Vec<u8>, String> {
+        let tree = self.call("Page.getFrameTree", serde_json::json!({}), true)?; let fid = tree["frameTree"]["frame"]["id"].as_str().ok_or("no frame")?.to_string();
+        self.call("Page.setDocumentContent", serde_json::json!({ "frameId": fid, "html": doc }), true)?;
+        self.call("Runtime.evaluate", serde_json::json!({ "expression": "Promise.all([document.fonts.ready, ...[...document.images].map((i) => i.decode().catch(() => 0))]).then(() => 1)", "awaitPromise": true }), true)?; // fonts and images are in before the capture
+        let r = self.call("Page.captureScreenshot", serde_json::json!({ "format": "png", "optimizeForSpeed": true }), true)?; unb64(r["data"].as_str().ok_or("no screenshot data")?).ok_or_else(|| "bad screenshot data".to_string())
+    }
+}
+impl Drop for Cdp { fn drop(&mut self) { let _ = self.child.kill(); let _ = self.child.wait(); } }
+struct Guard { child: Option<std::process::Child>, ws: Option<tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>> }
+impl Guard { fn into_cdp(mut self) -> Cdp { Cdp { ws: self.ws.take().unwrap(), id: 0, session: String::new(), child: self.child.take().unwrap() } } }
+impl Drop for Guard { fn drop(&mut self) { if let Some(mut c) = self.child.take() { let _ = c.kill(); let _ = c.wait(); } } }
+
+fn encode(dir: &Path, j: &Job, ffmpeg: &str) -> Result<Vec<u8>, String> {
+        let mp4 = dir.join("out.mp4"); let o = Command::new(ffmpeg).args(["-y", "-v", "error", "-framerate", &j.fps.to_string(), "-i"]).arg(dir.join("f%04d.png")).args(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-movflags", "+faststart"]).arg(&mp4).stdin(Stdio::null()).output().map_err(|e| format!("cannot start ffmpeg ({ffmpeg}): {e}"))?;
+        if !o.status.success() { return Err(format!("ffmpeg failed: {}", String::from_utf8_lossy(&o.stderr).trim().chars().take(300).collect::<String>())); }
+        fs::read(&mp4).map_err(|e: io::Error| e.to_string())
+}
+fn workdir() -> Result<PathBuf, String> { static N: AtomicUsize = AtomicUsize::new(0); let dir = std::env::temp_dir().join(format!("sc-render-{}-{}", std::process::id(), N.fetch_add(1, Ordering::SeqCst))); fs::create_dir_all(&dir).map_err(|e| e.to_string())?; Ok(dir) }
+/// The fast path: one browser over the DevTools Protocol (see Cdp), then one encode.
+pub fn render_cdp(chrome: &str, ffmpeg: &str, j: &Job) -> Result<Vec<u8>, String> {
+    check(j)?; let dir = workdir()?;
+    let out = (|| -> Result<Vec<u8>, String> { let mut c = Cdp::open(chrome, &dir.join("prof"), j.w, j.h)?; for (i, d) in j.docs.iter().enumerate() { let png = c.shot(&format!("{CSP}{d}")).map_err(|e| format!("frame {i}: {e}"))?; fs::write(dir.join(format!("f{i:04}.png")), png).map_err(|e| e.to_string())?; } drop(c); encode(&dir, j, ffmpeg) })();
+    let _ = fs::remove_dir_all(&dir); out
+}
+/// The slow path (a browser per frame, a few at a time): needs nothing but a Chrome that can `--screenshot`. Returns the MP4 bytes. `chrome` and `ffmpeg` are executables; `workers` frames are rasterized at once.
 pub fn render(chrome: &str, ffmpeg: &str, j: &Job, workers: usize) -> Result<Vec<u8>, String> {
-    check(j)?; static N: AtomicUsize = AtomicUsize::new(0); let dir: PathBuf = std::env::temp_dir().join(format!("sc-render-{}-{}", std::process::id(), N.fetch_add(1, Ordering::SeqCst))); fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    check(j)?; let dir = workdir()?;
     let out = (|| -> Result<Vec<u8>, String> {
         for (i, d) in j.docs.iter().enumerate() { fs::write(dir.join(format!("f{i:04}.html")), format!("{CSP}{d}")).map_err(|e| e.to_string())?; }
         let next = AtomicUsize::new(0); let err: Mutex<Option<String>> = Mutex::new(None);
         thread::scope(|s| { for _ in 0..workers.clamp(1, 8) { s.spawn(|| loop { let i = next.fetch_add(1, Ordering::SeqCst); if i >= j.docs.len() || err.lock().map(|e| e.is_some()).unwrap_or(true) { break; } if let Err(e) = shot(chrome, &dir.join(format!("f{i:04}.html")), &dir.join(format!("f{i:04}.png")), j.w, j.h) { if let Ok(mut g) = err.lock() { g.get_or_insert(format!("frame {i}: {e}")); } } }); } });
         if let Some(e) = err.into_inner().ok().flatten() { return Err(e); }
-        let mp4 = dir.join("out.mp4"); let o = Command::new(ffmpeg).args(["-y", "-v", "error", "-framerate", &j.fps.to_string(), "-i"]).arg(dir.join("f%04d.png")).args(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-movflags", "+faststart"]).arg(&mp4).stdin(Stdio::null()).output().map_err(|e| format!("cannot start ffmpeg ({ffmpeg}): {e}"))?;
-        if !o.status.success() { return Err(format!("ffmpeg failed: {}", String::from_utf8_lossy(&o.stderr).trim().chars().take(300).collect::<String>())); }
-        fs::read(&mp4).map_err(|e: io::Error| e.to_string())
+        encode(&dir, j, ffmpeg)
     })();
     let _ = fs::remove_dir_all(&dir); out
 }
@@ -36,6 +78,7 @@ pub fn render(chrome: &str, ffmpeg: &str, j: &Job, workers: usize) -> Result<Vec
     fn job(n: usize) -> Job { Job { w: 320, h: 240, fps: 30, docs: (0..n).map(|i| format!("<p>{i}</p>")).collect() } }
     const CHROME: &str = r#"for a in "$@"; do case "$a" in --screenshot=*) f="${a#--screenshot=}";; esac; done; echo png > "$f""#;
     #[test] fn base64_matches_the_standard_vectors() { for (i, o) in [("", ""), ("f", "Zg=="), ("fo", "Zm8="), ("foo", "Zm9v"), ("foob", "Zm9vYg=="), ("fooba", "Zm9vYmE="), ("foobar", "Zm9vYmFy")] { assert_eq!(b64(i.as_bytes()), o); } }
+    #[test] fn base64_round_trips() { for i in ["", "f", "fo", "foo", "foob", "fooba", "foobar"] { assert_eq!(unb64(&b64(i.as_bytes())).unwrap(), i.as_bytes()); } assert!(unb64("a$b").is_none()); assert_eq!(unb64("Zm9v\nYmFy").unwrap(), b"foobar"); }
     #[test] fn limits_are_enforced() { assert!(check(&Job { docs: vec![], ..job(0) }).is_err()); assert!(check(&job(MAX_FRAMES + 1)).is_err()); assert!(check(&Job { w: 10, ..job(1) }).is_err()); assert!(check(&Job { fps: 0, ..job(1) }).is_err()); assert!(check(&Job { docs: vec!["x".repeat(MAX_DOC + 1)], ..job(1) }).is_err()); assert!(check(&job(3)).is_ok()); }
     #[test] fn every_frame_is_shot_in_order_then_encoded_and_the_work_dir_is_removed() {
         let dirlog = std::env::temp_dir().join(format!("sc-rdir-{}", std::process::id())); let _ = fs::remove_file(&dirlog);
@@ -51,13 +94,13 @@ pub fn render(chrome: &str, ffmpeg: &str, j: &Job, workers: usize) -> Result<Vec
     #[test] #[ignore] fn real_tools_make_a_playable_mp4() {
         let docs = (0..30).map(|i| format!("<body style=\"margin:0;background:#101820\" onload=\"document.body.style.background='red'\"><script>document.body.style.background='red'</script><div style=\"position:absolute;left:{}px;top:40px;width:80px;height:80px;border-radius:20px;background:#7cf0d0;opacity:{}\"></div></body>", i * 20, 1.0 - i as f32 / 40.0)).collect();
         let chrome = std::env::var("SWIFT_CHROME_BIN").unwrap_or_else(|_| "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome".into()); let t0 = Instant::now();
-        let bytes = render(&chrome, "ffmpeg", &Job { w: 640, h: 360, fps: 30, docs }, 4).unwrap(); eprintln!("30 frames 640x360 in {:?}, {} bytes", t0.elapsed(), bytes.len());
+        let bytes = render_cdp(&chrome, "ffmpeg", &Job { w: 640, h: 360, fps: 30, docs }).unwrap(); eprintln!("30 frames 640x360 in {:?}, {} bytes", t0.elapsed(), bytes.len());
         assert!(bytes.len() > 1000 && &bytes[4..8] == b"ftyp"); fs::write(std::env::var("SC_RENDER_OUT").unwrap_or("/tmp/sc-render-test.mp4".into()), bytes).unwrap();
     }
     /// Proof run on real documents (cargo test real_documents -- --ignored --nocapture) with SC_DOCS=docs.json (a JSON array of HTML strings, 1920x1080 at 30 fps) and SC_RENDER_OUT=out.mp4.
     #[test] #[ignore] fn real_documents_render() {
         let Ok(p) = std::env::var("SC_DOCS") else { return }; let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(p).unwrap()).unwrap(); let docs: Vec<String> = v.as_array().unwrap().iter().map(|d| d.as_str().unwrap().to_string()).collect();
         let chrome = std::env::var("SWIFT_CHROME_BIN").unwrap_or_else(|_| "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome".into()); let (n, t0) = (docs.len(), Instant::now());
-        let b = render(&chrome, "ffmpeg", &Job { w: 1920, h: 1080, fps: 30, docs }, 4).unwrap(); eprintln!("{n} frames 1920x1080 in {:?}, {} bytes", t0.elapsed(), b.len()); fs::write(std::env::var("SC_RENDER_OUT").unwrap(), b).unwrap();
+        let b = if std::env::var("SC_SLOW").is_ok() { render(&chrome, "ffmpeg", &Job { w: 1920, h: 1080, fps: 30, docs }, 4) } else { render_cdp(&chrome, "ffmpeg", &Job { w: 1920, h: 1080, fps: 30, docs }) }.unwrap(); eprintln!("{n} frames 1920x1080 in {:?}, {} bytes", t0.elapsed(), b.len()); fs::write(std::env::var("SC_RENDER_OUT").unwrap(), b).unwrap();
     }
 }
