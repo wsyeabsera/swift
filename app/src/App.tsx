@@ -11,7 +11,7 @@ import { blankFrames, makeFrames, type FrameDef } from './canvas/fixtures';
 import { zoomAt } from './canvas/viewport';
 import { moveEdits, moveStart, type MoveStart, nudge, resizedSize } from './canvas/nudge';
 import { firstChild, parentOf } from './canvas/tree';
-import { compareSet } from './canvas/compare';
+import { compareSet, diffSigs, type Change } from './canvas/compare';
 import { exportDoc, exportName } from './canvas/exportHtml';
 import type { RepoEntry, RepoFile } from './helper';
 import { starterFrames } from './canvas/starter';
@@ -254,6 +254,8 @@ export function App() {
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, importOpen, appearanceOpen, shortcutsOpen, frameMenuOpen]);
   const [fxStack, setFxStack] = useState<Effect[]>(AURORA); const [fxDevice, setFxDevice] = useState<Device>('tv'); const fxM = fxMeter(fxStack, fxDevice); const fxS = fxSuggest(fxStack, fxDevice);
+  const [changes, setChanges] = useState<{ pair: string; list: Change[] } | null>(null);
+  const whatChanged = async () => { const api = window.__swift; if (!api || !cmp) return; const t0 = performance.now(); const [a, b] = await Promise.all([api.sig(cmp[0]!), api.sig(cmp[1]!)]); if (!a || !b) { setSayStatus('Could not read both frames'); return; } setChanges({ pair: `${cmp[1]} vs ${cmp[0]} · ${(performance.now() - t0).toFixed(0)} ms`, list: diffSigs(a, b) }); };
   const [findings, setFindings] = useState<(Finding & { frame: string })[]>([]); const [checkNote, setCheckNote] = useState(''); const checkedFrame = useRef('');
   const checkFrame = async () => { const f = frames.find((x) => x.id === selection?.frameId) ?? frames[0]; const api = window.__swift; if (!f || !api) return; const t0 = performance.now(); const facts = await api.audit(f.id); if (!facts) { setCheckNote('frame did not answer'); return; }
     const found = auditFacts(facts, f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop'); checkedFrame.current = f.id; setFindings(found.map((x) => ({ ...x, frame: f.id }))); setCheckNote(`${f.title}: ${found.length} finding${found.length === 1 ? '' : 's'} · ${(performance.now() - t0).toFixed(0)} ms`); };
@@ -430,6 +432,7 @@ export function App() {
             <h2>Selected frame</h2>
             <div className="projs">
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); if (cmp) window.__swift?.fitTo(cmp); }} disabled={!cmp} data-testid="compare" title="Show the selected take or copy next to its original">Compare with original</button>
+              <button className="rb btn" onClick={() => void whatChanged()} disabled={!cmp} data-testid="what-changed" title="List the elements and properties that differ from the original">What changed</button>
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void exportFrame(); }} data-testid="export">Export HTML</button>
               <button className="rb btn" onClick={() => { setFrameMenuOpen(false); void deleteFrame(); }} disabled={!selection} data-testid="delete-frame" title="Delete the selected frame (undoable)">Delete frame</button>
             </div>
@@ -450,6 +453,7 @@ export function App() {
             <ul className="liblist" data-testid="brand-kit">{Object.entries(brand).map(([name, val]) => (<li key={name} className="libitem" data-testid="brand-token"><span className="mono">{name}</span> {/^#[0-9a-f]{3,8}$/i.test(val) ? <input type="color" aria-label={`Edit ${name}`} data-testid="brand-color" value={/^#[0-9a-f]{6}$/i.test(val) ? val : '#808080'} onChange={(e) => void editToken(name, e.target.value)} title="Changes this colour in every frame" /> : null}{!/^#[0-9a-f]{3,8}$/i.test(val) ? <input key={val} className="mono" aria-label={`Edit ${name} as text`} data-testid="brand-text" defaultValue={val} onKeyDown={(e) => { if (e.key === 'Enter') void editToken(name, e.currentTarget.value); }} title="Type a new value (a colour, a size like 16px, a font family) and press Enter" /> : null}{/^#[0-9a-f]{3,8}$/i.test(val) ? <span className="mu mono"> {val}</span> : null}</li>))}</ul>
             <p className="mono mu" data-testid="pool">{pool ? `Claude pool: ${pool.running}/${pool.max} running · ${pool.spare ? 'warm spare ready' : 'no spare'}${pool.availableMb != null ? ` · ${(pool.availableMb / 1024).toFixed(1)} GB free (floor ${(pool.minFreeMb / 1024).toFixed(1)} GB)` : ''}` : 'Claude pool: helper offline'}</p>
             {repoPlan && <><h2>Export preview <span className="mono mu">{repoPlan.branch}</span></h2><ul className="liblist" data-testid="repo-plan">{repoPlan.entries.map((e) => (<li key={e.path} className="libitem mono" data-testid="repo-plan-row" data-state={e.status}>{e.status} · {e.path}</li>))}</ul><div className="projs"><button className="rb btn" onClick={() => void confirmRepoExport()} data-testid="repo-confirm">Create branch</button><button className="rb btn" onClick={() => setRepoPlan(null)} data-testid="repo-cancel">Cancel</button></div></>}
+            {changes && <><h2>Changed <span className="mono mu">{changes.pair}</span></h2><ul className="liblist" data-testid="changes">{changes.list.length === 0 ? <li className="mono mu">identical</li> : changes.list.map((c) => (<li key={c.el} className="libitem mono" data-testid="change" data-kind={c.kind}>{c.el} <span className="mu">{c.kind}{c.props.length ? `: ${c.props.join(', ')}` : ''}</span></li>))}</ul></>}
             <h2>Effects budget <span className="mono mu">estimate</span></h2>
             <div className="projs"><select aria-label="Device" data-testid="fx-device" value={fxDevice} onChange={(e) => setFxDevice(e.target.value as Device)}><option value="tv">TV</option><option value="phone">Phone</option><option value="desktop">Desktop</option></select><button className="rb btn" data-testid="fx-aurora" onClick={() => setFxStack(AURORA)}>Aurora</button><button className="rb btn" data-testid="fx-heavy" onClick={() => setFxStack([{ kind: 'gradient', scale: 1, fps: 30 }, { kind: 'blur', scale: 0.5, fps: 30 }])}>Heavy</button></div>
             <p className="mono mu" data-testid="fx-meter" data-over={fxM.over}>{fxM.frameMs.toFixed(0)} ms per update · {Math.round(fxM.load * 100)}% GPU{fxM.over ? ` · OVER: ${fxM.reason}` : ' · within budget'}</p>

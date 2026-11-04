@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { frameDoc, FrameBridge, type TreeNode, type AuditFacts } from './bridge';
+import { frameDoc, FrameBridge, type TreeNode, type AuditFacts, type ElSig } from './bridge';
 import type { FrameDef } from './fixtures';
 import { fit, isVisible, panBy, screenToWorld, transformCss, zoomAt, type View } from './viewport';
 
@@ -11,6 +11,7 @@ export type CanvasApi = {
   props: (frameId: string, el: string, props: string[]) => Promise<Record<string, string> | undefined>;
   tree: (frameId: string) => Promise<TreeNode[]>;
   audit: (frameId: string) => Promise<AuditFacts | undefined>;
+  sig: (frameId: string) => Promise<Record<string, ElSig> | undefined>;
   hit: (frameId: string, x: number, y: number) => Promise<string | null | undefined>;
   snapshot: (frameId: string) => Promise<string>;
   outer: (frameId: string, el: string) => Promise<string>;
@@ -77,6 +78,7 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
       edit: async (id, el, prop, value) => { const t0 = performance.now(); const r = await bridge(id)?.request({ t: 'edit', el, prop, value }); return { ok: !!r?.ok, ms: performance.now() - t0, before: r?.before ?? '' }; },
       get: async (id, el, prop) => (await bridge(id)?.request({ t: 'get', el, prop }))?.value,
       props: async (id, el, props) => (await bridge(id)?.request({ t: 'props', el, props }))?.values,
+      sig: async (id) => (await bridge(id)?.request({ t: 'sig' }))?.sig,
       audit: async (id) => (await bridge(id)?.request({ t: 'audit' }))?.audit,
       tree: async (id) => (await bridge(id)?.request({ t: 'tree' }))?.tree ?? [],
       hit: async (id, x, y) => (await bridge(id)?.request({ t: 'hit', x, y }))?.id,
