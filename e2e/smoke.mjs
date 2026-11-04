@@ -145,6 +145,9 @@ try {
   // + phone adds an empty preset frame whose root id is addressable
   { const n0 = await web.evaluate(() => window.__swift.frames.length); await web.getByTestId('frame-menu').click(); await web.getByTestId('add-phone').click(); await web.waitForFunction((n) => window.__swift && window.__swift.frames.length === n + 1, n0, { timeout: 4000 * SLOW }); await web.waitForTimeout(400);
     cv.added = await web.evaluate(async () => ({ has: window.__swift.frames.includes('phone-1'), width: await window.__swift.get('phone-1', 'phone-1', 'width') }));
+    { const has = async (id) => web.evaluate(async (needle) => { for (const f of window.__swift.frames) { const h = await window.__swift.snapshot(f); if (h && h.includes(needle)) return true; } return false; }, `id="${id}"`); // the bottom palette: Shape and Text add real layers (one undo step each) and undo removes them
+      await web.getByTestId('tool-shape').click(); await web.waitForFunction(() => /^Added shape-1/.test(document.querySelector('[data-testid=say-status]')?.textContent ?? ''), null, { timeout: 5000 * SLOW }); await web.getByTestId('tool-text').click(); await web.waitForFunction(() => /^Added text-1/.test(document.querySelector('[data-testid=say-status]')?.textContent ?? ''), null, { timeout: 5000 * SLOW });
+      const both = (await has('shape-1')) && (await has('text-1')); await web.getByTestId('undo').click(); await web.waitForTimeout(400); await web.getByTestId('undo').click(); await web.waitForTimeout(400); cv.palette = { both, gone: !(await has('shape-1')) && !(await has('text-1')) }; }
     // delete that frame, then undo brings it back (same place, with its markup)
     await web.evaluate(() => window.__swift.fitTo(['phone-1'])); await web.waitForTimeout(250); const c = await web.evaluate(() => { const r = document.querySelector('[data-testid=canvas]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await web.mouse.click(c.x, c.y); await web.waitForSelector('[data-testid=sel]', { timeout: 4000 * SLOW });
     await web.getByTestId('frame-menu').click(); await web.getByTestId('delete-frame').click(); await web.waitForTimeout(400); const gone = await web.evaluate(() => !window.__swift.frames.includes('phone-1')); await web.getByTestId('undo').click(); await web.waitForTimeout(600);
@@ -432,7 +435,7 @@ try {
   const discardUndoOk = cv0.discardUndo.afterDiscard === 1 && cv0.discardUndo.restored === 4 && cv0.discardUndo.restoredHtml && cv0.discardUndo.again === 1;
   const takesOk = discardUndoOk &&  busyOk &&  cv0.takes.spark.length === 1 && cv0.takes.total === 23 && cv0.dup.id === 'tv-d1' && cv0.dup.same;
   const frameDelOk = cv0.frameDel.gone && cv0.frameDel.back.has && cv0.frameDel.back.n === cv0.frameDel.n0 && cv0.frameDel.back.width === '390px';
-  const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px';
+  const addOk = frameDelOk &&  cv0.added.has && cv0.added.width === '390px' && cv0.palette.both && cv0.palette.gone;
   const compareOk = cv0.compare.sBoth < cv0.compare.sTake && cv0.compare.vis >= 2;
   const frameMenuOk = compareOk &&  cv0.frameMenu.closed && cv0.frameMenu.focusBack === 'frame-menu' && cv0.frameMenu.overflow <= 1;
   const shortcutsOk = frameMenuOk &&  cv0.shortcuts.rows >= 10 && cv0.shortcuts.closed && cv0.shortcuts.focusBack === 'shortcuts-button';

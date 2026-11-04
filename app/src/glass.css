@@ -55,7 +55,7 @@ button:disabled{opacity:.45;cursor:default}
 .fr-edit{pointer-events:auto;background:#000a;border:1px solid var(--ac);border-radius:8px;padding:0 8px;outline:none;min-width:220px;height:34px;top:-40px}.fr-label{pointer-events:auto;cursor:text}
 .fr-busy{position:absolute;inset:0;border-radius:12px;pointer-events:none;z-index:2;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%) 0 0/300% 100%,rgba(20,22,30,.35);animation:frbusy 1.2s linear infinite}@keyframes frbusy{to{background-position:-300% 0,0 0}}@media (prefers-reduced-motion:reduce){.fr-busy{animation:none}}
 .tools{overflow-x:auto;scrollbar-width:none}.tools::-webkit-scrollbar{display:none}.tools>*{flex:none}
-.kbs{margin:6px;display:grid;gap:4px}.kbs>div{display:flex;gap:14px;justify-content:space-between}.kbs dt{min-width:170px}.kbs dd{margin:0;opacity:.8}.kbbtn{min-width:28px;padding:0 8px}
+.kbs{margin:6px;display:grid;gap:4px}.kbs>div{display:flex;gap:14px;justify-content:space-between}.kbs dt{min-width:170px}.kbs dd{margin:0;opacity:.8}.kbbtn{min-width:36px;padding:0;border-radius:18px}
 .framemenu{left:calc(50% - 180px);top:auto;bottom:84px;width:360px;transform-origin:50% 100%}
 .sel-h{position:absolute;width:calc(14px*var(--inv,1));height:calc(14px*var(--inv,1));margin:calc(-7px*var(--inv,1)) 0 0 calc(-7px*var(--inv,1));border-radius:50%;background:var(--ac);box-shadow:0 0 0 calc(2px*var(--inv,1)) #fff,0 2px 8px #0008;cursor:nwse-resize;pointer-events:auto;z-index:3}
 .chips{position:fixed;left:50%;bottom:142px;transform:translateX(-50%);z-index:5;display:flex;gap:6px;padding:4px 8px;max-width:calc(100vw - 32px);overflow-x:auto;scrollbar-width:none;white-space:nowrap}.chip{flex:none;height:30px;font-size:13px}
@@ -105,7 +105,7 @@ button:disabled{opacity:.45;cursor:default}
 .say-quote{flex:none;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx);font:14px Inter,system-ui,sans-serif}.say-takes{flex:none;font-size:12px;opacity:.8}.say-edit{flex:none;width:34px;height:34px;border-radius:17px;display:inline-grid;place-items:center;opacity:.8}.say-edit:hover{opacity:1}
 
 /* Canvas decorations as designed: label pills, the selection's name tag and handles, the first-patch chip */
-.fr-label{background:color-mix(in srgb,var(--glass,rgba(20,24,32,.6)) 100%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--bd,rgba(255,255,255,.25));border-radius:999px;padding:6px 18px;top:-52px;text-shadow:none;color:var(--tx,#fff)}.fr-label .fr-size{opacity:.65;margin-left:8px}
+.fr-label{background:linear-gradient(var(--lift,transparent),var(--lift,transparent)),color-mix(in srgb,var(--glass,rgba(20,24,32,.6)) 100%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--bd,rgba(255,255,255,.25));border-radius:999px;padding:6px 18px;top:-52px;text-shadow:none;color:var(--tx,#fff)}.fr-label .fr-size{opacity:.8;margin-left:8px}
 .sel-tag{position:absolute;left:0;top:calc(-30px * var(--inv,1));font:600 calc(13px * var(--inv,1)) 'JetBrains Mono',monospace;padding:calc(3px * var(--inv,1)) calc(10px * var(--inv,1));border-radius:calc(8px * var(--inv,1));background:#fff;color:#0b0d12;white-space:nowrap;pointer-events:none}
 .sel-dot{position:absolute;width:calc(12px * var(--inv,1));height:calc(12px * var(--inv,1));border-radius:50%;background:var(--ac);box-shadow:0 0 0 calc(2px * var(--inv,1)) #fff;pointer-events:none}.sel-dot.tl{left:calc(-6px * var(--inv,1));top:calc(-6px * var(--inv,1))}.sel-dot.tr{right:calc(-6px * var(--inv,1));top:calc(-6px * var(--inv,1))}.sel-dot.bl{left:calc(-6px * var(--inv,1));bottom:calc(-6px * var(--inv,1))}
 .sel-chip{position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 14px * var(--inv,1));font:600 calc(15px * var(--inv,1)) 'JetBrains Mono',monospace;padding:calc(5px * var(--inv,1)) calc(14px * var(--inv,1));border-radius:999px;background:var(--ac);color:#06201a;white-space:nowrap;pointer-events:none}
@@ -116,3 +116,21 @@ nav.lens{z-index:40} /* above the menu scrim: switching lenses works while a len
 
 /* lens tools dock as a panel left of the Inspector (no scrim: the canvas stays live) */
 .framemenu.lenspanel{left:auto;right:322px;top:76px;bottom:auto;width:340px;max-height:calc(100vh - 170px);transform-origin:100% 0}
+
+/* tool palette (the board's bottom pill): round glass icon buttons, Spark in the accent; the action bar and Say sit above it */
+.palette{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:6px;padding:6px;border-radius:999px;height:56px}
+.palette .ib{width:44px;height:44px;border-radius:999px;display:grid;place-items:center;color:var(--tx);transition:transform .35s cubic-bezier(.34,1.56,.64,1),background .2s}
+.palette .ib:hover{background:color-mix(in srgb,var(--tx) 10%,transparent)}.palette .ib:active{transform:scale(.94)}
+.palette .ib.on{background:color-mix(in srgb,var(--tx) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--tx) 22%,transparent)}
+.palette .ib-ac{background:var(--ac);color:#06201a;box-shadow:0 4px 18px color-mix(in srgb,var(--ac) 45%,transparent),inset 0 1px 0 rgba(255,255,255,.45)}.palette .ib-ac:hover{background:var(--ac);filter:brightness(1.08)}.palette .ib:disabled{opacity:.45}
+.pal-sep{width:1px;height:26px;background:var(--bd);margin:0 4px}
+.tools{bottom:84px}.say{bottom:140px}.chips{bottom:206px}.framemenu{bottom:150px}.studio-bar{bottom:196px}
+
+/* glass for the controls INSIDE the islands: the same specular rim + sheen as .gl but lighter (no nested blur: it would be invisible and costly), a lift on hover, a squish on press */
+.rb.btn,.rb.seg,.rb.row.on{background:linear-gradient(165deg,rgba(255,255,255,calc(.06*var(--sheen,1))),rgba(255,255,255,calc(.01*var(--sheen,1))) 55%,rgba(255,255,255,calc(.02*var(--sheen,1)))),color-mix(in srgb,var(--tx) 2%,transparent);box-shadow:inset 1px 1px 0 -.5px rgba(255,255,255,calc(.5*var(--rim,1))),inset -1px -1px 0 -.5px rgba(255,255,255,calc(.14*var(--rim,1))),0 1px 2px rgba(0,0,0,.16);transition:transform .35s cubic-bezier(.34,1.56,.64,1),box-shadow .2s,background .2s}
+.rb.btn:hover:not(:disabled),.rb.seg:hover{transform:translateY(-1px);box-shadow:inset 1px 1px 0 -.5px rgba(255,255,255,calc(.65*var(--rim,1))),inset -1px -1px 0 -.5px rgba(255,255,255,calc(.2*var(--rim,1))),0 6px 14px rgba(0,0,0,.2)}
+.rb.btn:active:not(:disabled),.rb.seg:active{transform:scale(.97)}
+.rb.btn:disabled{background:color-mix(in srgb,var(--tx) 4%,transparent);box-shadow:none;opacity:.5}
+.rb.seg.on{background:linear-gradient(165deg,color-mix(in srgb,var(--ac) 16%,transparent),color-mix(in srgb,var(--ac) 16%,transparent));box-shadow:inset 1px 1px 0 -.5px rgba(255,255,255,.55),0 0 0 1px color-mix(in srgb,var(--ac) 55%,transparent)}
+.fld input:not([type=color]):not([type=range]),.say input{background:color-mix(in srgb,var(--tx) 7%,transparent);box-shadow:inset 0 1px 3px rgba(0,0,0,.22),inset 0 -1px 0 rgba(255,255,255,calc(.12*var(--rim,1)));border:1px solid var(--bd)}
+.fld input:focus-visible,.rb:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
