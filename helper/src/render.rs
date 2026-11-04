@@ -1,11 +1,20 @@
 //! Motion export: one standalone HTML document per time step -> PNG screenshots (headless Chrome, a few at a time) -> one H.264 MP4 (ffmpeg).
 //! The app does the deterministic part (it applies the timeline at time t and snapshots the frame); this module only rasterizes and encodes.
 //! Scripts are blocked in every document by a Content-Security-Policy (script-src 'none': inline handlers too; Chrome's screenshot mode does not work with scripting switched off), the work dir is private and removed afterwards, and sizes/counts are capped.
-use std::{fs, io, path::{Path, PathBuf}, process::{Command, Stdio}, sync::{atomic::{AtomicUsize, Ordering}, Mutex}, thread, time::{Duration, Instant}};
+use std::{fs, io, path::{Path, PathBuf}, process::{Command, Stdio}, sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc, Mutex}, thread, time::{Duration, Instant}};
 
 pub const MAX_FRAMES: usize = 600; pub const MAX_DOC: usize = 2 * 1024 * 1024; const CSP: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'\">"; const PER_FRAME: Duration = Duration::from_secs(20);
 /// Standard base64 (the MP4 travels in a JSON text frame).
 pub fn b64(b: &[u8]) -> String { const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; let mut o = String::with_capacity(b.len() / 3 * 4 + 4); for c in b.chunks(3) { let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32; o.push(T[(n >> 18) as usize & 63] as char); o.push(T[(n >> 12) as usize & 63] as char); o.push(if c.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' }); o.push(if c.len() > 2 { T[n as usize & 63] as char } else { '=' }); } o }
+/// Cancel flag and per-frame progress for one render; `Ctl::none()` for callers that need neither.
+pub struct Ctl { pub cancel: Arc<AtomicBool>, pub on_frame: Box<dyn Fn(usize, usize) + Send + Sync> }
+impl Ctl { pub fn none() -> Ctl { Ctl { cancel: Arc::new(AtomicBool::new(false)), on_frame: Box::new(|_, _| {}) } } }
+static LIVE: Mutex<Vec<(String, Arc<AtomicBool>)>> = Mutex::new(Vec::new());
+/// Renders in flight, by `<connection>:<request id>`, so a `render.cancel` from the same connection can stop one.
+pub fn register(key: &str) -> Arc<AtomicBool> { let f = Arc::new(AtomicBool::new(false)); if let Ok(mut l) = LIVE.lock() { l.push((key.to_string(), f.clone())); } f }
+pub fn cancel(key: &str) -> bool { LIVE.lock().ok().and_then(|l| l.iter().find(|(k, _)| k == key).map(|(_, f)| f.store(true, Ordering::SeqCst))).is_some() }
+pub fn finish(key: &str) { if let Ok(mut l) = LIVE.lock() { l.retain(|(k, _)| k != key); } }
+pub const CANCELLED: &str = "cancelled";
 pub struct Job { pub w: u32, pub h: u32, pub fps: u32, pub docs: Vec<String> }
 pub fn check(j: &Job) -> Result<(), String> {
     if j.docs.is_empty() { return Err("no frames".into()); } if j.docs.len() > MAX_FRAMES { return Err(format!("at most {MAX_FRAMES} frames")); }
@@ -55,19 +64,21 @@ fn encode(dir: &Path, j: &Job, ffmpeg: &str) -> Result<Vec<u8>, String> {
 }
 fn workdir() -> Result<PathBuf, String> { static N: AtomicUsize = AtomicUsize::new(0); let dir = std::env::temp_dir().join(format!("sc-render-{}-{}", std::process::id(), N.fetch_add(1, Ordering::SeqCst))); fs::create_dir_all(&dir).map_err(|e| e.to_string())?; Ok(dir) }
 /// The fast path: one browser over the DevTools Protocol (see Cdp), then one encode.
-pub fn render_cdp(chrome: &str, ffmpeg: &str, j: &Job) -> Result<Vec<u8>, String> {
+pub fn render_cdp(chrome: &str, ffmpeg: &str, j: &Job) -> Result<Vec<u8>, String> { render_cdp_ctl(chrome, ffmpeg, j, &Ctl::none()) }
+pub fn render_cdp_ctl(chrome: &str, ffmpeg: &str, j: &Job, ctl: &Ctl) -> Result<Vec<u8>, String> {
     check(j)?; let dir = workdir()?;
-    let out = (|| -> Result<Vec<u8>, String> { let mut c = Cdp::open(chrome, &dir.join("prof"), j.w, j.h)?; for (i, d) in j.docs.iter().enumerate() { let png = c.shot(&format!("{CSP}{d}")).map_err(|e| format!("frame {i}: {e}"))?; fs::write(dir.join(format!("f{i:04}.png")), png).map_err(|e| e.to_string())?; } drop(c); encode(&dir, j, ffmpeg) })();
+    let out = (|| -> Result<Vec<u8>, String> { let mut c = Cdp::open(chrome, &dir.join("prof"), j.w, j.h)?; for (i, d) in j.docs.iter().enumerate() { if ctl.cancel.load(Ordering::SeqCst) { return Err(CANCELLED.into()); } let png = c.shot(&format!("{CSP}{d}")).map_err(|e| format!("frame {i}: {e}"))?; fs::write(dir.join(format!("f{i:04}.png")), png).map_err(|e| e.to_string())?; (ctl.on_frame)(i + 1, j.docs.len()); } if ctl.cancel.load(Ordering::SeqCst) { return Err(CANCELLED.into()); } drop(c); encode(&dir, j, ffmpeg) })();
     let _ = fs::remove_dir_all(&dir); out
 }
 /// The slow path (a browser per frame, a few at a time): needs nothing but a Chrome that can `--screenshot`. Returns the MP4 bytes. `chrome` and `ffmpeg` are executables; `workers` frames are rasterized at once.
-pub fn render(chrome: &str, ffmpeg: &str, j: &Job, workers: usize) -> Result<Vec<u8>, String> {
+pub fn render(chrome: &str, ffmpeg: &str, j: &Job, workers: usize) -> Result<Vec<u8>, String> { render_ctl(chrome, ffmpeg, j, workers, &Ctl::none()) }
+pub fn render_ctl(chrome: &str, ffmpeg: &str, j: &Job, workers: usize, ctl: &Ctl) -> Result<Vec<u8>, String> {
     check(j)?; let dir = workdir()?;
     let out = (|| -> Result<Vec<u8>, String> {
         for (i, d) in j.docs.iter().enumerate() { fs::write(dir.join(format!("f{i:04}.html")), format!("{CSP}{d}")).map_err(|e| e.to_string())?; }
-        let next = AtomicUsize::new(0); let err: Mutex<Option<String>> = Mutex::new(None);
-        thread::scope(|s| { for _ in 0..workers.clamp(1, 8) { s.spawn(|| loop { let i = next.fetch_add(1, Ordering::SeqCst); if i >= j.docs.len() || err.lock().map(|e| e.is_some()).unwrap_or(true) { break; } if let Err(e) = shot(chrome, &dir.join(format!("f{i:04}.html")), &dir.join(format!("f{i:04}.png")), j.w, j.h) { if let Ok(mut g) = err.lock() { g.get_or_insert(format!("frame {i}: {e}")); } } }); } });
-        if let Some(e) = err.into_inner().ok().flatten() { return Err(e); }
+        let next = AtomicUsize::new(0); let done = AtomicUsize::new(0); let err: Mutex<Option<String>> = Mutex::new(None);
+        thread::scope(|s| { for _ in 0..workers.clamp(1, 8) { s.spawn(|| loop { let i = next.fetch_add(1, Ordering::SeqCst); if i >= j.docs.len() || ctl.cancel.load(Ordering::SeqCst) || err.lock().map(|e| e.is_some()).unwrap_or(true) { break; } match shot(chrome, &dir.join(format!("f{i:04}.html")), &dir.join(format!("f{i:04}.png")), j.w, j.h) { Err(e) => { if let Ok(mut g) = err.lock() { g.get_or_insert(format!("frame {i}: {e}")); } } Ok(()) => (ctl.on_frame)(done.fetch_add(1, Ordering::SeqCst) + 1, j.docs.len()) } }); } });
+        if let Some(e) = err.into_inner().ok().flatten() { return Err(e); } if ctl.cancel.load(Ordering::SeqCst) { return Err(CANCELLED.into()); }
         encode(&dir, j, ffmpeg)
     })();
     let _ = fs::remove_dir_all(&dir); out
@@ -102,5 +113,13 @@ pub fn render(chrome: &str, ffmpeg: &str, j: &Job, workers: usize) -> Result<Vec
         let Ok(p) = std::env::var("SC_DOCS") else { return }; let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(p).unwrap()).unwrap(); let docs: Vec<String> = v.as_array().unwrap().iter().map(|d| d.as_str().unwrap().to_string()).collect();
         let chrome = std::env::var("SWIFT_CHROME_BIN").unwrap_or_else(|_| "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome".into()); let (n, t0) = (docs.len(), Instant::now());
         let b = if std::env::var("SC_SLOW").is_ok() { render(&chrome, "ffmpeg", &Job { w: 1920, h: 1080, fps: 30, docs }, 4) } else { render_cdp(&chrome, "ffmpeg", &Job { w: 1920, h: 1080, fps: 30, docs }) }.unwrap(); eprintln!("{n} frames 1920x1080 in {:?}, {} bytes", t0.elapsed(), b.len()); fs::write(std::env::var("SC_RENDER_OUT").unwrap(), b).unwrap();
+    }
+    #[test] fn the_registry_cancels_only_the_named_render_and_forgets_finished_ones() { let a = register("1:m1"); let b = register("2:m1"); assert!(cancel("1:m1")); assert!(a.load(Ordering::SeqCst) && !b.load(Ordering::SeqCst)); assert!(!cancel("3:m1")); finish("1:m1"); assert!(!cancel("1:m1")); finish("2:m1"); }
+    #[test] fn progress_is_reported_per_frame_and_cancel_stops_the_run_and_cleans_up() {
+        let chrome = script("prog-chrome", CHROME); let ff = script("prog-ff", "for last; do :; done; echo mp4 > \"$last\"");
+        let seen = Arc::new(Mutex::new(Vec::new())); let s2 = seen.clone(); let ctl = Ctl { cancel: Arc::new(AtomicBool::new(false)), on_frame: Box::new(move |d, t| s2.lock().unwrap().push((d, t))) };
+        render_ctl(&chrome, &ff, &job(5), 1, &ctl).unwrap(); assert_eq!(*seen.lock().unwrap(), vec![(1, 5), (2, 5), (3, 5), (4, 5), (5, 5)]);
+        let cancel = Arc::new(AtomicBool::new(false)); let c2 = cancel.clone(); let n = Arc::new(AtomicUsize::new(0)); let n2 = n.clone(); let ctl = Ctl { cancel, on_frame: Box::new(move |d, _| { n2.store(d, Ordering::SeqCst); if d == 2 { c2.store(true, Ordering::SeqCst); } }) };
+        let e = render_ctl(&chrome, &ff, &job(50), 1, &ctl).unwrap_err(); assert_eq!(e, CANCELLED); assert!(n.load(Ordering::SeqCst) <= 3, "stopped early, shot {}", n.load(Ordering::SeqCst));
     }
 }
