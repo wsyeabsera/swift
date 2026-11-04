@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { MATERIALS, addLight, addObject, cameraPosition, DEFAULT_CAMERA, LIMITS, parseScene, removeItem, setCamera, starterScene, updateLight, updateObject } from './scene';
+import { focalMm, MATERIALS, addLight, addObject, cameraPosition, DEFAULT_CAMERA, LIMITS, parseScene, removeItem, setCamera, starterScene, updateLight, updateObject } from './scene';
 test('the starter scene is valid and survives its own parser', () => { const s = starterScene(); expect(s.objects).toHaveLength(3); expect(s.lights).toHaveLength(2); expect(parseScene(JSON.parse(JSON.stringify(s)))).toEqual(s); });
 test('adding objects gives unique ids, readable names, and stops at the limit', () => {
   let s = starterScene(); const a = addObject(s, 'box'); if (!a.ok) throw new Error(a.error); expect(a.id).toBe('box-2'); expect(a.scene.objects.at(-1)!.name).toBe('Box 2'); s = a.scene; const t = addObject(s, 'torus'); expect(t.ok && t.id).toBe('torus-1');
@@ -39,4 +39,8 @@ test('hidden objects and lights that are off stay in the scene and survive save 
   const base = starterScene(); const a = updateObject(base, 'box-1', { hidden: true }); const b = updateLight(base, 'light-2', { off: true }); expect(a.ok && b.ok).toBe(true); if (!a.ok || !b.ok) return;
   const both = { ...a.scene, lights: b.scene.lights }; const back = parseScene(JSON.parse(JSON.stringify(both)))!; expect(back.objects.find((o) => o.id === 'box-1')?.hidden).toBe(true); expect(back.lights.find((l) => l.id === 'light-2')?.off).toBe(true);
   expect(back.objects.length).toBe(base.objects.length); expect(starterScene().objects[0]!.hidden).toBeUndefined();
+});
+
+test('focal length follows the field of view: 45 degrees is about 29 mm, wider is shorter, input is clamped', () => {
+  expect(focalMm(45)).toBe(29); expect(focalMm(90)).toBe(12); expect(focalMm(30)).toBeGreaterThan(focalMm(60)); expect(focalMm(500)).toBe(focalMm(100)); expect(focalMm(1)).toBe(focalMm(15));
 });

@@ -65,3 +65,6 @@ export const applyPreset = (sc: Scene3D, p: CameraPreset): Scene3D => setCamera(
 /** The board's material swatches: a colour plus metalness and roughness, applied through updateObject (so every value is clamped and validated there). */
 export const MATERIALS = { Obsidian: { color: '#14161c', metalness: 0.2, roughness: 0.15 }, Aluminium: { color: '#c9ced6', metalness: 1, roughness: 0.35 }, Walnut: { color: '#5b3a24', metalness: 0, roughness: 0.7 }, White: { color: '#f2f2f0', metalness: 0, roughness: 0.5 } } as const;
 export type MaterialName = keyof typeof MATERIALS;
+
+/** The focal length (mm, 35 mm full-frame equivalent on the 24 mm sensor height) a vertical field of view corresponds to: the board shows lenses in mm, the scene stores degrees. */
+export const focalMm = (fovDeg: number): number => Math.round((12 / Math.tan((clamp(fovDeg, 15, 100) * Math.PI) / 360)) * 10) / 10;
