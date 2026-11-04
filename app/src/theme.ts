@@ -3,7 +3,7 @@
 export type BackdropKey = 'milkyway' | 'aurora' | 'lake' | 'fuji' | 'dunes' | 'glass' | 'manhattan' | 'mesh';
 export type Mode = 'dark' | 'light' | 'auto'; export type AccentKey = 'Mint' | 'Iris' | 'Coral' | 'Amber' | 'Sky'; export type GlassKey = 'thin' | 'regular' | 'thick';
 export type ThemeChoice = { bd: BackdropKey; mode: Mode; accent: AccentKey; glass: GlassKey };
-export const DEFAULT_THEME: ThemeChoice = { bd: 'lake', mode: 'auto', accent: 'Mint', glass: 'regular' };
+export const DEFAULT_THEME: ThemeChoice = { bd: 'milkyway', mode: 'dark', accent: 'Mint', glass: 'regular' }; // the look every design board opens in
 type Backdrop = { label: string; tint: string; dB: number; lB: number; lightish: boolean; credit: string };
 export const BACKDROPS: Record<BackdropKey, Backdrop> = {
   milkyway: { label: 'Milky Way', tint: '#4c4659', dB: 0, lB: 24, lightish: false, credit: 'Pascal Debrunner' },
