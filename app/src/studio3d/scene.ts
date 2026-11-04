@@ -68,3 +68,8 @@ export type MaterialName = keyof typeof MATERIALS;
 
 /** The focal length (mm, 35 mm full-frame equivalent on the 24 mm sensor height) a vertical field of view corresponds to: the board shows lenses in mm, the scene stores degrees. */
 export const focalMm = (fovDeg: number): number => Math.round((12 / Math.tan((clamp(fovDeg, 15, 100) * Math.PI) / 360)) * 10) / 10;
+
+/** The environment: the scene's background colour (refused unless it looks like #rrggbb, the scene is returned unchanged with the reason). */
+export function setBackground(sc: Scene3D, color: string): { ok: true; scene: Scene3D } | { ok: false; error: string } {
+  if (!HEX.test(color)) return { ok: false, error: 'colour must look like #rrggbb' }; return { ok: true, scene: { ...sc, background: color.toLowerCase() } };
+}

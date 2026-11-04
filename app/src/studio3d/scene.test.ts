@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { focalMm, MATERIALS, addLight, addObject, cameraPosition, DEFAULT_CAMERA, LIMITS, parseScene, removeItem, setCamera, starterScene, updateLight, updateObject } from './scene';
+import { setBackground, focalMm, MATERIALS, addLight, addObject, cameraPosition, DEFAULT_CAMERA, LIMITS, parseScene, removeItem, setCamera, starterScene, updateLight, updateObject } from './scene';
 test('the starter scene is valid and survives its own parser', () => { const s = starterScene(); expect(s.objects).toHaveLength(3); expect(s.lights).toHaveLength(2); expect(parseScene(JSON.parse(JSON.stringify(s)))).toEqual(s); });
 test('adding objects gives unique ids, readable names, and stops at the limit', () => {
   let s = starterScene(); const a = addObject(s, 'box'); if (!a.ok) throw new Error(a.error); expect(a.id).toBe('box-2'); expect(a.scene.objects.at(-1)!.name).toBe('Box 2'); s = a.scene; const t = addObject(s, 'torus'); expect(t.ok && t.id).toBe('torus-1');
@@ -43,4 +43,8 @@ test('hidden objects and lights that are off stay in the scene and survive save 
 
 test('focal length follows the field of view: 45 degrees is about 29 mm, wider is shorter, input is clamped', () => {
   expect(focalMm(45)).toBe(29); expect(focalMm(90)).toBe(12); expect(focalMm(30)).toBeGreaterThan(focalMm(60)); expect(focalMm(500)).toBe(focalMm(100)); expect(focalMm(1)).toBe(focalMm(15));
+});
+
+test('the environment colour is lowercased and a bad colour is refused with the scene unchanged', () => {
+  const base = starterScene(); const ok = setBackground(base, '#ABCDEF'); expect(ok.ok && ok.scene.background).toBe('#abcdef'); const bad = setBackground(base, 'red'); expect(bad.ok).toBe(false); expect(base.background).toBe('#101820');
 });
