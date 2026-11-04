@@ -1,0 +1,5 @@
+import type { CrewFile } from './sheet';
+/** The project's crew sheet files, remembered per project so the crew survives a reload (the folder is picked again to refresh). Untrusted on the way back in: only name/text strings, at most 30 files. */
+const KEY = (project: string): string => `swift-canvas.crew.v1.${project}`;
+export function loadCrewFiles(project: string): CrewFile[] { try { const raw = JSON.parse(localStorage.getItem(KEY(project)) ?? '[]') as unknown; return Array.isArray(raw) ? raw.flatMap((f: unknown) => { const o = (typeof f === 'object' && f !== null ? f : {}) as { name?: unknown; text?: unknown }; return typeof o.name === 'string' && typeof o.text === 'string' ? [{ name: o.name, text: o.text }] : []; }).slice(0, 30) : []; } catch { return []; } }
+export function saveCrewFiles(project: string, files: CrewFile[]): string | null { try { localStorage.setItem(KEY(project), JSON.stringify(files)); return null; } catch (e) { return e instanceof Error ? e.message : 'save failed'; } }

@@ -164,6 +164,14 @@ fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<A
             thread::spawn(move || { let t0 = std::time::Instant::now(); let r = if std::env::var("SWIFT_RENDER_SLOW").is_ok() { render::render_ctl(&chrome, &ffmpeg, &job, 4, &ctl) } else { render::render_cdp_ctl(&chrome, &ffmpeg, &job, &ctl) }; render::finish(&key); let reply = match r { Ok(b) => serde_json::json!({ "type": "render.mp4", "id": id, "ok": true, "mp4": render::b64(&b), "bytes": b.len(), "ms": t0.elapsed().as_millis() as u64 }), Err(e) => serde_json::json!({ "type": "render.mp4", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
         }
         Some("render.cancel") => { let id = v.get("id").and_then(|x| x.as_str()).unwrap_or(""); render::cancel(&format!("{cid}:{id}")); }
+        Some("crew.read") => { // the project's crew sheets from a folder the user allowed (picked or SWIFT_PROJECT_ROOTS)
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let path = v.get("path").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let (tx, mut roots) = (tx.clone(), cfg.project_roots.clone()); roots.extend(picked.lock().map(|p| p.clone()).unwrap_or_default());
+            thread::spawn(move || { let reply = match scan::allowed_root(std::path::Path::new(&path), &roots) {
+                None => serde_json::json!({ "type": "crew.read", "id": id, "ok": false, "error": "folder not allowed: pick it with Choose… first" }),
+                Some(p) => match store::read_crew(&p) { Ok(f) => serde_json::json!({ "type": "crew.read", "id": id, "ok": true, "files": f.iter().map(|(n, t)| serde_json::json!({ "name": n, "text": t })).collect::<Vec<_>>() }), Err(e) => serde_json::json!({ "type": "crew.read", "id": id, "ok": false, "error": e.to_string() }) } };
+                let _ = tx.send(reply.to_string()); });
+        }
         Some("project.pick") => {
             let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let (tx, bin, picked) = (tx.clone(), cfg.picker_bin.clone(), picked.clone());
             thread::spawn(move || { let reply = match pick_folder(&bin) { Ok(p) => { if let Ok(c) = std::fs::canonicalize(&p) { if let Ok(mut g) = picked.lock() { if g.len() < 50 && !g.contains(&c) { g.push(c); } } } serde_json::json!({ "type": "project.pick", "id": id, "ok": true, "path": p }) }, Err(e) => serde_json::json!({ "type": "project.pick", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });

@@ -17,6 +17,9 @@ import { componentName, frameToTsx } from './canvas/exportReact';
 import type { RepoEntry, RepoFile } from './helper';
 import { starterFrames } from './canvas/starter';
 import { retheme } from './retheme';
+import { DEFAULT_CREW } from './crew/defaults';
+import { loadCrew, type CrewFile } from './crew/sheet';
+import { loadCrewFiles, saveCrewFiles } from './crew/store';
 import { dtcgString, fromDtcg, toDtcg } from './dtcg';
 import { addRef, dominantColors, loadMoodboard, moodboardPrompt, parseTypeCue, removeRef, saveMoodboard, setNote, TYPE_PROMPT, TYPE_SYSTEM, type Moodboard } from './moodboard';
 import { isDue, parseProposals, refinePrompt, type Proposal } from './refine';
@@ -63,6 +66,12 @@ export function App() {
   // Moodboard: reference images (downscaled thumbnail + dominant colours) steer Spark directions as text only.
   const [mood, setMood] = useState<Moodboard>(() => loadMoodboard(project.id)); const moodFile = useRef<HTMLInputElement>(null);
   const changeMood = useCallback((next: Moodboard) => { setMood(next); const err = saveMoodboard(project.id, next); if (err) setSayStatus(`Moodboard kept for now, not stored: ${err}`); }, [project.id]);
+  const [crewFiles, setCrewFilesState] = useState<CrewFile[]>(() => loadCrewFiles(project.id)); const crewSet = useMemo(() => loadCrew(DEFAULT_CREW, crewFiles), [crewFiles]);
+  const loadCrewFolder = async () => { // the project's `.swift-canvas/crew/*.md` from a folder the user picks; a bad sheet is reported by file name and skipped, the rest load
+    const c = conn.current; if (!c) { setSayStatus('The helper is offline'); return; } const pick = await c.pickFolder(); if (!pick.ok) { if (pick.error !== 'cancelled') setSayStatus(`Crew not loaded: ${pick.error}`); return; }
+    const r = await c.readCrew(pick.path); if (!r.ok) { setSayStatus(`Crew not loaded: ${r.error}`); return; } setCrewFilesState(r.files); const err = saveCrewFiles(project.id, r.files); const res = loadCrew(DEFAULT_CREW, r.files);
+    setSayStatus(`Crew: ${res.crew.length} designers${r.files.length ? ` (${r.files.length} sheet${r.files.length === 1 ? '' : 's'} found${res.overridden.length ? `, overriding ${res.overridden.join(', ')}` : ''}${res.errors.length ? `, ${res.errors.length} refused` : ''})` : ' (no project sheets in that folder: the bundled five)'}${err ? ` · not remembered: ${err}` : ''}`);
+  };
   const dtcgFile = useRef<HTMLInputElement>(null);
   const exportDtcg = () => { const { skipped } = toDtcg(brand); const url = URL.createObjectURL(new Blob([dtcgString(brand)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'tokens.json'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported tokens.json (${Object.keys(brand).length - skipped.length} tokens${skipped.length ? `, ${skipped.length} not exportable: ${skipped.map((x) => x.name).join(', ')}` : ''})`); };
   const importDtcg = async (file: File) => { // merged into the kit (same names are replaced); designs are not recoloured, use the Brand editor for that
@@ -549,6 +558,10 @@ export function App() {
             {mixOptions.length > 0 && <div className="projs"><select aria-label="Mix with" data-testid="mix-with" value={mixWith} onChange={(e) => setMixWith(e.target.value)}><option value="">Mix this take with…</option>{mixOptions.map((f) => <option key={f.id} value={f.id}>{f.title}</option>)}</select><button className="rb btn" data-testid="mix" disabled={!mixWith} onClick={() => void mixTakes()} title="A new copy: this take plus what the other take changed that this one left alone (no model)">Mix</button></div>}
             <ul className="liblist" data-testid="devices">{(['tv', 'phone', 'desktop'] as const).map((k) => { const ids = frames.filter((f) => surfaceOf(f) === k).map((f) => f.id); return ids.length ? (<li key={k} className="libitem mono" data-testid="device-row" data-surface={k}>{k} <span className="mu">{ids.length} frame{ids.length === 1 ? '' : 's'}</span><button className="rb btn" onClick={() => { setFrameMenuOpen(false); window.__swift?.fitTo(ids); }} data-testid="device-show">Show</button></li>) : null; })}</ul>
             <label className="mono mu"><input type="checkbox" checked={chrome} onChange={(e) => setChrome(e.target.checked)} data-testid="device-chrome" /> Device chrome (bezels on the canvas, not in exports)</label>
+            <h2>Crew <span className="mono mu">{crewSet.crew.length} designers{crewSet.overridden.length ? ` · ${crewSet.overridden.length} overridden` : ''}</span></h2>
+            <ul className="liblist" data-testid="crew">{crewSet.crew.map((s) => (<li key={s.codename} className="libitem" data-testid="crew-member" data-codename={s.codename}><span className="mono">{s.codename}</span> <span className="mu">{s.role} · {s.voice}</span>{crewSet.overridden.includes(s.codename) && <span className="mono mu"> · from the project</span>}<div className="mono mu">{s.rules.map((r) => r.text).join(' · ')}</div></li>))}</ul>
+            {crewSet.errors.length > 0 && <ul className="liblist" data-testid="crew-errors">{crewSet.errors.map((e) => (<li key={e} className="mono" data-testid="crew-error">{e}</li>))}</ul>}
+            <div className="projs"><button className="rb btn" onClick={() => void loadCrewFolder()} data-testid="crew-load" title="Read .swift-canvas/crew/*.md from a project folder; its sheets add to or replace the bundled five">Load crew from folder…</button></div>
             <h2>Alternates <span className="mono mu">{selection ? `${selection.el}: ${altCount(alts, selKeyAlt)} saved` : 'select an element'}</span></h2>
             <div className="projs"><button className="rb btn" data-testid="alt-save" disabled={!selection} onClick={() => void saveAlt()} title="Save the selected element's current look as a variant">Save variant</button><button className="rb btn" data-testid="alt-next" disabled={!selection || altCount(alts, selKeyAlt) < 2} onClick={() => void nextAlt(1)} title="Next variant (V)">Next (V)</button><button className="rb btn" data-testid="alt-keep" disabled={!selection || altCount(alts, selKeyAlt) === 0} onClick={keepAlt} title="Keep the look on screen and forget the others">Keep this</button></div>
             <h2>Prototype <span className="mono mu">{links.length} link{links.length === 1 ? '' : 's'}{playFlow ? ' · playing' : ''}</span></h2>
