@@ -72,3 +72,6 @@ button:disabled{opacity:.45;cursor:default}
 .world[data-chrome="1"] .fr[data-surface=phone]::after{content:"";position:absolute;left:50%;top:12px;width:34%;height:32px;margin-left:-17%;border-radius:20px;background:#0b0b0f;pointer-events:none}
 .world[data-chrome="1"] .fr[data-surface=tv]{border-radius:6px;box-shadow:0 0 0 18px #0b0b0f,0 0 0 20px rgba(255,255,255,.22),0 40px 90px rgba(0,0,0,.5)}.world[data-chrome="1"] .fr[data-surface=tv] iframe{border-radius:4px}
 .world[data-chrome="1"] .fr[data-surface=desktop]{border-radius:14px;box-shadow:0 0 0 2px #2b2b33,0 0 0 3px rgba(255,255,255,.2),0 26px 70px rgba(0,0,0,.4)}.world[data-chrome="1"] .fr[data-surface=desktop] iframe{border-radius:12px}
+
+/* Compare: the original laid over a take (onion skin) and outlines on what the take changed */
+.world .onion{position:absolute;border:0;pointer-events:none;border-radius:12px;z-index:3;mix-blend-mode:normal}.sel-diff{outline:calc(2px * var(--inv,1)) solid var(--warn,#ffb340);box-shadow:none;z-index:4}

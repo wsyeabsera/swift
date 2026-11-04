@@ -33,7 +33,7 @@ const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].
 /** Infinite canvas: one transformed world layer, one sandboxed iframe per frame, offscreen frames frozen (display:none, spike #1706).
  *  The viewport lives in a ref and is applied to the DOM directly: panning and zooming never re-render React; React re-renders only when
  *  the set of visible frames changes or the selection changes. Selection is found by hit-testing through the frame bridge. */
-export function Canvas({ frames, selection, extras = [], onSelect, revision, onReady, onRename, painting, onMove, onResize, chrome }: { chrome?: boolean; painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; extras?: string[]; onSelect: (s: Sel | null, additive?: boolean) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
+export function Canvas({ frames, selection, extras = [], onSelect, revision, onReady, onRename, painting, onMove, onResize, chrome, diff }: { diff?: { frameId: string; els: string[]; ghost?: { html: string; mix: number } }; chrome?: boolean; painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; extras?: string[]; onSelect: (s: Sel | null, additive?: boolean) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
   const [editing, setEditing] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null); const worldRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View>({ x: 0, y: 0, s: 1 }); const iframes = useRef(new Map<string, HTMLIFrameElement>());
@@ -102,6 +102,11 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
     void bridges.get(selection.frameId)?.request({ t: 'rect', el: selection.el }).then((r) => { if (alive && r.ok && r.rect) setSelRect(r.rect); });
     return () => { alive = false; };
   }, [selection, revision, bridges]);
+  const [dRects, setDRects] = useState<{ x: number; y: number; w: number; h: number }[]>([]); const diffKey = diff ? `${diff.frameId}|${diff.els.join(',')}` : '';
+  useEffect(() => { let alive = true; setDRects([]); if (!diff || diff.els.length === 0) return; const b = bridges.get(diff.frameId); // outlines on the elements a take changed from its original
+    void Promise.all(diff.els.map((el) => b?.request({ t: 'rect', el }))).then((rs) => { if (alive) setDRects(rs.flatMap((r) => (r?.ok && r.rect && r.rect.w > 0 && r.rect.h > 0 ? [r.rect] : []))); }); return () => { alive = false; };
+  }, [diffKey, revision, bridges]); // eslint-disable-line react-hooks/exhaustive-deps
+  const diffFrame = diff ? frames.find((f) => f.id === diff.frameId) : undefined;
   const [xRects, setXRects] = useState<{ x: number; y: number; w: number; h: number }[]>([]); const extrasKey = extras.join(',');
   useEffect(() => { let alive = true; setXRects([]); if (!selection || extras.length === 0) return; const b = bridges.get(selection.frameId);
     void Promise.all(extras.map((el) => b?.request({ t: 'rect', el }))).then((rs) => { if (alive) setXRects(rs.flatMap((r) => (r?.ok && r.rect ? [r.rect] : []))); }); return () => { alive = false; };
@@ -121,6 +126,8 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
           </div>
         ))}
         {selFrame && selRect && onResize && selection?.el !== selFrame.root && <div className="sel-h" data-testid="resize-handle" style={{ left: selFrame.x + selRect.x + selRect.w, top: selFrame.y + selRect.y + selRect.h }} />}
+        {diffFrame && diff?.ghost && <iframe key={`ghost-${diffFrame.id}`} className="onion" data-testid="onion" title="Original (onion skin)" sandbox="allow-scripts" {...(EXT_FRAME ? { src: EXT_FRAME, onLoad: (e: React.SyntheticEvent<HTMLIFrameElement>) => { e.currentTarget.contentWindow?.postMessage({ t: 'load', rid: 1, html: diff.ghost!.html }, '*'); } } : { srcDoc: frameDoc(diff.ghost.html) })} width={diffFrame.w} height={diffFrame.h} style={{ left: diffFrame.x, top: diffFrame.y, opacity: diff.ghost.mix }} />}
+        {diffFrame && dRects.map((r, i) => <div key={`d${i}`} className="sel sel-diff" data-testid="diff-mark" style={{ left: diffFrame.x + r.x, top: diffFrame.y + r.y, width: r.w, height: r.h }} />)}
         {selFrame && xRects.map((r, i) => <div key={i} className="sel sel-x" data-testid="sel-extra" style={{ left: selFrame.x + r.x, top: selFrame.y + r.y, width: r.w, height: r.h }} />)}
         {selFrame && selRect && <div className="sel" data-testid="sel" style={{ left: selFrame.x + selRect.x, top: selFrame.y + selRect.y, width: selRect.w, height: selRect.h }} />}
       </div>
