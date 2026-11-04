@@ -34,6 +34,7 @@ import { runSayRepairing } from './say/say';
 import { compareKits, isColorValue, kitColors, loadBrand, replaceColor, saveBrand, shareToken, toBrandTokens } from './brand';
 import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
 import { pushHistory, step } from './say/history';
+import { auditFacts, type Finding } from './canvas/audit';
 import { localEdits, propTokenRequest, themeRequest, tokenRequest } from './say/local';
 import { suggestions, type SuggestProps } from './say/suggest';
 import { canSpark, DIRECTIONS, discardTakes, isTake, keepTake, runSpark } from './say/spark';
@@ -243,6 +244,10 @@ export function App() {
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [selection, importOpen, appearanceOpen, shortcutsOpen, frameMenuOpen]);
+  const [findings, setFindings] = useState<Finding[]>([]); const [checkNote, setCheckNote] = useState(''); const checkedFrame = useRef('');
+  const checkFrame = async () => { const f = frames.find((x) => x.id === selection?.frameId) ?? frames[0]; const api = window.__swift; if (!f || !api) return; const t0 = performance.now(); const facts = await api.audit(f.id); if (!facts) { setCheckNote('frame did not answer'); return; }
+    const found = auditFacts(facts, f.w >= 1600 ? 'tv' : f.w <= 500 ? 'phone' : 'desktop'); checkedFrame.current = f.id; setFindings(found); setCheckNote(`${f.title}: ${found.length} finding${found.length === 1 ? '' : 's'} · ${(performance.now() - t0).toFixed(0)} ms`); };
+  const fixFinding = async (f: Finding) => { if (!f.fix || !checkedFrame.current) return; await edit(checkedFrame.current, f.el, f.fix.prop, f.fix.value); setFindings((l) => l.filter((x) => x !== f)); }; // an ordinary edit: undoable, same op log
   const [brandTick, setBrandTick] = useState(0); const [pool, setPool] = useState<PoolStatus | null>(null); const [cmpId, setCmpId] = useState(''); const cmpKit = useMemo(() => (cmpId ? loadBrand(undefined, cmpId) : null), [cmpId, brand, brandTick]); // Brand board: the other project's kit, read-only until a token is shared
   const shareTokenTo = useCallback((name: string) => {
     if (!cmpId) return; const r = shareToken(loadBrand(undefined, cmpId), name, brand[name] ?? ''); if (!r.ok) { setSayStatus(r.error); return; }
@@ -422,6 +427,9 @@ export function App() {
             {cmpKit && <ul className="liblist" data-testid="brand-diff">{compareKits(brand, cmpKit).map((r) => (<li key={r.name} className="libitem" data-testid="brand-diff-row" data-state={r.state}><span className="mono">{r.name}</span><span className="mu mono"> {r.state === 'same' ? 'same' : r.state === 'differs' ? `${r.a} ≠ ${r.b}` : r.state === 'only-a' ? 'only here' : `only there: ${r.b}`}</span>{r.a !== undefined && r.state !== 'same' && <button type="button" className="rb btn" data-testid="brand-share" onClick={() => shareTokenTo(r.name)} title="Copy this one token to the other project">Share →</button>}</li>))}</ul>}
             <ul className="liblist" data-testid="brand-kit">{Object.entries(brand).map(([name, val]) => (<li key={name} className="libitem" data-testid="brand-token"><span className="mono">{name}</span> {/^#[0-9a-f]{3,8}$/i.test(val) ? <input type="color" aria-label={`Edit ${name}`} data-testid="brand-color" value={/^#[0-9a-f]{6}$/i.test(val) ? val : '#808080'} onChange={(e) => void editToken(name, e.target.value)} title="Changes this colour in every frame" /> : null}{!/^#[0-9a-f]{3,8}$/i.test(val) ? <input key={val} className="mono" aria-label={`Edit ${name} as text`} data-testid="brand-text" defaultValue={val} onKeyDown={(e) => { if (e.key === 'Enter') void editToken(name, e.currentTarget.value); }} title="Type a new value (a colour, a size like 16px, a font family) and press Enter" /> : null}{/^#[0-9a-f]{3,8}$/i.test(val) ? <span className="mu mono"> {val}</span> : null}</li>))}</ul>
             <p className="mono mu" data-testid="pool">{pool ? `Claude pool: ${pool.running}/${pool.max} running · ${pool.spare ? 'warm spare ready' : 'no spare'}${pool.availableMb != null ? ` · ${(pool.availableMb / 1024).toFixed(1)} GB free (floor ${(pool.minFreeMb / 1024).toFixed(1)} GB)` : ''}` : 'Claude pool: helper offline'}</p>
+            <h2>Check <span className="mono mu">{checkNote || 'contrast, clipping, taps'}</span></h2>
+            <div className="projs"><button className="rb btn" onClick={() => void checkFrame()} data-testid="check" title="Instant local checks on the selected frame (or the first one)">Check frame</button></div>
+            <ul className="liblist" data-testid="findings">{findings.map((f, i) => (<li key={`${f.el}-${f.kind}-${i}`} className="libitem" data-testid="finding" data-kind={f.kind}><span className="mono">{f.el}</span> <span className="mu">{f.message}</span>{f.fix && <button className="rb btn" onClick={() => void fixFinding(f)} data-testid="finding-fix">Fix: {f.fix.prop} {f.fix.value}</button>}</li>))}</ul>
             <h2>History <span className="mono mu">Says on this device</span></h2>
             <ul className="liblist" data-testid="history">{recs.filter((r) => r.prompt).slice(-12).reverse().map((r) => (<li key={r.id} className="mono" data-testid="history-row">“{r.prompt}” <span className="mu">· {r.tier}{r.firstMs != null ? ` · first ${r.firstMs.toFixed(0)} ms` : ''} · {r.ms.toFixed(0)} ms{r.rejected ? ` · ${r.rejected} rejected` : ''}{!r.ok ? ' · failed' : ''}{r.undone ? ' · undone' : ''}</span></li>))}</ul>
             <h2>Pulse <span className="mono mu">this device, last {recs.length}</span></h2>

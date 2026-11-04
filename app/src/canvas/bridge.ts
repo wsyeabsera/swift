@@ -16,11 +16,15 @@ export type BridgeRequest =
   | { t: 'remove'; rid: number; el: string }
   | { t: 'rect'; rid: number; el: string }
   | { t: 'props'; rid: number; el: string; props: string[] }
-  | { t: 'tree'; rid: number };
+  | { t: 'tree'; rid: number }
+  | { t: 'audit'; rid: number };
 export type TreeNode = { id: string; parent: string | null; depth: number; tag: string; text: string; hidden?: boolean };
+export type Rgb = { r: number; g: number; b: number };
+export type AuditNode = { id: string; tag: string; text: string; x: number; y: number; w: number; h: number; fs: number; color: (Rgb & { a: number }) | null; bg: (Rgb & { image: boolean }) | null; clipX: boolean; clipY: boolean; interactive: boolean };
+export type AuditFacts = { w: number; h: number; nodes: AuditNode[] };
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 export type BridgeInput = DistributiveOmit<BridgeRequest, 'rid'>;
-export type BridgeReply = { t: 'reply'; rid: number; ok: boolean; value?: string; id?: string | null; before?: string; html?: string; rect?: { x: number; y: number; w: number; h: number }; values?: Record<string, string>; tree?: TreeNode[] };
+export type BridgeReply = { t: 'reply'; rid: number; ok: boolean; value?: string; id?: string | null; before?: string; html?: string; rect?: { x: number; y: number; w: number; h: number }; values?: Record<string, string>; tree?: TreeNode[]; audit?: AuditFacts };
 import frameJs from './bridge-frame.js?raw';
 export const FRAME_JS: string = frameJs;
 export const BRIDGE_SCRIPT = `<script>${frameJs}</script>`;
