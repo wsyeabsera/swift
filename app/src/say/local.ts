@@ -75,3 +75,9 @@ export function themeRequest(request: string, kit: Record<string, string>): { na
   const find = (aliases: string[]) => Object.keys(kit).find((k) => aliases.includes(k.replace(/^--/, '').toLowerCase()) && /^#[0-9a-f]{3,8}$/i.test(kit[k]!.trim())); const bg = find(WORDS.background!), tx = find(WORDS.text!);
   return bg && tx ? [{ name: bg, value: t.background }, { name: tx, value: t.text }] : null;
 }
+/** "make it ease out" / "ease it in and out" / "use expo ease out": the motion ease for the selected element's animation. Not for plain words like "easier" (needs the word ease + a direction). */
+export function easeRequest(request: string): 'expo.out' | 'expo.in' | 'expo.inOut' | 'linear' | 'back.out' | null {
+  const t = request.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!]$/, ''); if (/^(?:please )?(?:make it |set it to |use )?(?:a )?linear(?: ease| motion)?$/.test(t)) return 'linear';
+  if (/\b(?:bounce|overshoot|back)\b.*\bease\b|\bease\b.*\b(?:bounce|overshoot)\b/.test(t)) return 'back.out'; if (!/^(?:please )?(?:make (?:it|this|that)|ease (?:it|this)|use|set (?:it )?to|animate (?:it|this))\b/.test(t) || !/\bease\b|\beas(?:e|ing)\b/.test(t)) return null;
+  if (/\bin (?:and|&) out\b|\bin-out\b|\binout\b/.test(t)) return 'expo.inOut'; if (/\bease (?:in)\b|\bease-in\b|\bease it in\b/.test(t)) return 'expo.in'; if (/\bease (?:out)\b|\bease-out\b|\bease it out\b/.test(t)) return 'expo.out'; return null;
+}

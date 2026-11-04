@@ -60,3 +60,8 @@ test('"nudge the title up 8 px" moves by left/top or translate, like the arrow k
   expect(await localEdits('move it right 5px', ctx({ position: 'static', left: 'auto', top: 'auto', translate: 'none' }))).toEqual([{ prop: 'translate', value: '5px 0px' }]);
   expect(await localEdits('nudge it up', ctx({}))).toBeNull();
 });
+test('easeRequest maps plain ease words to the motion eases, and ignores everything else', async () => {
+  const { easeRequest } = await import('./local');
+  expect([ 'make it ease out', 'Make it ease in.', 'ease it in and out', 'make it linear', 'make it bounce with an ease' ].map(easeRequest)).toEqual(['expo.out', 'expo.in', 'expo.inOut', 'linear', 'back.out']);
+  for (const no of ['make it bigger', 'this is easy', 'make the title ease', 'ease out the margins please maybe']) expect(easeRequest(no)).toBeNull();
+});
