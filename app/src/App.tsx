@@ -39,6 +39,8 @@ import { handleMcp, type McpEnv } from './mcp';
 import { runSayRepairing } from './say/say';
 import { compareKits, isColorValue, kitColors, loadBrand, replaceColor, saveBrand, shareToken, toBrandTokens } from './brand';
 import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, type Registry } from './projects';
+import { loadScene, saveScene, type Scene3D } from './studio3d/scene';
+import { Studio3D } from './studio3d/Studio3D';
 import { altKey, count as altCount, cycle as altCycle, keepOne, saveVariant, type Alts } from './alternates';
 import { addLink, follow, loadLinks, pruneLinks, removeLink, saveLinks, type Link } from './proto';
 import { EASES, emptyTimeline, loadTimeline, sample as motionSample, saveTimeline, setEase as motionEase, setKey as motionKey, type Ease, type Timeline } from './motion';
@@ -123,6 +125,12 @@ export function App() {
   const [library, setLibrary] = useState<LibItem[]>(() => loadLibrary()); const [libFilter, setLibFilter] = useState<string | null>(null);
   const dropFromLibrary = useCallback((id: string) => { const next = removeItem(library, id); setLibrary(next); const err = saveLibrary(next); setSayStatus(err ? `Removed for now, not stored: ${err}` : 'Removed from the library'); }, [library]);
   const [brand, setBrand] = useState<Record<string, string>>(() => loadBrand(undefined, project.id));
+  const [scene3d, setScene3dState] = useState<Scene3D>(() => loadScene(project.id)); const setScene3d = useCallback((s: Scene3D) => { setScene3dState(s); const err = saveScene(project.id, s); if (err) setSayStatus(`3D scene not saved: ${err}`); }, [project.id]);
+  const insertStill = async (dataUrl: string): Promise<void> => { // a rendered still of the 3D view as an image layer in the selected frame (one undo step)
+    const api = window.__swift; const f = frames.find((x) => x.id === (selection?.frameId ?? '')) ?? frames[0]; if (!api || !f) { setSayStatus('Open a frame first'); return; } const html0 = await api.snapshot(f.id); let n = 1; while (html0.includes(`id="render-${n}"`)) n++;
+    const img = `<img id="render-${n}" alt="3D render" src="${dataUrl}" style="position:absolute;left:40px;top:40px;width:480px;height:auto;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35)">`; if (!(await api.add(f.id, f.root, img))) { setSayStatus('Could not add the render to the frame'); return; }
+    recordOp({ kind: 'add', frame: f.id, parent: f.root, html: img }); setRevision((x) => x + 1); setLens('Design'); setSayStatus(`Added render-${n} (a still of the 3D view) to ${f.title}`); setTimeout(() => void api.glideTo([f.id]), 100);
+  };
   const [links, setLinksState] = useState<Link[]>(() => loadLinks(project.id)); const [playFlow, setPlayFlow] = useState(false); const [showHot, setShowHot] = useState(false); const [linkTo, setLinkTo] = useState(''); const flowBack = useRef<string[]>([]);
   const setLinks = useCallback((l: Link[]) => { setLinksState(l); const err = saveLinks(project.id, l); if (err) setSayStatus(`Links not saved: ${err}`); }, [project.id]);
   const [motion, setMotionState] = useState<Timeline>(() => loadTimeline(project.id)); const [mt, setMt] = useState(0); const [mProp, setMProp] = useState('opacity'); const [mEase, setMEase] = useState<Ease>('expo.out'); const [playing, setPlaying] = useState(false);
@@ -409,25 +417,25 @@ export function App() {
   // Project files: export everything as one portable JSON file, or open one as a NEW project (never overwrites an existing one).
   const exportProject = useCallback(async () => {
     if (!window.__swift) return; const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html })));
-    const url = URL.createObjectURL(new Blob([serializeProject(project.name, snaps, brand, logRef.current, motion, links)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = projectFileName(project.name); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
-  }, [frames, project.name, brand, motion, links]);
+    const url = URL.createObjectURL(new Blob([serializeProject(project.name, snaps, brand, logRef.current, motion, links, scene3d)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = projectFileName(project.name); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); setSayStatus(`Exported ${link.download}`);
+  }, [frames, project.name, brand, motion, links, scene3d]);
   // Write the project into a repo folder (git-friendly: <folder>/.swift-canvas/project.json) via the helper; choosing the folder in the native dialog is the consent.
   const saveToRepo = useCallback(async () => {
     const c = conn.current; if (!c || !window.__swift) { setSayStatus('The helper is offline'); return; } const pick = await c.pickFolder(); if (!pick.ok) { if (pick.error !== 'cancelled') setSayStatus(`Not saved: ${pick.error}`); return; }
-    const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const r = await c.writeRepo(pick.path, serializeProject(project.name, snaps, brand, logRef.current, motion, links)); setSayStatus(r.ok ? `Saved ${r.path}` : `Not saved: ${r.error}`);
-  }, [frames, project.name, brand, motion, links]);
+    const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const r = await c.writeRepo(pick.path, serializeProject(project.name, snaps, brand, logRef.current, motion, links, scene3d)); setSayStatus(r.ok ? `Saved ${r.path}` : `Not saved: ${r.error}`);
+  }, [frames, project.name, brand, motion, links, scene3d]);
   const [repoPlan, setRepoPlan] = useState<{ path: string; files: RepoFile[]; branch: string; entries: RepoEntry[] } | null>(null);
   const planRepoExport = async () => { // pick a folder, then PREVIEW the paths before anything is written; the branch is only made on the second click
     const c = conn.current; if (!c || !window.__swift) { setSayStatus('The helper is offline'); return; } const pick = await c.pickFolder(); if (!pick.ok) { if (pick.error !== 'cancelled') setSayStatus(`Not exported: ${pick.error}`); return; }
     const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift!.snapshot(f.id)) || f.html }))); const used = new Set<string>();
-    const files: RepoFile[] = snaps.map((f) => { let n = exportName(f.title); for (let i = 2; used.has(n); i++) n = exportName(f.title).replace(/\.html$/, `-${i}.html`); used.add(n); return { path: `swift-canvas/${n}`, content: exportDoc(f.title, f.html) }; }); for (const f of snaps) { let n = componentName(f.title); for (let i = 2; used.has(`${n}.tsx`); i++) n = `${componentName(f.title)}${i}`; used.add(`${n}.tsx`); files.push({ path: `swift-canvas/${n}.tsx`, content: frameToTsx(f.title, f.html) }); } files.push({ path: 'swift-canvas/project.json', content: serializeProject(project.name, snaps, brand, logRef.current, motion, links) });
+    const files: RepoFile[] = snaps.map((f) => { let n = exportName(f.title); for (let i = 2; used.has(n); i++) n = exportName(f.title).replace(/\.html$/, `-${i}.html`); used.add(n); return { path: `swift-canvas/${n}`, content: exportDoc(f.title, f.html) }; }); for (const f of snaps) { let n = componentName(f.title); for (let i = 2; used.has(`${n}.tsx`); i++) n = `${componentName(f.title)}${i}`; used.add(`${n}.tsx`); files.push({ path: `swift-canvas/${n}.tsx`, content: frameToTsx(f.title, f.html) }); } files.push({ path: 'swift-canvas/project.json', content: serializeProject(project.name, snaps, brand, logRef.current, motion, links, scene3d) });
     const r = await c.repoCall('plan', pick.path, project.name, files); if (!r.ok) { setSayStatus(`Not exported: ${r.error}`); return; } setRepoPlan({ path: pick.path, files, branch: r.branch, entries: r.entries ?? [] });
   };
   const confirmRepoExport = async () => { const pl = repoPlan; const c = conn.current; if (!pl || !c) return; const r = await c.repoCall('export', pl.path, project.name, pl.files); setRepoPlan(null); setSayStatus(r.ok ? `Committed ${pl.files.length} files on branch ${r.branch}; your current branch is untouched (undo: git branch -D ${r.branch})` : `Not exported: ${r.error}`); };
   const openProjectFile = useCallback(async (file: File) => {
     if (file.size > MAX_FILE_BYTES) { setSayStatus('Project file too large'); return; } const r = parseProjectFile(await file.text()); if (!r.ok) { setSayStatus(`Cannot open ${file.name}: ${r.error}`); return; }
     const next = addProject(reg, uniqueName(reg.list, r.project.name)); if (!next) { setSayStatus('Too many projects'); return; }
-    const e1 = saveDoc(r.project.frames, undefined, next.active, r.project.log ?? undefined); if (e1) { setSayStatus(`Not opened: ${e1}`); return; } saveBrand(r.project.brand, undefined, next.active); if (r.project.motion) saveTimeline(next.active, r.project.motion); if (r.project.links.length) saveLinks(next.active, r.project.links); void goTo(next);
+    const e1 = saveDoc(r.project.frames, undefined, next.active, r.project.log ?? undefined); if (e1) { setSayStatus(`Not opened: ${e1}`); return; } saveBrand(r.project.brand, undefined, next.active); if (r.project.motion) saveTimeline(next.active, r.project.motion); if (r.project.links.length) saveLinks(next.active, r.project.links); if (r.project.scene3d) saveScene(next.active, r.project.scene3d); void goTo(next);
   }, [reg, goTo]);
   // Shared library: save the selected element (markup + origin project), insert it into any frame later (ids de-duplicated, one undo step).
   const saveToLibrary = useCallback(async () => {
@@ -615,8 +623,9 @@ export function App() {
         </div>
       </header>
       <Canvas hotspots={playFlow || showHot ? links.map((l) => ({ frameId: l.frame, el: l.el })) : undefined} diff={cmpOutline || onion ? { frameId: (cmpOutline ?? onion)!.frame, els: cmpOutline?.els ?? [], ghost: onion ? { html: onion.html, mix: onion.mix / 100 } : undefined } : undefined} chrome={chrome} onResize={(f, e, dw, dh, ph) => void resizeElement(f, e, dw, dh, ph)} onMove={(f, e, dx, dy, ph) => void moveElement(f, e, dx, dy, ph)} painting={painting} key={epoch} onRename={(id, t) => { const next = renameFrame(frames, id, t); if (next === frames) return; const before = frames.find((f) => f.id === id)?.title ?? ''; const after = next.find((f) => f.id === id)?.title ?? ''; recordOp({ kind: 'rename', frame: id, before, after }); setFrames(next); }} frames={frames} selection={selection} extras={extras} onSelect={pickElement} revision={revision} onReady={() => setRevision((n) => n + 1)} />
-      <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} extras={extras} onSelect={pickElement} revision={revision} />
-      <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />
+      {lens !== '3D' && <Layers onToggleHidden={(el, hidden) => void edit(selection?.frameId ?? frames[0]?.id ?? '', el, 'visibility', hidden ? 'hidden' : 'visible')} frameId={selection?.frameId ?? frames[0]?.id ?? ''} selection={selection} extras={extras} onSelect={pickElement} revision={revision} />}
+      {lens !== '3D' && <Inspector selection={selection} revision={revision} onEdit={(prop, value) => { if (selection) void edit(selection.frameId, selection.el, prop, value); }} />}
+      {lens === '3D' && <Studio3D scene={scene3d} onScene={setScene3d} onInsertStill={(url) => void insertStill(url)} onStatus={setSayStatus} fileName={exportName(project.name).replace(/\.html$/, '')} />}
       {chips.length > 0 && !saying && !sayText && !pendingAsk && (
         <div className="gl isl chips" role="group" aria-label="Suggestions" data-testid="chips">
           {chips.map((c) => <button key={c.label} className="rb btn chip" onClick={() => void say(c.text)} data-testid="chip">{c.label}</button>)}

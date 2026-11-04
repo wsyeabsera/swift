@@ -1,0 +1,60 @@
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
+import type { Engine } from './engine';
+import { addLight, addObject, removeItem, setCamera, SHAPES, LIGHTS, updateLight, updateObject, type Scene3D, type Vec3 } from './scene';
+/** The 3D lens: a viewport (orbit by dragging, zoom with the wheel, click to select), an outline of objects and lights, a properties panel, and export (glb, a still as an image layer in a frame, png).
+ *  The scene is the document (`Scene3D`); this component only edits it and asks the engine to draw it. */
+export function Studio3D({ scene, onScene, onInsertStill, onStatus, fileName }: { scene: Scene3D; onScene: (s: Scene3D) => void; onInsertStill: (dataUrl: string) => void; onStatus: (t: string) => void; fileName: string }) {
+  const canvas = useRef<HTMLCanvasElement>(null); const engine = useRef<Engine | null>(null); const [ready, setReady] = useState(false); const [backend, setBackend] = useState(''); const [error, setError] = useState('');
+  const [selected, setSelected] = useState<string | null>(scene.objects[0]?.id ?? null); const sceneRef = useRef(scene); sceneRef.current = scene; const drag = useRef<{ x: number; y: number; moved: number } | null>(null);
+  useEffect(() => { let alive = true; let eng: Engine | null = null; void import('./engine').then(async (m) => { if (!canvas.current) return; try { eng = await m.createEngine(canvas.current); } catch (e) { if (alive) setError(e instanceof Error ? e.message : 'could not start the 3D engine'); return; } if (!alive) { eng.dispose(); return; } engine.current = eng; setBackend(eng.backend); setReady(true); }); return () => { alive = false; engine.current = null; eng?.dispose(); }; }, []);
+  useEffect(() => { if (ready) void engine.current?.setScene(scene, selected); }, [ready, scene, selected]);
+  useEffect(() => { if (!ready) return; const ro = new ResizeObserver(() => void engine.current?.resize()); if (canvas.current) ro.observe(canvas.current); return () => ro.disconnect(); }, [ready]);
+  const apply = (r: { ok: true; scene: Scene3D } | { ok: false; error: string }): void => { if (r.ok) onScene(r.scene); else onStatus(r.error); };
+  const add = (shape: (typeof SHAPES)[number]): void => { const r = addObject(scene, shape); if (!r.ok) { onStatus(r.error); return; } onScene(r.scene); setSelected(r.id); };
+  const addL = (kind: (typeof LIGHTS)[number]): void => { const r = addLight(scene, kind); if (!r.ok) { onStatus(r.error); return; } onScene(r.scene); setSelected(r.id); };
+  const del = useCallback(() => { if (!selected) return; onScene(removeItem(sceneRef.current, selected)); setSelected(null); }, [selected, onScene]);
+  useEffect(() => { const k = (e: KeyboardEvent): void => { const t = e.target; if ((e.key === 'Delete' || e.key === 'Backspace') && !(t instanceof HTMLInputElement) && !(t instanceof HTMLTextAreaElement)) { e.preventDefault(); del(); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [del]);
+  const obj = scene.objects.find((o) => o.id === selected); const light = scene.lights.find((l) => l.id === selected);
+  const vecRow = (label: string, v: Vec3, set: (n: Vec3) => void, step: number): ReactElement => (<label className="fld" data-testid={`f-${label}`}><span className="mu">{label}</span><span className="vec">{[0, 1, 2].map((i) => (<input key={i} type="number" step={step} aria-label={`${label} ${'xyz'[i]}`} value={Number(v[i]!.toFixed(3))} onChange={(e) => { const n = [...v] as Vec3; n[i] = Number(e.target.value); set(n); }} />))}</span></label>);
+  const download = (blob: Blob, name: string): void => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); };
+  const exportGlb = async (): Promise<void> => { try { const buf = await engine.current!.exportGlb(); download(new Blob([buf], { type: 'model/gltf-binary' }), `${fileName}.glb`); onStatus(`Exported ${fileName}.glb (${(buf.byteLength / 1024).toFixed(0)} KB, ${scene.objects.length} objects, ${scene.lights.length} lights)`); } catch (e) { onStatus(`Not exported: ${e instanceof Error ? e.message : 'failed'}`); } };
+  const insertStill = async (): Promise<void> => { try { onInsertStill(await engine.current!.still(640, 'image/jpeg')); } catch (e) { onStatus(`No still: ${e instanceof Error ? e.message : 'failed'}`); } };
+  const downloadPng = async (): Promise<void> => { try { const url = await engine.current!.still(1280, 'image/png'); const blob = await (await fetch(url)).blob(); download(blob, `${fileName}.png`); onStatus(`Saved ${fileName}.png`); } catch (e) { onStatus(`No image: ${e instanceof Error ? e.message : 'failed'}`); } };
+  return (
+    <div className="studio" data-testid="studio3d">
+      <canvas ref={canvas} className="studio-canvas" data-testid="studio-canvas" aria-label="3D viewport"
+        onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, moved: 0 }; (e.target as HTMLElement).setPointerCapture(e.pointerId); }}
+        onPointerMove={(e) => { const d = drag.current; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; d.x = e.clientX; d.y = e.clientY; d.moved += Math.abs(dx) + Math.abs(dy); if (d.moved > 3) { const c = sceneRef.current.camera; onScene(setCamera(sceneRef.current, { azimuth: c.azimuth - dx * 0.4, elevation: c.elevation + dy * 0.4 })); } }}
+        onPointerUp={(e) => { const d = drag.current; drag.current = null; if (d && d.moved <= 3) setSelected(engine.current?.pick(e.clientX, e.clientY) ?? null); }}
+        onWheel={(e) => { const c = sceneRef.current.camera; onScene(setCamera(sceneRef.current, { distance: c.distance * Math.exp(e.deltaY * 0.001) })); }} />
+      {!ready && !error && <p className="studio-note mono mu" data-testid="studio-loading">Loading the 3D engine…</p>}
+      {error && <p className="studio-note mono" data-testid="studio-error">3D is not available here: {error}</p>}
+      <aside className="gl isl-panel studio-outline" aria-label="Outline" data-testid="outline3d">
+        <h2>Outline <span className="mono mu">{scene.objects.length} objects · {scene.lights.length} lights</span></h2>
+        <ul className="liblist">{scene.objects.map((o) => (<li key={o.id}><button className={`rb row${o.id === selected ? ' on' : ''}`} onClick={() => setSelected(o.id)} data-testid="outline-obj" data-id={o.id}><span className="sw" style={{ background: o.color }} />{o.name}<span className="mono mu"> {o.shape}</span></button></li>))}
+          {scene.lights.map((l) => (<li key={l.id}><button className={`rb row${l.id === selected ? ' on' : ''}`} onClick={() => setSelected(l.id)} data-testid="outline-light" data-id={l.id}><span className="sw" style={{ background: l.color }} />Light<span className="mono mu"> {l.kind}</span></button></li>))}</ul>
+        <div className="projs">{SHAPES.map((s) => (<button key={s} className="rb btn" onClick={() => add(s)} data-testid={`add3d-${s}`}>+ {s}</button>))}</div>
+        <div className="projs">{LIGHTS.map((k) => (<button key={k} className="rb btn" onClick={() => addL(k)} data-testid={`addlight-${k}`}>+ {k} light</button>))}</div>
+      </aside>
+      <aside className="gl isl-panel studio-props" aria-label="Properties" data-testid="props3d">
+        <h2>Properties <span className="mono mu" data-testid="props-name">{obj?.name ?? (light ? `${light.kind} light` : 'nothing selected')}</span></h2>
+        {obj && <>
+          <label className="fld"><span className="mu">name</span><input aria-label="name" data-testid="p-name" value={obj.name} onChange={(e) => apply(updateObject(scene, obj.id, { name: e.target.value }))} /></label>
+          {vecRow('position', obj.position, (v) => apply(updateObject(scene, obj.id, { position: v })), 0.1)}{vecRow('rotation', obj.rotation, (v) => apply(updateObject(scene, obj.id, { rotation: v })), 5)}{vecRow('scale', obj.scale, (v) => apply(updateObject(scene, obj.id, { scale: v })), 0.1)}
+          <label className="fld"><span className="mu">colour</span><input type="color" aria-label="colour" data-testid="p-color" value={obj.color} onChange={(e) => apply(updateObject(scene, obj.id, { color: e.target.value }))} /></label>
+          <label className="fld"><span className="mu">metalness</span><input type="range" min={0} max={1} step={0.05} aria-label="metalness" data-testid="p-metal" value={obj.metalness} onChange={(e) => apply(updateObject(scene, obj.id, { metalness: Number(e.target.value) }))} /></label>
+          <label className="fld"><span className="mu">roughness</span><input type="range" min={0} max={1} step={0.05} aria-label="roughness" data-testid="p-rough" value={obj.roughness} onChange={(e) => apply(updateObject(scene, obj.id, { roughness: Number(e.target.value) }))} /></label>
+        </>}
+        {light && <>
+          <label className="fld"><span className="mu">colour</span><input type="color" aria-label="light colour" data-testid="l-color" value={light.color} onChange={(e) => apply(updateLight(scene, light.id, { color: e.target.value }))} /></label>
+          <label className="fld"><span className="mu">intensity</span><input type="range" min={0} max={8} step={0.1} aria-label="intensity" data-testid="l-intensity" value={light.intensity} onChange={(e) => apply(updateLight(scene, light.id, { intensity: Number(e.target.value) }))} /></label>
+          {light.kind !== 'ambient' && vecRow('position', light.position, (v) => apply(updateLight(scene, light.id, { position: v })), 0.5)}
+        </>}
+        {(obj || light) && <div className="projs"><button className="rb btn" onClick={del} data-testid="delete3d">Delete</button></div>}
+        <h2>Camera <span className="mono mu">orbit: drag · zoom: wheel</span></h2>
+        <label className="fld"><span className="mu">field of view</span><input type="range" min={15} max={100} step={1} aria-label="field of view" data-testid="fov" value={scene.camera.fov} onChange={(e) => onScene(setCamera(scene, { fov: Number(e.target.value) }))} /></label>
+      </aside>
+      <div className="gl isl studio-bar" data-testid="studio-bar"><span className="mono mu" data-testid="studio-backend">{ready ? backend : '…'}</span><button className="rb btn" onClick={() => void exportGlb()} disabled={!ready} data-testid="export-glb">Export glb</button><button className="rb btn" onClick={() => void insertStill()} disabled={!ready} data-testid="still-insert" title="A render of this view as an image layer in the selected frame">Still → frame</button><button className="rb btn" onClick={() => void downloadPng()} disabled={!ready} data-testid="still-png">Save PNG</button></div>
+    </div>
+  );
+}

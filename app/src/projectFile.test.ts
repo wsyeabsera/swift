@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest';
+import { starterScene } from './studio3d/scene';
 import { parseProjectFile, projectFileName, serializeProject, MAX_FILE_BYTES } from './projectFile';
 import { makeFrames } from './canvas/fixtures';
-test('round trip keeps name, frames and brand', () => { const f = makeFrames(5); const r = parseProjectFile(serializeProject('Research Radar', f, { '--ac': '#0a84ff' })); expect(r).toEqual({ ok: true, project: { name: 'Research Radar', frames: f, brand: { '--ac': '#0a84ff' }, log: null, motion: null, links: [] } }); });
+test('round trip keeps name, frames and brand', () => { const f = makeFrames(5); const r = parseProjectFile(serializeProject('Research Radar', f, { '--ac': '#0a84ff' })); expect(r).toEqual({ ok: true, project: { name: 'Research Radar', frames: f, brand: { '--ac': '#0a84ff' }, log: null, motion: null, links: [], scene3d: null } }); });
 test('refusals say why: junk, wrong version, no name, bad frames, too large', () => {
   const f = makeFrames(2); const base = { swiftCanvas: 1, name: 'x', frames: f, brand: {} };
   const err = (v: unknown) => { const r = parseProjectFile(typeof v === 'string' ? v : JSON.stringify(v)); return r.ok ? 'OK' : r.error; };
@@ -28,4 +29,9 @@ test('prototype links round-trip with the project; junk links are dropped, the f
   const fr = { id: 'tv', root: 'tv', title: 'TV', x: 0, y: 0, w: 10, h: 10, html: '<div id="tv"></div>' }; const links = [{ frame: 'tv', el: 'clock', to: 'phone-1' }];
   const ok = parseProjectFile(serializeProject('demo', [fr], {}, undefined, undefined, links)); expect(ok.ok && ok.project.links).toEqual(links); const none = parseProjectFile(serializeProject('demo', [fr], {})); expect(none.ok && none.project.links).toEqual([]);
   const bad = JSON.parse(serializeProject('demo', [fr], {}, undefined, undefined, links)); bad.links = [{ frame: 1 }, null, { frame: 'a', el: 'b', to: 'a' }, ...links]; const r = parseProjectFile(JSON.stringify(bad)); expect(r.ok && r.project.links).toEqual(links);
+});
+test('the 3D scene round-trips with the project; a damaged scene is dropped, the frames still open', () => {
+  const fr = { id: 'tv', root: 'tv', title: 'TV', x: 0, y: 0, w: 10, h: 10, html: '<div id="tv"></div>' }; const sc = starterScene();
+  const ok = parseProjectFile(serializeProject('demo', [fr], {}, undefined, undefined, undefined, sc)); expect(ok.ok && ok.project.scene3d).toEqual(sc); const none = parseProjectFile(serializeProject('demo', [fr], {})); expect(none.ok && none.project.scene3d).toBeNull();
+  const bad = JSON.parse(serializeProject('demo', [fr], {}, undefined, undefined, undefined, sc)); bad.scene3d = { objects: 'x' }; const r = parseProjectFile(JSON.stringify(bad)); expect(r.ok && r.project.scene3d).toBeNull(); expect(r.ok && r.project.frames).toHaveLength(1);
 });

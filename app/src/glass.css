@@ -76,3 +76,10 @@ button:disabled{opacity:.45;cursor:default}
 /* Compare: the original laid over a take (onion skin) and outlines on what the take changed */
 .world .onion{position:absolute;border:0;pointer-events:none;border-radius:12px;z-index:3;mix-blend-mode:normal}.sel-diff{outline:calc(2px * var(--inv,1)) solid var(--warn,#ffb340);box-shadow:none;z-index:4}
 .sel-hot{outline:calc(2px * var(--inv,1)) dashed var(--ac);box-shadow:0 0 calc(18px * var(--inv,1)) rgba(124,240,208,.35);z-index:4}
+
+/* The 3D lens: a viewport under the islands, an outline (left) and properties (right), a bar for export */
+.studio{position:fixed;inset:0;z-index:2}.studio-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}.studio-canvas:active{cursor:grabbing}
+.studio-note{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 16px;border-radius:14px;background:rgba(0,0,0,.35)}
+.studio-outline{left:16px}.studio-outline ul{list-style:none;margin:0 0 8px;padding:0}.studio-outline li{display:block}.studio-outline .row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;height:30px;border-radius:10px;white-space:nowrap;overflow:hidden}.studio-outline .row.on{background:rgba(255,255,255,.16)}.studio-outline .sw{display:inline-block;width:12px;height:12px;border-radius:6px;box-shadow:0 0 0 1px rgba(255,255,255,.35)}
+.studio-props{right:16px;width:290px}.studio-props .vec{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.studio-props .fld{grid-template-columns:78px 1fr}.studio-props input[type=color]{padding:0;width:44px;cursor:pointer}.studio-props .vec input{width:100%;min-width:0;padding:0 4px}
+.studio-bar{position:fixed;left:50%;bottom:132px;transform:translateX(-50%);z-index:5;gap:8px;padding:0 14px}
