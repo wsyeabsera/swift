@@ -24,3 +24,8 @@ test('parseScene keeps what is valid and drops the rest: junk objects, duplicate
   const s = parseScene({ background: 'nope', objects: [{ id: 'a', shape: 'box', color: '#ABCDEF', position: [1, 2, 3], scale: [0, 0, 0] }, { id: 'a', shape: 'sphere', color: '#000000' }, { id: 'b', shape: 'cone', color: '#000000' }, { id: 'c', shape: 'box', color: 'red' }, 5, { id: 'Bad Id', shape: 'box', color: '#000000' }], lights: [{ id: 'l', kind: 'point', color: '#ffffff', intensity: 99 }, { id: 'l', kind: 'point', color: '#ffffff' }, { id: 'a', kind: 'ambient', color: '#ffffff' }, { id: 'z', kind: 'laser', color: '#ffffff' }], camera: { distance: 1e9, elevation: -9e9 } })!;
   expect(s.objects.map((o) => o.id)).toEqual(['a']); expect(s.objects[0]).toMatchObject({ color: '#abcdef', scale: [0.001, 0.001, 0.001], name: 'a' }); expect(s.lights.map((l) => [l.id, l.intensity])).toEqual([['l', 20]]); expect(s.background).toBe('#101820'); expect(s.camera).toMatchObject({ distance: 80, elevation: -85 });
 });
+
+test('camera presets move only the viewpoint and stay within limits', async () => {
+  const m = await import('./scene'); const base = m.starterScene();
+  for (const p of Object.keys(m.CAMERA_PRESETS) as (keyof typeof m.CAMERA_PRESETS)[]) { const r = m.applyPreset(base, p); expect(r.camera.fov).toBe(base.camera.fov); expect(r.camera.target).toEqual(base.camera.target); expect(r.camera.elevation).toBeLessThanOrEqual(85); expect(r.camera.elevation).toBeGreaterThanOrEqual(-85); expect(r.camera.azimuth).toBe(m.CAMERA_PRESETS[p].azimuth); expect(r.camera.distance).toBe(m.CAMERA_PRESETS[p].distance); }
+});

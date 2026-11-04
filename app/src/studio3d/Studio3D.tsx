@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Engine } from './engine';
-import { addLight, addObject, removeItem, setCamera, SHAPES, LIGHTS, updateLight, updateObject, type Scene3D, type Vec3 } from './scene';
+import { addLight, addObject, applyPreset, CAMERA_PRESETS, type CameraPreset, removeItem, setCamera, SHAPES, LIGHTS, updateLight, updateObject, type Scene3D, type Vec3 } from './scene';
 /** The 3D lens: a viewport (orbit by dragging, zoom with the wheel, click to select), an outline of objects and lights, a properties panel, and export (glb, a still as an image layer in a frame, png).
  *  The scene is the document (`Scene3D`); this component only edits it and asks the engine to draw it. */
 export function Studio3D({ scene, onScene, onInsertStill, onStatus, fileName, onShip }: { onShip?: (kind: string, name: string, detail: string) => void; scene: Scene3D; onScene: (s: Scene3D) => void; onInsertStill: (dataUrl: string) => void; onStatus: (t: string) => void; fileName: string }) {
@@ -52,6 +52,7 @@ export function Studio3D({ scene, onScene, onInsertStill, onStatus, fileName, on
         </>}
         {(obj || light) && <div className="projs"><button className="rb btn" onClick={del} data-testid="delete3d">Delete</button></div>}
         <h2>Camera <span className="mono mu">orbit: drag · zoom: wheel</span></h2>
+        <div className="projs" data-testid="cam-presets">{(Object.keys(CAMERA_PRESETS) as CameraPreset[]).map((p) => (<button key={p} className="rb btn" onClick={() => onScene(applyPreset(scene, p))} data-testid={`cam-${p}`}>{p}</button>))}</div>
         <label className="fld"><span className="mu">field of view</span><input type="range" min={15} max={100} step={1} aria-label="field of view" data-testid="fov" value={scene.camera.fov} onChange={(e) => onScene(setCamera(scene, { fov: Number(e.target.value) }))} /></label>
       </aside>
       <div className="gl isl studio-bar" data-testid="studio-bar"><span className="mono mu" data-testid="studio-backend">{ready ? backend : '…'}</span><button className="rb btn" onClick={() => void exportGlb()} disabled={!ready} data-testid="export-glb">Export glb</button><button className="rb btn" onClick={() => void insertStill()} disabled={!ready} data-testid="still-insert" title="A render of this view as an image layer in the selected frame">Still → frame</button><button className="rb btn" onClick={() => void downloadPng()} disabled={!ready} data-testid="still-png">Save PNG</button></div>

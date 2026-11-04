@@ -56,3 +56,8 @@ export function parseScene(raw: unknown): Scene3D | null {
 const KEY = (project: string): string => `swift-canvas.scene3d.v1.${project}`;
 export function loadScene(project: string): Scene3D { try { const raw = localStorage.getItem(KEY(project)); return (raw ? parseScene(JSON.parse(raw)) : null) ?? starterScene(); } catch { return starterScene(); } }
 export function saveScene(project: string, sc: Scene3D): string | null { try { localStorage.setItem(KEY(project), JSON.stringify(sc)); return null; } catch (e) { return e instanceof Error ? e.message : 'save failed'; } }
+
+/** Named viewpoints around the camera's target (the board's Hero / Front / Low / Top / Orbit): azimuth, elevation and distance only; fov and target stay. */
+export const CAMERA_PRESETS = { Hero: { azimuth: 35, elevation: 18, distance: 9 }, Front: { azimuth: 0, elevation: 0, distance: 10 }, Low: { azimuth: 20, elevation: -12, distance: 8 }, Top: { azimuth: 0, elevation: 85, distance: 12 }, Orbit: { azimuth: 135, elevation: 25, distance: 11 } } as const;
+export type CameraPreset = keyof typeof CAMERA_PRESETS;
+export const applyPreset = (sc: Scene3D, p: CameraPreset): Scene3D => setCamera(sc, CAMERA_PRESETS[p]);
