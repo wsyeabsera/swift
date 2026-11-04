@@ -6,7 +6,7 @@ import { fit, isVisible, panBy, screenToWorld, transformCss, zoomAt, type View }
 
 export type Sel = { frameId: string; el: string };
 export type CanvasApi = {
-  frames: string[]; view: () => View; setView: (v: View) => void; fitAll: () => void; fitTo: (ids: string[]) => void; visibleCount: () => number;
+  frames: string[]; view: () => View; setView: (v: View) => void; fitAll: () => void; fitTo: (ids: string[]) => void; glideTo: (ids: string[], ms?: number) => Promise<void>; visibleCount: () => number;
   edit: (frameId: string, el: string, prop: string, value: string) => Promise<{ ok: boolean; ms: number; before: string }>;
   get: (frameId: string, el: string, prop: string) => Promise<string | undefined>;
   props: (frameId: string, el: string, props: string[]) => Promise<Record<string, string> | undefined>;
@@ -33,10 +33,10 @@ const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].
 /** Infinite canvas: one transformed world layer, one sandboxed iframe per frame, offscreen frames frozen (display:none, spike #1706).
  *  The viewport lives in a ref and is applied to the DOM directly: panning and zooming never re-render React; React re-renders only when
  *  the set of visible frames changes or the selection changes. Selection is found by hit-testing through the frame bridge. */
-export function Canvas({ frames, selection, extras = [], onSelect, revision, onReady, onRename, painting, onMove, onResize, chrome, diff }: { diff?: { frameId: string; els: string[]; ghost?: { html: string; mix: number } }; chrome?: boolean; painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; extras?: string[]; onSelect: (s: Sel | null, additive?: boolean) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
+export function Canvas({ frames, selection, extras = [], onSelect, revision, onReady, onRename, painting, onMove, onResize, chrome, diff, hotspots }: { hotspots?: { frameId: string; el: string }[]; diff?: { frameId: string; els: string[]; ghost?: { html: string; mix: number } }; chrome?: boolean; painting?: Set<string>; onResize?: (frameId: string, el: string, dw: number, dh: number, phase: 'start' | 'move' | 'end') => void; onMove?: (frameId: string, el: string, dx: number, dy: number, phase: 'start' | 'move' | 'end') => void; frames: FrameDef[]; selection: Sel | null; extras?: string[]; onSelect: (s: Sel | null, additive?: boolean) => void; revision: number; onReady?: () => void; onRename?: (id: string, title: string) => void }) {
   const [editing, setEditing] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null); const worldRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<View>({ x: 0, y: 0, s: 1 }); const iframes = useRef(new Map<string, HTMLIFrameElement>());
+  const viewRef = useRef<View>({ x: 0, y: 0, s: 1 }); const glideRaf = useRef(0); const iframes = useRef(new Map<string, HTMLIFrameElement>());
   const bridges = useMemo(() => new Map(frames.map((f) => [f.id, new FrameBridge(() => iframes.current.get(f.id)?.contentWindow)])), [frames]);
   const [visible, setVisible] = useState<Set<string>>(() => new Set(frames.map((f) => f.id))); const visRef = useRef(visible);
   const [selRect, setSelRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -76,7 +76,11 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
     window.__swift = {
       frames: frames.map((f) => f.id), view: () => ({ ...viewRef.current }), setView: (v) => { viewRef.current = v; sync(); },
       fitAll: () => { const r = rect(); viewRef.current = fit(frames, r.width, r.height, 90); sync(); },
-      fitTo: (ids) => { const r = rect(); viewRef.current = fit(frames.filter((f) => ids.includes(f.id)), r.width, r.height, 110); sync(); }, visibleCount: () => visRef.current.size,
+      glideTo: (ids, ms = 260) => new Promise<void>((resolve) => { // an eased move of the view to frames (Prototype Play), cancelled by the next glide or fit
+        const r = rect(); const to = fit(frames.filter((f) => ids.includes(f.id)), r.width, r.height, 110); const from = { ...viewRef.current }; const t0 = performance.now(); cancelAnimationFrame(glideRaf.current);
+        const step = (now: number): void => { const k = Math.min(1, (now - t0) / ms); const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; viewRef.current = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e, s: from.s + (to.s - from.s) * e }; sync(); if (k < 1) glideRaf.current = requestAnimationFrame(step); else resolve(); }; glideRaf.current = requestAnimationFrame(step);
+      }),
+      fitTo: (ids) => { cancelAnimationFrame(glideRaf.current); const r = rect(); viewRef.current = fit(frames.filter((f) => ids.includes(f.id)), r.width, r.height, 110); sync(); }, visibleCount: () => visRef.current.size,
       edit: async (id, el, prop, value) => { const t0 = performance.now(); const r = await bridge(id)?.request({ t: 'edit', el, prop, value }); return { ok: !!r?.ok, ms: performance.now() - t0, before: r?.before ?? '' }; },
       get: async (id, el, prop) => (await bridge(id)?.request({ t: 'get', el, prop }))?.value,
       props: async (id, el, props) => (await bridge(id)?.request({ t: 'props', el, props }))?.values,
@@ -106,6 +110,10 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
   useEffect(() => { let alive = true; setDRects([]); if (!diff || diff.els.length === 0) return; const b = bridges.get(diff.frameId); // outlines on the elements a take changed from its original
     void Promise.all(diff.els.map((el) => b?.request({ t: 'rect', el }))).then((rs) => { if (alive) setDRects(rs.flatMap((r) => (r?.ok && r.rect && r.rect.w > 0 && r.rect.h > 0 ? [r.rect] : []))); }); return () => { alive = false; };
   }, [diffKey, revision, bridges]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [hRects, setHRects] = useState<{ frameId: string; x: number; y: number; w: number; h: number }[]>([]); const hotKey = hotspots ? hotspots.map((h) => `${h.frameId}/${h.el}`).join(',') : '';
+  useEffect(() => { let alive = true; if (!hotspots?.length) { setHRects([]); return; } // outlines on the elements that link to another frame (Prototype)
+    void Promise.all(hotspots.map(async (h) => { const r = await bridges.get(h.frameId)?.request({ t: 'rect', el: h.el }); return r?.ok && r.rect && r.rect.w > 0 && r.rect.h > 0 ? [{ frameId: h.frameId, ...r.rect }] : []; })).then((rs) => { if (alive) setHRects(rs.flat()); }); return () => { alive = false; };
+  }, [hotKey, revision, bridges]); // eslint-disable-line react-hooks/exhaustive-deps
   const diffFrame = diff ? frames.find((f) => f.id === diff.frameId) : undefined;
   const [xRects, setXRects] = useState<{ x: number; y: number; w: number; h: number }[]>([]); const extrasKey = extras.join(',');
   useEffect(() => { let alive = true; setXRects([]); if (!selection || extras.length === 0) return; const b = bridges.get(selection.frameId);
@@ -127,6 +135,7 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
         ))}
         {selFrame && selRect && onResize && selection?.el !== selFrame.root && <div className="sel-h" data-testid="resize-handle" style={{ left: selFrame.x + selRect.x + selRect.w, top: selFrame.y + selRect.y + selRect.h }} />}
         {diffFrame && diff?.ghost && <iframe key={`ghost-${diffFrame.id}`} className="onion" data-testid="onion" title="Original (onion skin)" sandbox="allow-scripts" {...(EXT_FRAME ? { src: EXT_FRAME, onLoad: (e: React.SyntheticEvent<HTMLIFrameElement>) => { e.currentTarget.contentWindow?.postMessage({ t: 'load', rid: 1, html: diff.ghost!.html }, '*'); } } : { srcDoc: frameDoc(diff.ghost.html) })} width={diffFrame.w} height={diffFrame.h} style={{ left: diffFrame.x, top: diffFrame.y, opacity: diff.ghost.mix }} />}
+        {hRects.map((r, i) => { const f = frames.find((x) => x.id === r.frameId); return f ? <div key={`h${i}`} className="sel sel-hot" data-testid="hotspot" style={{ left: f.x + r.x, top: f.y + r.y, width: r.w, height: r.h }} /> : null; })}
         {diffFrame && dRects.map((r, i) => <div key={`d${i}`} className="sel sel-diff" data-testid="diff-mark" style={{ left: diffFrame.x + r.x, top: diffFrame.y + r.y, width: r.w, height: r.h }} />)}
         {selFrame && xRects.map((r, i) => <div key={i} className="sel sel-x" data-testid="sel-extra" style={{ left: selFrame.x + r.x, top: selFrame.y + r.y, width: r.w, height: r.h }} />)}
         {selFrame && selRect && <div className="sel" data-testid="sel" style={{ left: selFrame.x + selRect.x, top: selFrame.y + selRect.y, width: selRect.w, height: selRect.h }} />}
