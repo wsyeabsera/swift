@@ -29,8 +29,8 @@ test('keep promotes one take, discard removes the rest and never touches real fr
   expect(keepTake(f, 'tv')).toEqual(f); expect(discardTakes([base])).toEqual([base]);
 });
 test('spark is refused while too many takes are unreviewed', () => {
-  const many = Array.from({ length: 5 }, (_, i) => ({ ...base, id: `tv-t${i + 1}` })); expect(canSpark([base], 4)).toEqual({ ok: true }); expect(canSpark(many, 3)).toEqual({ ok: true });
-  const r = canSpark(many, 4); expect(r.ok).toBe(false); expect(r.ok === false && r.reason).toContain('5 takes waiting'); expect(canSpark(keepTake(many, 'tv-t1'), 4).ok).toBe(true);
+  const many = Array.from({ length: 9 }, (_, i) => ({ ...base, id: `tv-t${i + 1}` })); expect(canSpark([base], 4)).toEqual({ ok: true }); expect(canSpark(many, 3)).toEqual({ ok: true });
+  const r = canSpark(many, 4); expect(r.ok).toBe(false); expect(r.ok === false && r.reason).toContain('9 takes waiting'); expect(canSpark(keepTake(many, 'tv-t1'), 4).ok).toBe(true);
 });
 test('cancelling one running take leaves the others finishing', async () => {
   const added: FrameDef[] = []; const running = new Map<string, AbortController>(); const emitters: Record<number, (e: SayEvent) => void> = {}; let k = 0;
