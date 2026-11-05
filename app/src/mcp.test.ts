@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { handleMcp, type McpEnv } from './mcp';
+import { handleMcp, resetTemplateInstances, type McpEnv } from './mcp';
+import type { FrameDef } from './canvas/fixtures';
 import type { CanvasApi } from './canvas/Canvas';
 import type { Op } from './oplog';
 
@@ -83,3 +84,48 @@ describe('read-side MCP tools (#1828)', () => {
   it('frame_html feeds the helper screenshot', async () => { const r = await handleMcp(rich(), 'frame_html', {}) as { frame: string; html: string }; expect(r.frame).toBe('tv'); expect(r.html).toContain('clock'); });
 });
 
+
+describe('templates via MCP (#1834)', () => {
+  const manifest = { swiftCanvasTemplate: 1, name: 'Pricing', description: 'A pricing page', slots: [
+    { id: 'headline', type: 'text', label: 'Headline', prompt: 'Page headline', default: 'Plans', required: true },
+    { id: 'tiers', type: 'list', label: 'Tiers', prompt: 'Tier names', default: ['Free'], required: false },
+    { id: 'who', type: 'text', label: 'Customer', prompt: 'Who it is for', default: '', required: true }], tokens: { '--ac': '#0a84ff' },
+    frames: [{ id: 'pricing', title: 'Pricing', file: 'main.html', w: 800, h: 600 }] };
+  const folder = { files: { 'template.json': JSON.stringify(manifest), 'frames/main.html': '<div id="pricing"><h1 id="h">{{headline}}</h1><p>{{who}}</p><ul>{{tiers}}</ul></div>' } };
+  function rig() {
+    const { env } = fake(); const loaded: Record<string, string> = {}; const added: FrameDef[] = []; const tokens: Record<string, string> = {}; const recorded: Op[] = [];
+    const api = { ...env.api, snapshot: async (f: string) => loaded[f] ?? '<div id="pricing">old</div>', load: async (f: string, h: string) => { if (h.includes('REFUSE')) return false; loaded[f] = h; return true; } } as unknown as CanvasApi;
+    const e: McpEnv = { ...env, api, record: (o) => recorded.push(o), builtinTemplates: [{ dir: 'builtin/pricing', folder }], addFrames: (d) => { added.push(...d); }, setBrandToken: (n, v) => { tokens[n] = v; } };
+    return { e, loaded, added, tokens, recorded };
+  }
+  const user = [{ dir: 'u/bad', error: 'template.json too large' }];
+  it('list_templates lists good ones and reports bad folders', async () => {
+    const { e } = rig(); const r = await handleMcp(e, 'list_templates', { userTemplates: user }) as { templates: { name: string; slots: number; source: string }[]; problems: { error: string }[] };
+    expect(r.templates).toMatchObject([{ name: 'Pricing', slots: 3, source: 'builtin' }]); expect(r.problems[0]!.error).toMatch(/too large/);
+    await expect(handleMcp(e, 'list_templates', { userTemplates: 'x' })).rejects.toThrow(/list/);
+  });
+  it('new_from_template: frames + tokens as ONE undo step, required empty slots get placeholders, ids stay unique', async () => {
+    resetTemplateInstances(); const { e, added, tokens, recorded } = rig();
+    const r = await handleMcp(e, 'new_from_template', { template: 'pricing' }) as { instance: string; slots: { id: string; type: string }[]; frames: { id: string }[] };
+    expect(r.slots.map((s) => s.id)).toEqual(['headline', 'tiers', 'who']); expect(added[0]!.html).toContain('[Customer]'); expect(tokens).toEqual({ '--ac': '#0a84ff' });
+    expect(recorded).toHaveLength(1); expect(recorded[0]!.kind).toBe('group'); expect(added[0]!.x).toBeGreaterThanOrEqual(121);
+    await expect(handleMcp(e, 'new_from_template', { template: 'nope' })).rejects.toThrow(/unknown template/);
+    await expect(handleMcp(e, 'new_from_template', { template: 'pricing', values: { zzz: 'x' } })).rejects.toThrow(/unknown slot/);
+    await expect(handleMcp(e, 'new_from_template', { template: 'pricing', values: [] })).rejects.toThrow(/object/);
+  });
+  it('fill_slots: validated, escaped, pack markers, one undo step; bad values change nothing', async () => {
+    resetTemplateInstances(); const { e, loaded, recorded } = rig(); const n = await handleMcp(e, 'new_from_template', { template: 'Pricing' }) as { instance: string; frames: { id: string }[] };
+    e.frames = [...e.frames, { id: n.frames[0]!.id, root: 'pricing', title: 'Pricing', x: 0, y: 0, w: 800, h: 600, html: '' }]; recorded.length = 0;
+    const r = await handleMcp(e, 'fill_slots', { instance: n.instance, values: { headline: 'Vet <b>invoicing</b>', who: '{{people.name}}', tiers: ['Solo', 'Clinic'] } }) as { filled: string[]; undoSteps: number };
+    const html = loaded[n.frames[0]!.id]!; expect(r.undoSteps).toBe(1); expect(html).toContain('Vet &lt;b&gt;invoicing'); expect(html).toContain('<li>Clinic</li>'); expect(html).not.toContain('{{'); expect(recorded).toHaveLength(1); expect(recorded[0]!.kind).toBe('group');
+    const before = JSON.stringify(loaded);
+    await expect(handleMcp(e, 'fill_slots', { values: { headline: 'x', tiers: 'not a list' } })).rejects.toThrow(); await expect(handleMcp(e, 'fill_slots', { values: { who: '{{people.nonsense}}' } })).rejects.toThrow(/who/);
+    await expect(handleMcp(e, 'fill_slots', { values: { headline: 'x'.repeat(5000) } })).rejects.toThrow(); await expect(handleMcp(e, 'fill_slots', { values: {} })).rejects.toThrow(/empty/); await expect(handleMcp(e, 'fill_slots', { instance: 'zz', values: { headline: 'x' } })).rejects.toThrow(/unknown instance/);
+    expect(JSON.stringify(loaded)).toBe(before); expect(recorded).toHaveLength(1);
+  });
+  it('fill_slots before new_from_template says so; a refused frame rolls back', async () => {
+    resetTemplateInstances(); const { e, loaded } = rig(); await expect(handleMcp(e, 'fill_slots', { values: { headline: 'x' } })).rejects.toThrow(/new_from_template first/);
+    const n = await handleMcp(e, 'new_from_template', { template: 'Pricing' }) as { instance: string; frames: { id: string }[] }; e.frames = [...e.frames, { id: n.frames[0]!.id, root: 'pricing', title: 'P', x: 0, y: 0, w: 1, h: 1, html: '' }];
+    await expect(handleMcp(e, 'fill_slots', { values: { headline: 'REFUSE' } })).rejects.toThrow(/refused.*nothing changed/); expect(loaded).toEqual({});
+  });
+});
