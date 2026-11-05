@@ -17,6 +17,13 @@ SWIFT_DEV=1 npm run helper       # helper on 127.0.0.1:7431 (needs the `claude` 
 ```
 Or load `extension/` unpacked in Chromium after `npm run build` (the helper then needs `SWIFT_ALLOWED_ORIGINS=chrome-extension://<id>`).
 
+## Claude Code plugin
+```
+/plugin marketplace add wsyeabsera/swift
+/plugin install swift-canvas@swift
+```
+Adds the `swift` MCP server (`swift-canvas-helper mcp`). On enable it asks for `helper_path` (default `swift-canvas-helper` on PATH) and `data_dir` (`SWIFT_DATA_DIR` of the running helper; empty = `~/.swift-canvas`). The helper and app must be running. Check: `npm run test:plugin`, `claude plugin validate .`.
+
 ## Test it
 `npm run typecheck`, `npm test` (Vitest), `npm run helper:test` (Rust), `npm run e2e` (real unpacked extension + web page, speed budgets in `e2e/budgets.json`), `npm run e2e:contrast`. Run the UI tests in the background; they own ports 7431 and 5173. Timings: `docs/dev-speed.md`.
 

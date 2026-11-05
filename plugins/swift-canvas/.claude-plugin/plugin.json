@@ -1,0 +1,31 @@
+{
+  "name": "swift-canvas",
+  "displayName": "Swift Canvas",
+  "version": "0.1.0",
+  "description": "Design on the Swift Canvas from Claude Code: MCP tools to read, edit and undo the open design.",
+  "author": { "name": "wsyeabsera" },
+  "homepage": "https://github.com/wsyeabsera/swift",
+  "repository": "https://github.com/wsyeabsera/swift",
+  "keywords": ["design", "canvas", "mcp"],
+  "userConfig": {
+    "helper_path": {
+      "type": "string",
+      "title": "Helper binary",
+      "description": "Path to swift-canvas-helper (a bare name is looked up on PATH)",
+      "default": "swift-canvas-helper"
+    },
+    "data_dir": {
+      "type": "string",
+      "title": "Data directory",
+      "description": "SWIFT_DATA_DIR of the running helper. Leave empty for the default (~/.swift-canvas).",
+      "default": ""
+    }
+  },
+  "mcpServers": {
+    "swift": {
+      "command": "${user_config.helper_path}",
+      "args": ["mcp"],
+      "env": { "SWIFT_DATA_DIR": "${user_config.data_dir}" }
+    }
+  }
+}
