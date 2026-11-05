@@ -18,7 +18,8 @@
     "e2e:mcp": "cargo build -q -p swift-canvas-helper && node e2e/mcp.mjs",
     "gen:core": "cargo run -q -p swift-canvas-core --example gen",
     "e2e:errors": "cargo build -q -p swift-canvas-helper && node e2e/fake-errors.mjs",
-    "test:tools": "node --test tools/swift-canvas.test.mjs"
+    "test:tools": "node --test tools/swift-canvas.test.mjs",
+    "test:plugin": "node tools/validate-plugin.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
