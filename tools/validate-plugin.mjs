@@ -34,7 +34,7 @@ for (const e of mk.plugins ?? []) {
   const mcpSrc = readFileSync(join(root, 'helper/src/mcp.rs'), 'utf8')
   for (const s of existsSync(skills) ? readdirSync(skills) : []) {
     const t = readFileSync(join(skills, s, 'SKILL.md'), 'utf8')
-    for (const m of t.matchAll(/`([a-z_]+)`/g)) if (/^[a-z]+_[a-z_]+$/.test(m[1]) && ['read_subtree','apply_ops','set_token','list_frames','new_from_template','fill_slots','list_templates','artifact_page'].includes(m[1])) need(mcpSrc.includes(`"${m[1]}"`), `skill ${s} names tool ${m[1]} not found in helper/src/mcp.rs`)
+    for (const m of t.matchAll(/`([a-z_]+)`/g)) if (/^[a-z]+_[a-z_]+$/.test(m[1]) && ['read_subtree','apply_ops','set_token','undo','list_frames','check','screenshot','export','new_from_template','fill_slots','list_templates','artifact_page'].includes(m[1])) need(mcpSrc.includes(`"${m[1]}"`), `skill ${s} names tool ${m[1]} not found in helper/src/mcp.rs`)
   }
 }
 if (errors.length) { console.error(errors.map((e) => 'FAIL ' + e).join('\n')); process.exit(1) }
