@@ -168,7 +168,7 @@ nav.lens{z-index:40} /* above the menu scrim: switching lenses works while a len
 .pulsepanel{position:fixed;right:16px;top:76px;z-index:5;width:380px;max-height:calc(100vh - 180px);overflow-y:auto}
 
 /* Brand lens panel (brand kit, moodboard, crew): docked right like Pulse, the Inspector hides while it is open */
-.brandpanel{position:fixed;right:16px;top:76px;z-index:5;width:400px;max-height:calc(100vh - 180px);overflow-y:auto}
+.brandpanel{position:fixed;right:16px;top:76px;z-index:5;width:400px;max-height:calc(100vh - 240px);overflow-y:auto}/* ends above the tools bar (bottom 84px, ~56px tall): a wide tools bar must not cover the Crew button at the panel bottom */
 
 /* quick project switcher (⌘P) */
 .switcher-wrap{position:fixed;inset:0;z-index:60;display:grid;justify-items:center;align-content:start;padding-top:14vh;background:rgba(0,0,0,.2)}
