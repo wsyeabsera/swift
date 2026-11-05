@@ -29,7 +29,7 @@ describe('content packs', () => {
     expect(resolve('metrics.users', { seed: 3, locale: 'en-US', index: 4 })).toMatch(/,/); // thousands comma
     expect(resolve('metrics.users', { seed: 3, locale: 'de-DE', index: 4 })).toMatch(/\./);
     const d = new Date(Date.UTC(2026, 9, 5)); expect(formatDate(d, { seed: 0, locale: 'en-US' })).toBe('Oct 5, 2026'); expect(formatDate(d, { seed: 0, locale: 'de-DE' })).toBe('05.10.2026');
-    expect(resolve('conversion' === 'x' ? '' : 'metrics.conversion', { seed: 3, locale: 'de-DE' })).toMatch(/%/);
+    expect(resolve('metrics.conversion', { seed: 3, locale: 'de-DE' })).toMatch(/%/);
   });
   it('text packs localize with fallback to en', () => {
     const de = resolve('copy.cta', { seed: 2, locale: 'de-DE' }); const en = resolve('copy.cta', { seed: 2, locale: 'en-US' }); const ja = resolve('copy.cta', { seed: 2, locale: 'ja-JP' });
