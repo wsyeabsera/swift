@@ -42,6 +42,8 @@ pub fn tools() -> Value {
           "inputSchema": { "type": "object", "required": ["values"], "properties": { "instance": { "type": "string", "description": "Instance id from new_from_template (default: the latest)." }, "values": { "type": "object", "description": "slotId -> value." } } } },
         { "name": "save_template", "description": "Save a smart template to disk (a folder: template.json + frames/*.html with {{slots}}). From the design: the selected frame (or `frames`), where every plain text becomes a text slot (bare <li> runs become a list slot) and --custom-properties on the frame root become template tokens. From a repo: pass from_repo (an allowed project folder) and its scanned tokens/colours/fonts become a branded starter. Saved to ~/.swift-canvas/templates (dest user) or <repo>/.swift-canvas/templates (dest repo, needs from_repo). Refuses to replace an existing template unless overwrite is true.",
           "inputSchema": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string", "description": "Template name (also the folder name, slugified)." }, "description": { "type": "string" }, "frame": frame, "frames": { "type": "array", "items": { "type": "string" }, "maxItems": 12, "description": "Frame ids to save together (default: the selected frame)." }, "from_repo": { "type": "string", "description": "Repository folder to scan for tokens instead of saving frames." }, "dest": { "type": "string", "enum": ["user", "repo"] }, "overwrite": { "type": "boolean" } } } },
+        { "name": "fill_from_data", "description": "Read real data from a file in the project folder and show it in the design. Reads .json, .csv, .tsv or an OpenAPI .json (its example values) from a path INSIDE the allowed project folder only (anything outside, hidden, dependency or build folders, other file types and files over 1 MB are refused). Returns the table: columns, rows (max 50 by default, 200; cells cut at 120 chars) and `dropped` (what was cut). With `el` (the id of a list or table container: its first child is the row template, its text elements take the columns in order) the rows are also filled into that container as ONE undo step; without `el` nothing in the design changes.",
+          "inputSchema": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string", "description": "File path, relative to the project folder or absolute inside it." }, "frame": frame, "el": { "type": "string", "description": "Container element id to fill (its first child is the row template). Omit to only read the data." }, "max_rows": { "type": "integer", "minimum": 1, "maximum": 200, "description": "Rows to keep (default 50)." }, "columns": { "type": "array", "items": { "type": "string" }, "maxItems": 20, "description": "Columns to use, in this order (default: all, first 20)." }, "pointer": { "type": "string", "description": "JSON pointer to the array inside a JSON file, e.g. /data/items." }, "example": { "type": "string", "description": "OpenAPI: part of the example label to use, e.g. \"GET /users 200\" (default: the first list example). The labels found are returned." } } } },
         { "name": "undo", "description": "Undo the last step in the app (the same as the Undo button): an apply_ops batch is one step.",
           "inputSchema": { "type": "object", "properties": {} } }
     ])
@@ -109,7 +111,7 @@ impl Hub {
 const WAIT: Duration = Duration::from_secs(15);
 
 /// What a tool may use besides the app: the project files and the browser. `chrome` is an executable that can `--screenshot`.
-pub struct Ctx { pub data_dir: std::path::PathBuf, pub chrome: String }
+pub struct Ctx { pub data_dir: std::path::PathBuf, pub chrome: String, /** folders `fill_from_data` may read */ pub roots: Vec<std::path::PathBuf> }
 const WAIT_CHECK: Duration = Duration::from_secs(55); // a Claude critique, still inside the MCP process's 60 s read timeout
 
 /// Execute one tool call from an MCP process: validate and dry-run with the core crate, then relay. `list_frames` and `screenshot` of a saved project run here, with no app.
@@ -141,6 +143,7 @@ pub fn run_tool(hub: &Hub, ctx: &Ctx, tool: &str, args: &Value) -> Result<Value,
             check_frame_arg(args)?; let confirm = opt_bool(args, "confirm")?;
             hub.ask_app("export", with_frame(json!({ "target": target, "confirm": confirm })), WAIT)
         }
+        "fill_from_data" => fill_from_data(hub, args, &ctx.roots),
         _ => Err(format!("unknown tool {tool}")),
     }
 }
@@ -218,6 +221,17 @@ fn screenshot(hub: &Hub, ctx: &Ctx, args: &Value) -> Result<Value, String> {
     let png = png_of(&ctx.chrome, &html, w.round() as u32, h.round() as u32)?;
     if png.len() > MAX_SHOT { return Err(format!("the screenshot is {} bytes (max {MAX_SHOT})", png.len())); }
     Ok(json!({ "frame": id, "w": w, "h": h, "bytes": png.len(), "_image": { "mimeType": "image/png", "data": crate::render::b64(&png) } }))
+}
+/// Read the file here (the helper owns the folder allow-list), then hand the capped table to the app to fill the container.
+fn fill_from_data(hub: &Hub, args: &Value, roots: &[std::path::PathBuf]) -> Result<Value, String> {
+    let path = args.get("path").and_then(|p| p.as_str()).ok_or("path must be a string")?;
+    let s = |k: &str| args.get(k).and_then(|v| v.as_str()).map(String::from);
+    let o = crate::data::Opts { max_rows: args.get("max_rows").and_then(|v| v.as_u64()).map(|n| n as usize), pointer: s("pointer"), example: s("example"),
+        columns: args.get("columns").and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|c| c.as_str().map(String::from)).collect()) };
+    let mut table = crate::data::load_table(path, roots, &o)?;
+    let Some(el) = s("el") else { table["filled"] = Value::Bool(false); return Ok(table) };
+    let mut req = json!({ "el": el, "columns": table["columns"], "rows": table["rows"] }); if let Some(f) = args.get("frame").filter(|f| f.is_string()) { req["frame"] = f.clone(); }
+    let r = hub.ask_app("fill_rows", req, WAIT)?; table["filled"] = Value::Bool(true); table["fill"] = r; Ok(table)
 }
 fn apply(hub: &Hub, args: &Value) -> Result<Value, String> {
     let raw = args.get("ops").and_then(|o| o.as_array()).ok_or("ops must be an array")?;

@@ -12,7 +12,7 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
     let mut be = Fake(vec![], Ok(json!({ "applied": 1 })));
     let r = talk("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"1\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"apply_ops\",\"arguments\":{\"ops\":[]}}}\n", &mut be);
     assert_eq!(r.len(), 3, "the notification gets no reply"); assert_eq!(r[0]["result"]["protocolVersion"], "2024-11-05"); assert_eq!(r[0]["id"], 1);
-    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "list_frames", "check", "screenshot", "export", "list_templates", "new_from_template", "fill_slots", "save_template", "undo"]);
+    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "list_frames", "check", "screenshot", "export", "list_templates", "new_from_template", "fill_slots", "save_template", "fill_from_data", "undo"]);
     assert_eq!(r[2]["result"]["content"][0]["text"], "{\"applied\":1}"); assert_eq!(be.0[0].0, "apply_ops");
 }
 #[test] fn protocol_errors_are_reported() {
@@ -25,9 +25,10 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
 
 struct Rig { port: u16, dir: std::path::PathBuf, applied: Arc<Mutex<Vec<Value>>>, calls: Arc<Mutex<Vec<(String, Value)>>> }
 /// A real helper, plus a fake app: an allowed-origin client that registers and answers `tree` / `apply_ops` / `undo` relays.
-fn rig(with_app: bool) -> Rig {
+fn rig(with_app: bool) -> Rig { rig_roots(with_app, vec![]) }
+fn rig_roots(with_app: bool, roots: Vec<std::path::PathBuf>) -> Rig {
     let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port(); let dir = std::env::temp_dir().join(format!("sc-mcp-{port}"));
-    let cfg = Config { port, token: "tok".into(), allowed: vec!["http://app.test".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![], data_dir: dir.clone(), picker_bin: "osascript".into(), min_free_mb: 0 };
+    let cfg = Config { port, token: "tok".into(), allowed: vec!["http://app.test".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: roots, data_dir: dir.clone(), picker_bin: "osascript".into(), min_free_mb: 0 };
     thread::spawn(move || { let _ = serve(l, cfg); }); thread::sleep(std::time::Duration::from_millis(100));
     let applied = Arc::new(Mutex::new(Vec::new())); let calls = Arc::new(Mutex::new(Vec::new()));
     if with_app { let ap = applied.clone(); let cl = calls.clone(); thread::spawn(move || {
@@ -43,6 +44,7 @@ fn rig(with_app: bool) -> Rig {
                 "tree" => json!({ "frame": "tv", "tree": [{ "id": "root", "parent": null, "tag": "div", "text": "" }, { "id": "clock", "parent": "root", "tag": "div", "text": "12:00" }] }),
                 "apply_ops" => { ap.lock().unwrap().push(v["args"].clone()); json!({ "applied": v["args"]["ops"].as_array().unwrap().len() }) }
                 "save_template" => if v["args"]["name"] == "boom" { json!({ "slug": "../x", "files": { "template.json": "{}" } }) } else { json!({ "slug": "my-t", "name": v["args"]["name"], "slots": 1, "warnings": [], "files": { "template.json": "{\"n\":1}", "frames/home.html": "<div id=\"home\"></div>" }, "sawScan": v["args"].get("scan").is_some() }) },
+                "fill_rows" => { ap.lock().unwrap().push(v["args"].clone()); json!({ "rows": v["args"]["rows"].as_array().unwrap().len() }) }
                 _ => json!({ "ok": true }) };
             ws.send(Message::text(json!({ "type": "mcp.res", "id": v["id"], "ok": true, "result": res }).to_string())).unwrap(); } }); thread::sleep(std::time::Duration::from_millis(200)); }
     let rig = Rig { port, dir, applied, calls };
@@ -94,7 +96,7 @@ fn call(rig: &Rig, tool: &str, args: Value) -> Result<Value, String> { let mut b
 use std::time::Duration;
 fn script(n: &str, body: &str) -> String { let p = std::env::temp_dir().join(format!("sc-mcp-{n}-{}.sh", std::process::id())); std::fs::write(&p, format!("#!/bin/sh\n{body}\n")).unwrap(); #[cfg(unix)] { use std::os::unix::fs::PermissionsExt; std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap(); } p.to_string_lossy().into() }
 const CHROME: &str = r#"for a in "$@"; do case "$a" in --screenshot=*) f="${a#--screenshot=}";; esac; done; printf 'PNGDATA' > "$f""#;
-fn ctx(n: &str, chrome: &str) -> mcp::Ctx { let d = std::env::temp_dir().join(format!("sc-mcp-ctx-{n}-{}", std::process::id())); let _ = std::fs::remove_dir_all(&d); std::fs::create_dir_all(&d).unwrap(); mcp::Ctx { data_dir: d, chrome: chrome.into() } }
+fn ctx(n: &str, chrome: &str) -> mcp::Ctx { let d = std::env::temp_dir().join(format!("sc-mcp-ctx-{n}-{}", std::process::id())); let _ = std::fs::remove_dir_all(&d); std::fs::create_dir_all(&d).unwrap(); mcp::Ctx { data_dir: d, chrome: chrome.into(), roots: vec![] } }
 fn save(c: &mcp::Ctx, id: &str, frames: Value) { std::fs::write(c.data_dir.join(format!("{id}.project.json")), json!({ "swiftCanvas": 1, "name": id, "frames": frames }).to_string()).unwrap(); }
 fn frames() -> Value { json!([{ "id": "tv-1", "title": "Living room", "w": 1920, "h": 1080, "html": "<div id=\"tv-1\">a</div>" }, { "id": "phone-1", "title": "Phone", "w": 390, "h": 844, "html": "<div>b</div>" }]) }
 
@@ -169,4 +171,16 @@ fn frames() -> Value { json!([{ "id": "tv-1", "title": "Living room", "w": 1920,
     assert!(call(&r, "save_template", json!({ "name": "boom" })).unwrap_err().contains("bad template folder name")); assert!(!r.dir.join("x").exists());
     assert!(call(&r, "save_template", json!({})).unwrap_err().contains("name is required"));
     assert!(call(&r, "save_template", json!({ "name": "a", "from_repo": "/etc" })).unwrap_err().contains("not allowed")); assert!(call(&r, "save_template", json!({ "name": "a", "dest": "repo" })).unwrap_err().contains("from_repo")); assert!(call(&r, "save_template", json!({ "name": "a", "dest": "nope" })).unwrap_err().contains("dest must be"));
+}
+#[test] fn fill_from_data_reads_inside_the_root_only_and_relays_the_capped_table() {
+    let root = std::fs::canonicalize(std::env::temp_dir()).unwrap().join(format!("sc-data-{}", std::process::id())); let _ = std::fs::remove_dir_all(&root); std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("users.csv"), "name,role\nAda,admin\nBo,dev\nCy,dev\n").unwrap(); let outside = root.parent().unwrap().join(format!("sc-secret-{}.csv", std::process::id())); std::fs::write(&outside, "k\n1\n").unwrap();
+    let r = rig_roots(true, vec![root.clone()]);
+    let preview = call(&r, "fill_from_data", json!({ "path": "users.csv", "max_rows": 2 })).unwrap();
+    assert_eq!(preview["filled"], false); assert_eq!(preview["rows"].as_array().unwrap().len(), 2); assert_eq!(preview["dropped"]["rows"], 1); assert!(r.applied.lock().unwrap().is_empty(), "no el = nothing relayed");
+    let filled = call(&r, "fill_from_data", json!({ "path": "users.csv", "el": "list", "columns": ["role", "name"] })).unwrap();
+    assert_eq!(filled["fill"]["rows"], 3); let sent = r.applied.lock().unwrap()[0].clone(); assert_eq!(sent["el"], "list"); assert_eq!(sent["columns"], json!(["role", "name"])); assert_eq!(sent["rows"][0], json!(["admin", "Ada"]));
+    for bad in [outside.to_str().unwrap(), "../sc-secret.csv", "nope.csv"] { assert!(call(&r, "fill_from_data", json!({ "path": bad, "el": "list" })).is_err(), "{bad}"); }
+    assert_eq!(r.applied.lock().unwrap().len(), 1, "a refused path never reaches the app");
+    let none = rig_roots(true, vec![]); assert!(call(&none, "fill_from_data", json!({ "path": "users.csv" })).unwrap_err().contains("no project folder"));
 }

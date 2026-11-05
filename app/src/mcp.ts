@@ -5,6 +5,7 @@ import type { FrameDef } from './canvas/fixtures';
 import { checkLine, type Op as SayOp } from './say/ops';
 import type { Op } from './oplog';
 import { buildArtifactPage } from './publish';
+import { applyFill, containerOf, parseTable, planFill } from './dataFill';
 import { templateFromFrames, templateFromScan, type ScanLike } from './saveTemplate';
 import { surfaceOf } from './canvas/frames';
 import { auditFacts } from './canvas/audit';
@@ -157,6 +158,15 @@ export async function handleMcp(env: McpEnv, tool: string, args: Record<string, 
       } catch (e) { for (const d of done.reverse()) await api.load(d.f.id, d.before); throw new Error(`${e instanceof Error ? e.message : String(e)} (restored, nothing changed)`); }
       inst.values = merged; env.record({ kind: 'group', label: `Fill slots: ${inst.template.name}`, ops }); env.bump();
       return { instance: key, filled: Object.keys(filled), frames: targets.map((t) => t.f.id), undoSteps: 1, next: 'call check on each frame, then screenshot' };
+    }
+    case 'fill_rows': { // rows of repo data (read + capped by the helper) into a list/table container; ONE undo step, all or nothing
+      const f = pick(env, args.frame); if (!isStr(args.el) || !args.el) throw new Error('el must be a container element id'); const t = parseTable(args);
+      const nodes = await api.tree(f.id); const container = containerOf(nodes, args.el); const first = nodes.find((n) => n.parent === container);
+      if (!first) throw new Error(`${container} has no child to use as the row template: add one example row first`);
+      const plan = planFill(nodes, container, await api.outer(f.id, first.id), t); const before = await api.snapshot(f.id);
+      try { await applyFill(api, f.id, plan); } catch (e) { await api.load(f.id, before); throw new Error(`${e instanceof Error ? e.message : 'failed'}; the frame was restored, nothing changed`); }
+      const after = await api.snapshot(f.id); if (after !== before) env.record({ kind: 'snap', frame: f.id, before, after }); env.bump();
+      return { frame: f.id, container, rows: plan.rows.length, columnsUsed: plan.mapped, columnsUnused: plan.unmapped, undoSteps: after === before ? 0 : 1 };
     }
     case 'undo': return { undone: await env.undo() };
     default: throw new Error(`unknown tool ${tool}`);
