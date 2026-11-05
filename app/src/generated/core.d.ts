@@ -4,3 +4,6 @@ export type Tree = { root: Node, tokens: { [key in string]?: string }, };
 export type FlatNode = { id: string, parent: string | null, tag: string, text: string, };
 export type Op = { "op": "set", id: string, prop: string, value: string | null, } | { "op": "token", name: string, value: string | null, } | { "op": "text", id: string, value: string, } | { "op": "add", parent: string, id: string, html: string, } | { "op": "remove", id: string, } | { "op": "insert", parent: string, index: number, node: Node, } | { "op": "replace", id: string, node: Node, };
 export type OpError = { code: string, message: string, };
+export type Source = "agent" | "browser";
+export type LiveEvent = { "kind": "thinking.delta", text: string, } | { "kind": "op", op: unknown, } | { "kind": "tool.start", id: string, tool: string, } | { "kind": "tool.end", id: string, ok: boolean, detail?: string, } | { "kind": "shot", png: string, } | { "kind": "snapshot", text: string, } | { "kind": "user.action", action: string, detail?: string, } | { "kind": "error", message: string, } | { "kind": "done", summary?: string, };
+export type LiveEnvelope = { run: string, seq: number, source: Source, event: LiveEvent, };

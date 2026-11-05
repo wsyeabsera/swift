@@ -7,6 +7,8 @@ fn main() -> std::io::Result<()> {
     if args.get(1).map(String::as_str) == Some("scan") { let Some(dir) = args.get(2) else { eprintln!("usage: swift-canvas-helper scan <folder>"); std::process::exit(2) }; let root = fs::canonicalize(dir)?; println!("{}", serde_json::to_string_pretty(&helper::scan::scan_dir(&root)?).expect("json")); return Ok(()); }
     // `swift-canvas-helper mcp`: MCP server on stdio for a Claude Code session (`claude mcp add swift -- swift-canvas-helper mcp`); talks to the RUNNING helper.
     if args.get(1).map(String::as_str) == Some("mcp") { let cfg = config_from(|k| env::var(k).ok(), || String::new()); let mut be = helper::mcp::WsBackend::new(cfg.data_dir); let stdin = std::io::stdin(); return helper::mcp::serve_stdio(stdin.lock(), std::io::stdout(), &mut be); }
+    // `swift-canvas-helper watch`: read-only tail of the live run stream (one line per step) for a second terminal; reconnects when the helper restarts.
+    if args.get(1).map(String::as_str) == Some("watch") { let cfg = config_from(|k| env::var(k).ok(), || String::new()); let stop = std::sync::atomic::AtomicBool::new(false); helper::live::watch(&cfg.data_dir, std::io::stdout(), &stop); return Ok(()); }
     let cfg = config_from(|k| env::var(k).ok(), random_token);
     let listener = TcpListener::bind(("127.0.0.1", cfg.port))?; // loopback only
     eprintln!("swift-canvas-helper 127.0.0.1:{} claude={} allowed_origins={}", cfg.port, helper::status::probe(&cfg.claude_bin).legacy(), cfg.allowed.len());

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { firstSelection } from './a11y';
 import { useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { Appearance } from './Appearance';
 import { ImportProject } from './ImportProject';
@@ -42,8 +43,10 @@ import { capturedFrame, duplicateFrame, duplicateId, newFrame, PRESETS, renameFr
 import { clearDoc, fitLog, loadDoc, loadLog, nextSparkN, parseDoc, parseLog, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { handleMcp, type McpEnv } from './mcp';
+import { STARTERS } from './templates/starters';
 import { runSayRepairing } from './say/say';
 import { compareKits, isColorValue, kitColors, loadBrand, replaceColor, saveBrand, shareToken, toBrandTokens } from './brand';
+import { parseEntry, lensForKey } from './entry';
 import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, loadRecent, saveRecent, touchRecent, type Registry } from './projects';
 import { loadScene, saveScene, type Scene3D } from './studio3d/scene';
 import { Studio3D } from './studio3d/Studio3D';
@@ -60,12 +63,14 @@ import { localEdits, propTokenRequest, themeRequest, easeRequest, tokenRequest }
 import { suggestions, type SuggestProps } from './say/suggest';
 import { canSpark, DIRECTIONS, discardTakes, isTake, keepTake, runSpark } from './say/spark';
 import { buildSystemPrompt } from './say/prompt';
+import { LENSES, type Lens } from './tour/lenses';
+import { LensStrip } from './tour/LensStrip';
+import { buildSample, isSampleName, TOUR_FLAG } from './tour/sample';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
-const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Pulse', 'Brand', 'Diagram'] as const;
 export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
-  const [reg] = useState<Registry>(() => loadRegistry()); const project = activeProject(reg);
+  const [entry] = useState(() => parseEntry(location.hash, LENSES)); const [reg] = useState<Registry>(() => { const r = loadRegistry(); if (!entry.project) return r; const n = switchProject(r, entry.project); if (n !== r) saveRecent(touchRecent(loadRecent(), n.active)); if (n !== r) saveRegistry(n); return n; }); const project = activeProject(reg); // popup / side panel links: #project=<id>&lens=3&say=1 const project = activeProject(reg);
   const hadLocal = useRef(loadDoc(undefined, project.id) !== null); const [ready, setReady] = useState(hadLocal.current); const [epoch, setEpoch] = useState(0);
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
   // Pulse telemetry (local only): one record per local edit / Say / Spark; an undo marks its record, a redo unmarks it.
@@ -508,11 +513,12 @@ export function App() {
   // Enter selects the first child, Shift+Enter the parent (outside inputs and buttons, where Enter has its own meaning).
   useEffect(() => {
     const k = async (e: KeyboardEvent) => {
-      if (e.key !== 'Enter' || !selection || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLButtonElement) return;
+      if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLButtonElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.getAttribute('role') === 'button')) return;
+      if (!selection) { const first = firstSelection(frames); if (first) { e.preventDefault(); setSelection(first); setSayStatus('Selected the first screen'); } return; }
       const tree = await window.__swift?.tree(selection.frameId); if (!tree) return; const next = e.shiftKey ? parentOf(tree, selection.el) : firstChild(tree, selection.el); if (next) setSelection({ frameId: selection.frameId, el: next });
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
-  }, [selection]);
+  }, [selection, frames]);
   const nudgeChain = useRef<Promise<void>>(Promise.resolve());
   // Arrow keys nudge the selected element (Shift = 10 px) when it is positioned (static elements are left alone).
   useEffect(() => {
@@ -568,11 +574,29 @@ export function App() {
   const [zoomPct, setZoomPct] = useState(100);
   useEffect(() => { const t = setInterval(() => { const v = window.__swift?.view(); if (v) setZoomPct((p) => { const n = Math.round(v.s * 100); return p === n ? p : n; }); }, 250); return () => clearInterval(t); }, []);
   const actualSize = useCallback(() => { const r = document.querySelector('[data-testid=canvas]')?.getBoundingClientRect(); const v = window.__swift?.view(); if (r && v && window.__swift) window.__swift.setView(zoomAt(v, r.width / 2, r.height / 2, 1 / v.s)); }, []);
-  const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
+  const [lens, setLens] = useState<(typeof LENSES)[number]>((entry.lens as (typeof LENSES)[number] | undefined) ?? 'Design');
+  // Lens tour (#1843): one sample project, every lens in turn; a lens opens its own tools exactly as a click on it does.
+  const pickLens = useCallback((l: Lens) => { setLens(l); setFrameMenuOpen(l === 'Prototype' || l === 'Motion' || l === 'Effects' || l === 'Critique'); /* a lens opens its own tools; Design and 3D close the menu */ }, []);
+  useEffect(() => { const k = (e: KeyboardEvent) => { const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable)) return; const l = lensForKey(e, LENSES); if (l) { e.preventDefault(); pickLens(l as (typeof LENSES)[number]); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []); // 1..9 pick the lens in bar order (not while typing)
+  useEffect(() => { if (entry.say) setTimeout(() => sayRef.current?.focus(), 50); }, [entry.say]);
+  const [tour, setTour] = useState(false); const tourBtn = useRef<HTMLButtonElement>(null); const [hintsOff, setHintsOff] = useState(() => { try { return localStorage.getItem('swift-canvas.lensstrip.off') === '1'; } catch { return false; } });
+  const loadSample = useCallback(async () => { const s = buildSample(); const next = addProject(reg, uniqueName(reg.list, s.name)); if (!next) { setSayStatus('Too many projects to add the sample'); return; } const e1 = saveDoc(s.frames, undefined, next.active); if (e1) { setSayStatus(`Sample not loaded: ${e1}`); return; } saveBrand(s.brand, undefined, next.active); saveTimeline(next.active, s.motion); saveLinks(next.active, s.links); saveScene(next.active, s.scene); try { sessionStorage.setItem(TOUR_FLAG, '1'); } catch { /* the tour then starts from the Tour button */ } await goTo(next); }, [reg, goTo]);
+  const startTour = useCallback(() => { if (!isSampleName(project.name)) { void loadSample(); return; } setTour(true); pickLens('Design'); setTimeout(() => window.__swift?.fitAll(), 50); }, [project.name, loadSample, pickLens]);
+  const stepTour = useCallback((l: Lens) => { pickLens(l); setTimeout(() => window.__swift?.fitAll(), 50); }, [pickLens]);
+  const exitTour = useCallback(() => { setTour(false); pickLens('Design'); tourBtn.current?.focus(); }, [pickLens]);
+  useEffect(() => { try { if (sessionStorage.getItem(TOUR_FLAG) !== '1') return; sessionStorage.removeItem(TOUR_FLAG); } catch { return; } if (isSampleName(project.name)) setTour(true); }, [project.name]);
+  const tourFrame = frames.find((f) => surfaceOf(f) === 'phone' && f.html.includes('id="sample-close"'));
+  useEffect(() => { if (tour && lens === 'Critique' && tourFrame) { setSelection({ frameId: tourFrame.id, el: tourFrame.root }); setTimeout(() => window.__swift?.fitTo([tourFrame.id]), 50); } }, [tour, lens, tourFrame?.id]); // the sample's phone frame holds the finding
+  useEffect(() => { if (tour && lens === 'Critique' && ready && tourFrame && selection?.frameId === tourFrame.id && checkedFrame.current !== tourFrame.id && !critiquing) void checkFrame(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tour, lens, ready, selection?.frameId]); // the local audit is free and instant: the tour arrives at real findings
+  useEffect(() => { if (tour && lens === 'Motion' && motion.tracks.length) void scrub(Math.round(motion.duration / 2)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tour, lens]); // a still frame mid-animation; the tour never autoplays (reduced motion)
   useEffect(() => { if (!frameMenuOpen && lens !== 'Pulse') return; let alive = true; const tick = () => { void conn.current?.poolStatus().then((p) => { if (alive) setPool(p); }); }; tick(); const t = setInterval(tick, 3000); return () => { alive = false; clearInterval(t); }; }, [frameMenuOpen, lens]); // Pulse: the Claude pool while the menu is open
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   // In-app MCP server (#1712): the helper relays design-op calls from Claude Code sessions here; a batch = ONE undo step. The ref keeps the handler on the latest state.
-  const mcpEnv = useRef<McpEnv | null>(null); mcpEnv.current = { project: project.name, api: window.__swift, frames, selection, record: recordOp, bump: () => setRevision((n) => n + 1), undo: async () => { if (!L.canUndo(logRef.current)) return false; await undo(); return true; } };
+  const askOnce = (system: string, prompt: string) => new Promise<string>((resolve, reject) => { // one Claude answer for the MCP `check` tool (same Say connection as the Critique button)
+    const c = conn.current; if (!c) { reject(new Error('helper offline')); return; } if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { reject(new Error(`Claude is not ready: ${helper.claudeStatus.message}`)); return; }
+    let text = '', err = ''; c.say(system, prompt, (e) => { if (e.kind === 'delta') text += e.text; else { if (e.kind === 'error') err = e.text; if (err && !text) reject(new Error(`Claude failed: ${err}`)); else resolve(text); } });
+  });
+  const mcpEnv = useRef<McpEnv | null>(null); mcpEnv.current = { project: project.name, api: window.__swift, frames, selection, record: recordOp, bump: () => setRevision((n) => n + 1), undo: async () => { if (!L.canUndo(logRef.current)) return false; await undo(); return true; }, brand, ask: askOnce, builtinTemplates: STARTERS, addFrames: (defs) => setFrames((f) => [...f, ...defs.filter((d) => !f.some((x) => x.id === d.id))]), setBrandToken: (name, value) => setBrand((b) => { const next = { ...b, [name]: value }; saveBrand(next, undefined, project.id); return next; }), projectFile: async () => { const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift?.snapshot(f.id)) || f.html }))); return serializeProject(project.name, snaps, brand, logRef.current, motion, links, scene3d); } };
   useEffect(() => { conn.current?.setMcpHandler((tool, args) => handleMcp(mcpEnv.current!, tool, args)); }, []);
   const dot = helper.status === 'connected' ? (helper.claudeStatus && helper.claudeStatus.state !== 'ready' ? 'warn' : 'ok') : helper.status === 'connecting' ? 'warn' : 'bad';
   return (
@@ -659,7 +683,8 @@ export function App() {
         {shortcutsOpen && <Shortcuts onClose={() => { setShortcutsOpen(false); kbRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
-          {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => { setLens(l); setFrameMenuOpen(l === 'Prototype' || l === 'Motion' || l === 'Effects' || l === 'Critique'); /* a lens opens its own tools; Design and 3D close the menu */ }}>{l}</button>))}
+          {LENSES.map((l, n) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} aria-label={l} aria-keyshortcuts={String(n + 1)} title={`${l} (${n + 1})`} data-testid={`lens-${l}`} onClick={() => pickLens(l)}>{l}<kbd className="lensnum mono" aria-hidden="true">{n + 1}</kbd></button>))}
+          <button ref={tourBtn} className={`rb seg tourbtn${tour ? ' on' : ''}`} aria-pressed={tour} onClick={() => (tour ? exitTour() : startTour())} title={isSampleName(project.name) ? 'Step through every lens (→ ← Esc)' : 'Open the sample project and step through every lens'} data-testid="tour-button">Tour</button>
         </nav>
         <div className="gl isl speed" role="status" aria-live="polite" data-testid="helper-status">
           <span className={`dot ${dot}`} aria-hidden />
@@ -698,7 +723,7 @@ export function App() {
         <span className="pal-sep" aria-hidden="true" />
         <button className="rb ib ib-ac" aria-label="Spark 4 takes" title="Spark: 4 takes of the selection" disabled={sparking} onClick={() => void spark(4)} data-testid="tool-spark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
       </div>
-      {lens === 'Critique' && <CritiquePanel findings={findings} note={checkNote} busy={critiquing} onRun={() => void checkFrame()} onSelect={(f) => { setSelection({ frameId: f.frame, el: f.el }); window.__swift?.fitTo([f.frame]); }} onFix={(f) => void fixFinding(f)} />}
+      {lens === 'Critique' && <CritiquePanel onLoadSample={isSampleName(project.name) ? undefined : () => void loadSample()} findings={findings} note={checkNote} busy={critiquing} onRun={() => void checkFrame()} onSelect={(f) => { setSelection({ frameId: f.frame, el: f.el }); window.__swift?.fitTo([f.frame]); }} onFix={(f) => void fixFinding(f)} />}
       {switcherOpen && <ProjectSwitcher projects={reg.list} active={project.id} recent={recent} onClose={() => setSwitcherOpen(false)} onPick={(id) => { setSwitcherOpen(false); if (id !== project.id) { saveRecent(touchRecent(recent, id)); void goTo(switchProject(reg, id)); } }} onCreate={(name) => { setSwitcherOpen(false); const next = addProject(reg, name); if (next) { saveRecent(touchRecent(recent, next.active)); void goTo(next); } else setSayStatus('Could not create that project (name needs letters or digits, or the limit of 50 is reached)'); }} />}
       {shipDone && <ShipBoard run={summarizeRun(shipLog, shipDone.since, shipDone.ms)} artifactUrl={artifact?.url} onAgain={() => { setShipDone(null); void runShip(); }} onClose={() => setShipDone(null)} />}
       {lens === 'Pulse' && (
@@ -732,7 +757,8 @@ export function App() {
             <div className="projs"><button className="rb btn" onClick={() => void loadCrewFolder()} data-testid="crew-load" title="Read .swift-canvas/crew/*.md from a project folder; its sheets add to or replace the bundled five">Load crew from folder…</button></div>
         </aside>
       )}
-      {lens === 'Motion' && <MotionStrip motion={motion} t={mt} playing={playing} onScrub={(ms) => void scrub(ms)} onPlay={() => { if (mt >= motion.duration) setMt(0); setPlaying((p) => !p); }} onRender={() => void renderMotion()} />}
+      {lens === 'Motion' && <MotionStrip onLoadSample={isSampleName(project.name) ? undefined : () => void loadSample()} motion={motion} t={mt} playing={playing} onScrub={(ms) => void scrub(ms)} onPlay={() => { if (mt >= motion.duration) setMt(0); setPlaying((p) => !p); }} onRender={() => void renderMotion()} />}
+      {(tour || (lens !== 'Design' && !hintsOff)) && <LensStrip lens={lens} tour={tour} onStep={stepTour} onExit={exitTour} onHide={() => { setHintsOff(true); try { localStorage.setItem('swift-canvas.lensstrip.off', '1'); } catch { /* per-session then */ } }} />}
       <footer className="gl isl tools" aria-label="Canvas tools">
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
         {sparking ? <>{selection && takesRunning.current.has(selection.frameId) && <button className="rb btn" onClick={() => takesRunning.current.get(selection.frameId)?.abort()} data-testid="cancel-take">Cancel this take</button>}<button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button></> : <button className="rb btn" onClick={() => void spark(4)} data-testid="spark-button" title={`Spark ×4 costs about ${tokensShort((e => e.input + e.output)(estimateSpark(usage, 4)))} tokens (from your recent requests, cached input included)`}>Spark ×4</button>}

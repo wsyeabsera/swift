@@ -1,0 +1,12 @@
+{
+  "name": "swift",
+  "description": "Swift Canvas plugins for Claude Code",
+  "owner": { "name": "wsyeabsera" },
+  "plugins": [
+    {
+      "name": "swift-canvas",
+      "source": "./plugins/swift-canvas",
+      "description": "Swift Canvas MCP tools and skills for Claude Code"
+    }
+  ]
+}

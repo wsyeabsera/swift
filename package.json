@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:changed": "vitest --changed",
     "e2e:contrast": "node e2e/contrast.mjs",
+    "e2e:tour": "cargo build -q -p swift-canvas-helper && node e2e/tour.mjs",
+    "e2e:a11y": "cargo build -q -p swift-canvas-helper && node e2e/a11y.mjs",
     "e2e:radii": "node e2e/radii.mjs",
     "helper": "cargo run -q -p swift-canvas-helper",
     "helper:test": "cargo test -q -p swift-canvas-helper",
@@ -18,7 +20,8 @@
     "e2e:mcp": "cargo build -q -p swift-canvas-helper && node e2e/mcp.mjs",
     "gen:core": "cargo run -q -p swift-canvas-core --example gen",
     "e2e:errors": "cargo build -q -p swift-canvas-helper && node e2e/fake-errors.mjs",
-    "test:tools": "node --test tools/swift-canvas.test.mjs"
+    "test:tools": "node --test tools/swift-canvas.test.mjs",
+    "test:plugin": "node tools/validate-plugin.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
