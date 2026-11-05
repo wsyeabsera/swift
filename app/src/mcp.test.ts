@@ -46,3 +46,40 @@ describe('artifact_page', () => {
     expect(((await handleMcp(env, 'artifact_page', { frames: ['ph'] })) as { frames: number }).frames).toBe(1); await expect(handleMcp(env, 'artifact_page', { frames: ['ghost'] })).rejects.toThrow(/unknown frame/);
   });
 });
+
+describe('read-side MCP tools (#1828)', () => {
+  const facts = { w: 1920, h: 1080, nodes: [{ id: 'clock', tag: 'div', x: 400, y: 400, w: 300, h: 60, fs: 20, text: 'tiny', color: { r: 120, g: 120, b: 120, a: 1 }, bg: { r: 125, g: 125, b: 125, image: false }, clipX: false, clipY: false, interactive: false }] };
+  function rich(over: Partial<McpEnv> = {}) {
+    const { env } = fake(); const api = { ...env.api, audit: async () => facts, snapshot: async () => '<div id="tv" style="width:1920px;height:1080px"><div id="clock">12:00</div></div>' } as unknown as CanvasApi;
+    return { ...env, api, brand: { '--ac': '#0a84ff' }, ...over } as McpEnv;
+  }
+  it('list_frames: ids, names, size and lens', async () => {
+    const r = await handleMcp(rich(), 'list_frames', {}) as { frames: { id: string; name: string; lens: string }[] }; expect(r.frames).toEqual([{ id: 'tv', name: 'TV', w: 1, h: 1, lens: 'phone' }]);
+  });
+  it('check: numbered local findings with element ids and a fix; no Claude unless judge', async () => {
+    let asked = 0; const env = rich({ ask: async () => { asked++; return '[]'; } });
+    const r = await handleMcp(env, 'check', {}) as { findings: { n: number; el: string; kind: string; fix?: { prop: string } }[]; judged: number }; expect(asked).toBe(0); expect(r.findings.length).toBeGreaterThan(0);
+    expect(r.findings.map((x) => x.n)).toEqual(r.findings.map((_, i) => i + 1)); expect(r.findings.every((x) => x.el === 'clock')).toBe(true); expect(r.findings.some((x) => x.kind === 'contrast' && x.fix?.prop === 'color')).toBe(true);
+  });
+  it('check judge:true adds Claude findings, validated against known ids; errors are returned', async () => {
+    const env = rich({ ask: async () => '[{"el":"clock","message":"Too small for the room","fix":{"prop":"font-size","value":"60px"}},{"el":"ghost","message":"x"}]' });
+    const r = await handleMcp(env, 'check', { judge: true }) as { findings: { kind: string; n: number }[]; judged: number; rejected: number }; expect(r.judged).toBe(1); expect(r.rejected).toBe(1); expect(r.findings.at(-1)!.kind).toBe('critique'); expect(r.findings.at(-1)!.n).toBe(r.findings.length);
+    await expect(handleMcp(rich({ ask: async () => { throw new Error('Claude failed: boom'); } }), 'check', { judge: true })).rejects.toThrow(/boom/);
+    await expect(handleMcp(rich(), 'check', { judge: true })).rejects.toThrow(/not available/);
+    await expect(handleMcp(rich(), 'check', { judge: 'yes' })).rejects.toThrow(/judge must be/);
+    await expect(handleMcp(rich(), 'check', { frame: 'zz' })).rejects.toThrow(/unknown frame/);
+    await expect(handleMcp(rich({ api: { ...rich().api, audit: async () => undefined } as unknown as CanvasApi }), 'check', {})).rejects.toThrow(/did not answer/);
+  });
+  it('export: preview first, full content only with confirm, caps and bad targets refused', async () => {
+    const env = rich(); const p = await handleMcp(env, 'export', { target: 'html' }) as { name: string; bytes: number; preview: string; content?: string }; expect(p.name).toBe('tv.html'); expect(p.content).toBeUndefined(); expect(p.preview).toContain('<!doctype html>'); expect(p.bytes).toBeGreaterThan(50);
+    const full = await handleMcp(env, 'export', { target: 'html', confirm: true }) as { content: string }; expect(full.content).toContain('id="clock"');
+    const tsx = await handleMcp(env, 'export', { target: 'react', confirm: true }) as { name: string; content: string }; expect(tsx.name).toMatch(/\.tsx$/); expect(tsx.content).toContain('export');
+    const tok = await handleMcp(env, 'export', { target: 'tokens', confirm: true }) as { content: string }; expect(JSON.parse(tok.content)).toBeTruthy();
+    for (const bad of [{}, { target: 'glb' }, { target: 'artifact' }, { target: 7 }, { target: 'html', confirm: 'y' }, { target: 'html', frame: 'zz' }]) await expect(handleMcp(env, 'export', bad)).rejects.toThrow();
+    await expect(handleMcp(rich({ brand: {} }), 'export', { target: 'tokens' })).rejects.toThrow(/no brand tokens/);
+    await expect(handleMcp(rich({ projectFile: async () => 'x'.repeat(1024 * 1024 + 1) }), 'export', { target: 'project', confirm: true })).rejects.toThrow(/over the/);
+    const big = await handleMcp(rich({ projectFile: async () => 'x'.repeat(1024 * 1024 + 1) }), 'export', { target: 'project' }) as { preview: string; truncated: boolean }; expect(big.preview.length).toBeLessThanOrEqual(3000); expect(big.truncated).toBe(true);
+  });
+  it('frame_html feeds the helper screenshot', async () => { const r = await handleMcp(rich(), 'frame_html', {}) as { frame: string; html: string }; expect(r.frame).toBe('tv'); expect(r.html).toContain('clock'); });
+});
+
