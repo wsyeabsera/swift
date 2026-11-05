@@ -24,6 +24,8 @@ pub fn tools() -> Value {
           "inputSchema": { "type": "object", "required": ["name", "value"], "properties": { "frame": frame, "name": { "type": "string", "description": "e.g. --ac" }, "value": { "type": "string" } } } },
         { "name": "artifact_page", "description": "Build the open Swift Canvas project as ONE self-contained HTML page (a tab per frame, each frame in a sandboxed script-free iframe, light and dark) and return it as `html` with `title`, `frames` and `bytes`. To publish it as a Claude artifact, write `html` to a file and pass that file to your Artifact tool (pass the project's previous artifact `url` to update it in place). Max 2 MB and 24 frames; pass `frames` (ids) to pick some. Read-only: nothing in the design changes.",
           "inputSchema": { "type": "object", "properties": { "frames": { "type": "array", "items": { "type": "string" }, "maxItems": 24, "description": "Frame ids to include (default: all)." } } } },
+        { "name": "fill_from_data", "description": "Read real data from a file in the project folder and show it in the design. Reads .json, .csv, .tsv or an OpenAPI .json (its example values) from a path INSIDE the allowed project folder only (anything outside, hidden, dependency or build folders, other file types and files over 1 MB are refused). Returns the table: columns, rows (max 50 by default, 200; cells cut at 120 chars) and `dropped` (what was cut). With `el` (the id of a list or table container: its first child is the row template, its text elements take the columns in order) the rows are also filled into that container as ONE undo step; without `el` nothing in the design changes.",
+          "inputSchema": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string", "description": "File path, relative to the project folder or absolute inside it." }, "frame": frame, "el": { "type": "string", "description": "Container element id to fill (its first child is the row template). Omit to only read the data." }, "max_rows": { "type": "integer", "minimum": 1, "maximum": 200, "description": "Rows to keep (default 50)." }, "columns": { "type": "array", "items": { "type": "string" }, "maxItems": 20, "description": "Columns to use, in this order (default: all, first 20)." }, "pointer": { "type": "string", "description": "JSON pointer to the array inside a JSON file, e.g. /data/items." }, "example": { "type": "string", "description": "OpenAPI: part of the example label to use, e.g. \"GET /users 200\" (default: the first list example). The labels found are returned." } } } },
         { "name": "undo", "description": "Undo the last step in the app (the same as the Undo button): an apply_ops batch is one step.",
           "inputSchema": { "type": "object", "properties": {} } }
     ])
@@ -85,7 +87,7 @@ impl Hub {
 const WAIT: Duration = Duration::from_secs(15);
 
 /// Execute one tool call from an MCP process: validate and dry-run with the core crate, then relay.
-pub fn run_tool(hub: &Hub, tool: &str, args: &Value) -> Result<Value, String> {
+pub fn run_tool(hub: &Hub, tool: &str, args: &Value, roots: &[std::path::PathBuf]) -> Result<Value, String> {
     let frame = args.get("frame").cloned().filter(|f| f.is_string());
     let with_frame = |mut a: Value| { if let Some(f) = &frame { a["frame"] = f.clone(); } a };
     match tool {
@@ -94,8 +96,20 @@ pub fn run_tool(hub: &Hub, tool: &str, args: &Value) -> Result<Value, String> {
         "artifact_page" => hub.ask_app("artifact_page", json!({ "frames": args.get("frames").cloned().filter(|f| f.is_array()) }), WAIT),
         "set_token" => { let ops = json!([{ "op": "token", "name": args.get("name"), "value": args.get("value") }]); apply(hub, &with_frame(json!({ "ops": ops }))) }
         "apply_ops" => apply(hub, args),
+        "fill_from_data" => fill_from_data(hub, args, roots),
         _ => Err(format!("unknown tool {tool}")),
     }
+}
+/// Read the file here (the helper owns the folder allow-list), then hand the capped table to the app to fill the container.
+fn fill_from_data(hub: &Hub, args: &Value, roots: &[std::path::PathBuf]) -> Result<Value, String> {
+    let path = args.get("path").and_then(|p| p.as_str()).ok_or("path must be a string")?;
+    let s = |k: &str| args.get(k).and_then(|v| v.as_str()).map(String::from);
+    let o = crate::data::Opts { max_rows: args.get("max_rows").and_then(|v| v.as_u64()).map(|n| n as usize), pointer: s("pointer"), example: s("example"),
+        columns: args.get("columns").and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|c| c.as_str().map(String::from)).collect()) };
+    let mut table = crate::data::load_table(path, roots, &o)?;
+    let Some(el) = s("el") else { table["filled"] = Value::Bool(false); return Ok(table) };
+    let mut req = json!({ "el": el, "columns": table["columns"], "rows": table["rows"] }); if let Some(f) = args.get("frame").filter(|f| f.is_string()) { req["frame"] = f.clone(); }
+    let r = hub.ask_app("fill_rows", req, WAIT)?; table["filled"] = Value::Bool(true); table["fill"] = r; Ok(table)
 }
 fn apply(hub: &Hub, args: &Value) -> Result<Value, String> {
     let raw = args.get("ops").and_then(|o| o.as_array()).ok_or("ops must be an array")?;

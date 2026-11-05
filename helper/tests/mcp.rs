@@ -12,7 +12,7 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
     let mut be = Fake(vec![], Ok(json!({ "applied": 1 })));
     let r = talk("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"1\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"apply_ops\",\"arguments\":{\"ops\":[]}}}\n", &mut be);
     assert_eq!(r.len(), 3, "the notification gets no reply"); assert_eq!(r[0]["result"]["protocolVersion"], "2024-11-05"); assert_eq!(r[0]["id"], 1);
-    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "undo"]);
+    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "fill_from_data", "undo"]);
     assert_eq!(r[2]["result"]["content"][0]["text"], "{\"applied\":1}"); assert_eq!(be.0[0].0, "apply_ops");
 }
 #[test] fn protocol_errors_are_reported() {
@@ -25,9 +25,10 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
 
 struct Rig { port: u16, dir: std::path::PathBuf, applied: Arc<Mutex<Vec<Value>>> }
 /// A real helper, plus a fake app: an allowed-origin client that registers and answers `tree` / `apply_ops` / `undo` relays.
-fn rig(with_app: bool) -> Rig {
+fn rig(with_app: bool) -> Rig { rig_roots(with_app, vec![]) }
+fn rig_roots(with_app: bool, roots: Vec<std::path::PathBuf>) -> Rig {
     let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port(); let dir = std::env::temp_dir().join(format!("sc-mcp-{port}"));
-    let cfg = Config { port, token: "tok".into(), allowed: vec!["http://app.test".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![], data_dir: dir.clone(), picker_bin: "osascript".into(), min_free_mb: 0 };
+    let cfg = Config { port, token: "tok".into(), allowed: vec!["http://app.test".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: roots, data_dir: dir.clone(), picker_bin: "osascript".into(), min_free_mb: 0 };
     thread::spawn(move || { let _ = serve(l, cfg); }); thread::sleep(std::time::Duration::from_millis(100));
     let applied = Arc::new(Mutex::new(Vec::new()));
     if with_app { let ap = applied.clone(); thread::spawn(move || {
@@ -37,6 +38,7 @@ fn rig(with_app: bool) -> Rig {
             let res = match v["tool"].as_str().unwrap() {
                 "tree" => json!({ "frame": "tv", "tree": [{ "id": "root", "parent": null, "tag": "div", "text": "" }, { "id": "clock", "parent": "root", "tag": "div", "text": "12:00" }] }),
                 "apply_ops" => { ap.lock().unwrap().push(v["args"].clone()); json!({ "applied": v["args"]["ops"].as_array().unwrap().len() }) }
+                "fill_rows" => { ap.lock().unwrap().push(v["args"].clone()); json!({ "rows": v["args"]["rows"].as_array().unwrap().len() }) }
                 _ => json!({ "ok": true }) };
             ws.send(Message::text(json!({ "type": "mcp.res", "id": v["id"], "ok": true, "result": res }).to_string())).unwrap(); } }); thread::sleep(std::time::Duration::from_millis(200)); }
     Rig { port, dir, applied }
@@ -78,4 +80,17 @@ fn call(rig: &Rig, tool: &str, args: Value) -> Result<Value, String> { let mut b
     let Message::Text(t) = ws.read().unwrap() else { panic!() }; assert!(t.as_str().contains("pong"), "say from an mcp connection is ignored: {t}");
     let tok = std::fs::read_to_string(r.dir.join(mcp::TOKEN_FILE)).unwrap(); assert!(tok.contains("\"token\":\"tok\""));
     #[cfg(unix)] { use std::os::unix::fs::PermissionsExt; assert_eq!(std::fs::metadata(r.dir.join(mcp::TOKEN_FILE)).unwrap().permissions().mode() & 0o777, 0o600); }
+}
+
+#[test] fn fill_from_data_reads_inside_the_root_only_and_relays_the_capped_table() {
+    let root = std::fs::canonicalize(std::env::temp_dir()).unwrap().join(format!("sc-data-{}", std::process::id())); let _ = std::fs::remove_dir_all(&root); std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("users.csv"), "name,role\nAda,admin\nBo,dev\nCy,dev\n").unwrap(); let outside = root.parent().unwrap().join(format!("sc-secret-{}.csv", std::process::id())); std::fs::write(&outside, "k\n1\n").unwrap();
+    let r = rig_roots(true, vec![root.clone()]);
+    let preview = call(&r, "fill_from_data", json!({ "path": "users.csv", "max_rows": 2 })).unwrap();
+    assert_eq!(preview["filled"], false); assert_eq!(preview["rows"].as_array().unwrap().len(), 2); assert_eq!(preview["dropped"]["rows"], 1); assert!(r.applied.lock().unwrap().is_empty(), "no el = nothing relayed");
+    let filled = call(&r, "fill_from_data", json!({ "path": "users.csv", "el": "list", "columns": ["role", "name"] })).unwrap();
+    assert_eq!(filled["fill"]["rows"], 3); let sent = r.applied.lock().unwrap()[0].clone(); assert_eq!(sent["el"], "list"); assert_eq!(sent["columns"], json!(["role", "name"])); assert_eq!(sent["rows"][0], json!(["admin", "Ada"]));
+    for bad in [outside.to_str().unwrap(), "../sc-secret.csv", "nope.csv"] { assert!(call(&r, "fill_from_data", json!({ "path": bad, "el": "list" })).is_err(), "{bad}"); }
+    assert_eq!(r.applied.lock().unwrap().len(), 1, "a refused path never reaches the app");
+    let none = rig_roots(true, vec![]); assert!(call(&none, "fill_from_data", json!({ "path": "users.csv" })).unwrap_err().contains("no project folder"));
 }

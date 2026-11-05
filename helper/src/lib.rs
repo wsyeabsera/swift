@@ -8,6 +8,7 @@ pub mod capture;
 pub mod status;
 pub mod store;
 pub mod mcp;
+pub mod data;
 pub mod repo;
 pub mod render;
 use say::Pool;
@@ -119,8 +120,8 @@ fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<A
         Some("mcp.res") => { if let Some(id) = v.get("id").and_then(|x| x.as_str()) { hub.deliver(id, v.clone()); } }
         Some("mcp.call") => {
             let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let tool = v.get("tool").and_then(|x| x.as_str()).unwrap_or("").to_string(); let args = v.get("args").cloned().unwrap_or(serde_json::Value::Null);
-            let (tx, hub) = (tx.clone(), hub.clone());
-            thread::spawn(move || { let reply = match mcp::run_tool(&hub, &tool, &args) { Ok(r) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": true, "result": r }), Err(e) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
+            let (tx, hub) = (tx.clone(), hub.clone()); let mut roots = cfg.project_roots.clone(); roots.extend(picked.lock().map(|p| p.clone()).unwrap_or_default());
+            thread::spawn(move || { let reply = match mcp::run_tool(&hub, &tool, &args, &roots) { Ok(r) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": true, "result": r }), Err(e) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
         }
         Some("ping") => { let _ = tx.send("{\"type\":\"pong\"}".to_string()); }
         Some("project.scan") => {
