@@ -3,7 +3,7 @@
 //! Scripts are blocked in every document by a Content-Security-Policy (script-src 'none': inline handlers too; Chrome's screenshot mode does not work with scripting switched off), the work dir is private and removed afterwards, and sizes/counts are capped.
 use std::{fs, io, path::{Path, PathBuf}, process::{Command, Stdio}, sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc, Mutex}, thread, time::{Duration, Instant}};
 
-pub const MAX_FRAMES: usize = 600; pub const MAX_DOC: usize = 2 * 1024 * 1024; const CSP: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'\">"; const PER_FRAME: Duration = Duration::from_secs(20);
+pub const MAX_FRAMES: usize = 600; pub const MAX_DOC: usize = 2 * 1024 * 1024; pub(crate) const CSP: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'\">"; const PER_FRAME: Duration = Duration::from_secs(20);
 /// Standard base64 (the MP4 travels in a JSON text frame).
 pub fn b64(b: &[u8]) -> String { const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; let mut o = String::with_capacity(b.len() / 3 * 4 + 4); for c in b.chunks(3) { let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32; o.push(T[(n >> 18) as usize & 63] as char); o.push(T[(n >> 12) as usize & 63] as char); o.push(if c.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' }); o.push(if c.len() > 2 { T[n as usize & 63] as char } else { '=' }); } o }
 /// Cancel flag and per-frame progress for one render; `Ctl::none()` for callers that need neither.
@@ -21,7 +21,7 @@ pub fn check(j: &Job) -> Result<(), String> {
     if !(160..=3840).contains(&j.w) || !(160..=2160).contains(&j.h) { return Err("size must be 160-3840 x 160-2160".into()); } if !(1..=60).contains(&j.fps) { return Err("fps must be 1-60".into()); }
     if j.docs.iter().any(|d| d.len() > MAX_DOC) { return Err("a frame is too large".into()); } Ok(())
 }
-fn shot(chrome: &str, doc: &Path, png: &Path, w: u32, h: u32) -> Result<(), String> {
+pub(crate) fn shot(chrome: &str, doc: &Path, png: &Path, w: u32, h: u32) -> Result<(), String> {
     let mut child = Command::new(chrome).args(["--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--force-device-scale-factor=1", &format!("--window-size={w},{h}"), &format!("--screenshot={}", png.display()), &format!("file://{}", doc.display())]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|e| format!("cannot start the browser ({chrome}): {e}"))?;
     let t0 = Instant::now(); loop { match child.try_wait() { Ok(Some(s)) => { return if s.success() && png.exists() { Ok(()) } else { Err(format!("the browser failed on a frame ({s})")) }; } Ok(None) if t0.elapsed() > PER_FRAME => { let _ = child.kill(); let _ = child.wait(); return Err("the browser hung on a frame".into()); } Ok(None) => thread::sleep(Duration::from_millis(15)), Err(e) => return Err(e.to_string()) } }
 }
@@ -62,7 +62,7 @@ fn encode(dir: &Path, j: &Job, ffmpeg: &str) -> Result<Vec<u8>, String> {
         if !o.status.success() { return Err(format!("ffmpeg failed: {}", String::from_utf8_lossy(&o.stderr).trim().chars().take(300).collect::<String>())); }
         fs::read(&mp4).map_err(|e: io::Error| e.to_string())
 }
-fn workdir() -> Result<PathBuf, String> { static N: AtomicUsize = AtomicUsize::new(0); let dir = std::env::temp_dir().join(format!("sc-render-{}-{}", std::process::id(), N.fetch_add(1, Ordering::SeqCst))); fs::create_dir_all(&dir).map_err(|e| e.to_string())?; Ok(dir) }
+pub(crate) fn workdir() -> Result<PathBuf, String> { static N: AtomicUsize = AtomicUsize::new(0); let dir = std::env::temp_dir().join(format!("sc-render-{}-{}", std::process::id(), N.fetch_add(1, Ordering::SeqCst))); fs::create_dir_all(&dir).map_err(|e| e.to_string())?; Ok(dir) }
 /// The fast path: one browser over the DevTools Protocol (see Cdp), then one encode.
 pub fn render_cdp(chrome: &str, ffmpeg: &str, j: &Job) -> Result<Vec<u8>, String> { render_cdp_ctl(chrome, ffmpeg, j, &Ctl::none()) }
 pub fn render_cdp_ctl(chrome: &str, ffmpeg: &str, j: &Job, ctl: &Ctl) -> Result<Vec<u8>, String> {

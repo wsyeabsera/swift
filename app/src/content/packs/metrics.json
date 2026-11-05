@@ -1,0 +1,9 @@
+{"id":"metrics","description":"KPI values and chart series.","fields":{
+"revenue":{"kind":"number","min":18000,"max":240000,"decimals":0,"format":"currency"},
+"users":{"kind":"number","min":900,"max":58000,"decimals":0,"format":"int"},
+"conversion":{"kind":"number","min":0.012,"max":0.071,"decimals":3,"format":"percent"},
+"churn":{"kind":"number","min":0.008,"max":0.045,"decimals":3,"format":"percent"},
+"delta":{"kind":"number","min":-0.12,"max":0.34,"decimals":3,"format":"percent"},
+"day":{"kind":"date","from":"2026-10-01","to":"2026-10-31"},
+"kpi":{"kind":"pick","values":{"en":["Monthly revenue","Active users","Conversion rate","Churn","Average order value"],"de":["Monatsumsatz","Aktive Nutzer","Konversionsrate","Abwanderung","Ø Bestellwert"]}}},
+"records":{"kpi":["kpi","revenue","delta"]},"templates":{}}
