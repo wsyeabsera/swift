@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { firstSelection } from './a11y';
 import { useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { Appearance } from './Appearance';
 import { ImportProject } from './ImportProject';
@@ -508,11 +509,12 @@ export function App() {
   // Enter selects the first child, Shift+Enter the parent (outside inputs and buttons, where Enter has its own meaning).
   useEffect(() => {
     const k = async (e: KeyboardEvent) => {
-      if (e.key !== 'Enter' || !selection || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLButtonElement) return;
+      if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLButtonElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.getAttribute('role') === 'button')) return;
+      if (!selection) { const first = firstSelection(frames); if (first) { e.preventDefault(); setSelection(first); setSayStatus('Selected the first screen'); } return; }
       const tree = await window.__swift?.tree(selection.frameId); if (!tree) return; const next = e.shiftKey ? parentOf(tree, selection.el) : firstChild(tree, selection.el); if (next) setSelection({ frameId: selection.frameId, el: next });
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
-  }, [selection]);
+  }, [selection, frames]);
   const nudgeChain = useRef<Promise<void>>(Promise.resolve());
   // Arrow keys nudge the selected element (Shift = 10 px) when it is positioned (static elements are left alone).
   useEffect(() => {

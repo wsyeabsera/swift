@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:changed": "vitest --changed",
     "e2e:contrast": "node e2e/contrast.mjs",
+    "e2e:a11y": "cargo build -q -p swift-canvas-helper && node e2e/a11y.mjs",
     "e2e:radii": "node e2e/radii.mjs",
     "helper": "cargo run -q -p swift-canvas-helper",
     "helper:test": "cargo test -q -p swift-canvas-helper",
