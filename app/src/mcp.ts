@@ -5,6 +5,7 @@ import type { FrameDef } from './canvas/fixtures';
 import { checkLine, type Op as SayOp } from './say/ops';
 import type { Op } from './oplog';
 import { buildArtifactPage } from './publish';
+import { templateFromFrames, templateFromScan, type ScanLike } from './saveTemplate';
 import { surfaceOf } from './canvas/frames';
 import { auditFacts } from './canvas/audit';
 import { CRITIQUE_SYSTEM, critiquePrompt, parseCritique } from './canvas/critique';
@@ -61,7 +62,15 @@ function checkValues(v: unknown, what: string): Record<string, unknown> {
 function fillValues(t: Template, values: Record<string, unknown>, seed: string): Record<string, unknown> {
   const out: Record<string, unknown> = {}; for (const [k, v] of Object.entries(values)) { try { out[k] = packFill(v, seed); } catch (e) { throw new Error(`slot "${k}": ${e instanceof Error ? e.message : String(e)}`); } } void t; return out;
 }
+/** Needs no open canvas tab for a scan; frames come from the env. Returns the template folder's files; the helper writes them to disk. */
+function saveTemplate(env: McpEnv, args: Record<string, unknown>): unknown {
+  if (!isStr(args.name)) throw new Error('name is required');
+  const desc = isStr(args.description) ? args.description : undefined;
+  const r = args.scan ? templateFromScan(args.scan as ScanLike, { name: args.name, description: desc }) : templateFromFrames(Array.isArray(args.frames) && args.frames.length ? args.frames.map((id) => pick(env, id)) : [pick(env, args.frame)], { name: args.name, description: desc });
+  if (!r.ok) throw new Error(r.error); return { slug: r.slug, name: r.name, slots: r.slots, warnings: r.warnings, files: r.folder.files };
+}
 export async function handleMcp(env: McpEnv, tool: string, args: Record<string, unknown>): Promise<unknown> {
+  if (tool === 'save_template') return saveTemplate(env, args);
   const api = env.api; if (!api) throw new Error('the canvas is not ready');
   switch (tool) {
     case 'tree': { const f = pick(env, args.frame); const t = await api.tree(f.id); return { frame: f.id, tree: t.map((n) => ({ id: n.id, parent: n.parent, tag: n.tag, text: n.text })) }; }
