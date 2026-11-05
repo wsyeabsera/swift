@@ -12,6 +12,7 @@ import { exportDoc, exportName } from './canvas/exportHtml';
 import { componentName, frameToTsx } from './canvas/exportReact';
 import { dtcgString } from './dtcg';
 import { isTarget } from './ship';
+import { applyFill, containerOf, parseTable, planFill } from './dataFill';
 export type McpEnv = { project?: string; api: CanvasApi | undefined; frames: FrameDef[]; selection: Sel | null; record: (op: Op) => void; undo: () => Promise<boolean>; bump: () => void;
   /** One Claude answer for `check` with judge:true (rejects with the reason; the app's Say connection in production, a fake in tests). */ ask?: (system: string, prompt: string) => Promise<string>; brand?: Record<string, string>; /** The project file text, for export target `project`. */ projectFile?: () => Promise<string> };
 export const MCP_MAX_OPS = 200; const MAX_NODES = 400; const MAX_HTML = 6000; export const MCP_MAX_EXPORT = 1024 * 1024; const PREVIEW_LINES = 40; const PREVIEW_CHARS = 3000;
@@ -79,6 +80,15 @@ export async function handleMcp(env: McpEnv, tool: string, args: Record<string, 
       const bytes = new TextEncoder().encode(content).length; const lines = content.split('\n'); const head = { target, name, ...(f ? { frame: f.id } : {}), bytes, lines: lines.length };
       if (args.confirm === true) { if (bytes > MCP_MAX_EXPORT) throw new Error(`${name} is ${bytes} bytes; over the ${MCP_MAX_EXPORT} byte limit for MCP (export it from the app's Ship board)`); return { ...head, content }; }
       return { ...head, preview: lines.slice(0, PREVIEW_LINES).join('\n').slice(0, PREVIEW_CHARS), truncated: lines.length > PREVIEW_LINES || content.length > PREVIEW_CHARS, next: 'call export again with confirm: true to receive the full content' };
+    }
+    case 'fill_rows': { // rows of repo data (read + capped by the helper) into a list/table container; ONE undo step, all or nothing
+      const f = pick(env, args.frame); if (!isStr(args.el) || !args.el) throw new Error('el must be a container element id'); const t = parseTable(args);
+      const nodes = await api.tree(f.id); const container = containerOf(nodes, args.el); const first = nodes.find((n) => n.parent === container);
+      if (!first) throw new Error(`${container} has no child to use as the row template: add one example row first`);
+      const plan = planFill(nodes, container, await api.outer(f.id, first.id), t); const before = await api.snapshot(f.id);
+      try { await applyFill(api, f.id, plan); } catch (e) { await api.load(f.id, before); throw new Error(`${e instanceof Error ? e.message : 'failed'}; the frame was restored, nothing changed`); }
+      const after = await api.snapshot(f.id); if (after !== before) env.record({ kind: 'snap', frame: f.id, before, after }); env.bump();
+      return { frame: f.id, container, rows: plan.rows.length, columnsUsed: plan.mapped, columnsUnused: plan.unmapped, undoSteps: after === before ? 0 : 1 };
     }
     case 'undo': return { undone: await env.undo() };
     default: throw new Error(`unknown tool ${tool}`);
