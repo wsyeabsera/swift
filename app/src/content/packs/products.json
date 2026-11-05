@@ -1,0 +1,8 @@
+{"id":"products","description":"Physical products with prices and ratings.","fields":{
+"name":{"kind":"pick","values":{"en":["Ridge Trail Jacket","Cedar Desk Lamp","Atlas Carry-on","Pebble Wireless Speaker","Loom Wool Blanket","Summit Water Bottle","Aero Running Shoes","Mono Ceramic Mug"],"de":["Ridge Trailjacke","Cedar Schreibtischlampe","Atlas Handgepäckkoffer","Pebble Funklautsprecher","Loom Wolldecke","Summit Trinkflasche","Aero Laufschuhe","Mono Keramiktasse"]}},
+"category":{"kind":"pick","values":{"en":["Outdoor","Home","Travel","Audio","Kitchen"],"de":["Outdoor","Zuhause","Reisen","Audio","Küche"]}},
+"price":{"kind":"number","min":12,"max":289,"decimals":0,"format":"currency"},
+"rating":{"kind":"number","min":3.6,"max":4.9,"decimals":1,"format":"decimal"},
+"reviews":{"kind":"number","min":12,"max":4800,"decimals":0,"format":"int"},
+"sku":{"kind":"number","min":10000,"max":99999,"decimals":0,"format":"raw"}},
+"records":{"product":["name","category","price","rating","reviews","sku"]},"templates":{}}

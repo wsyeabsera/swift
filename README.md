@@ -17,11 +17,14 @@ SWIFT_DEV=1 npm run helper       # helper on 127.0.0.1:7431 (needs the `claude` 
 ```
 Or load `extension/` unpacked in Chromium after `npm run build` (the helper then needs `SWIFT_ALLOWED_ORIGINS=chrome-extension://<id>`).
 
+## Use it from Claude Code
+Register the in-app MCP server once (`claude mcp add swift -- swift-canvas-helper mcp`), keep the helper and an app tab open, then ask Claude Code to start from a template, fill it from your brief and repo data, check it, screenshot it and export it. Steps, the tool list and the design loop: `docs/claude-code-quickstart.md`. Writing your own templates: `docs/template-authoring.md`. Not built yet: starter templates, template screens in the app, `swift-canvas new`.
+
 ## Test it
 `npm run typecheck`, `npm test` (Vitest), `npm run helper:test` (Rust), `npm run e2e` (real unpacked extension + web page, speed budgets in `e2e/budgets.json`), `npm run e2e:contrast`. Run the UI tests in the background; they own ports 7431 and 5173. Timings: `docs/dev-speed.md`.
 
 ## Docs
-- `docs/handoff.md` (read first), `docs/architecture.md`, `CLAUDE.md` (rules and commands), `spikes/*/RESULTS.md` (measured numbers).
+- `docs/claude-code-quickstart.md`, `docs/template-authoring.md`, `docs/handoff.md` (read first), `docs/architecture.md`, `CLAUDE.md` (rules and commands), `spikes/*/RESULTS.md` (measured numbers).
 - **V1 mockups (UI source of truth):** https://claude.ai/artifact/9JQD7AcKDh7FgGxhPurcxh · design files `~/Hobby/swift-canvas-design/project` (boards `*.dc.html`, `KIT.md`).
 
 Work is tracked as ws-command groups (project `swift`).
