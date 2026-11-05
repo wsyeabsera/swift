@@ -201,3 +201,9 @@ nav.lens{z-index:40} /* above the menu scrim: switching lenses works while a len
 
 /* Lens bar (task #1844): the shortcut number sits small beside each name; the active lens is the lit pill. */
 .lensnum{margin-left:6px;font-size:10px;opacity:.55;font-weight:500}.seg.on .lensnum{opacity:.85}
+/* Lens tour strip (task #1843): beside the canvas, never modal; motion is already removed by the global reduced-motion rules */
+.lensstrip{position:fixed;z-index:6;left:50%;top:76px;transform:translateX(-50%);width:min(520px,calc(100vw - 640px));min-width:300px;padding:12px 16px;border-radius:22px;display:grid;gap:6px;animation:lensstrip-in .2s ease-out}
+.lensstrip-top{display:flex;align-items:center;gap:10px}.lensstrip-nav{margin-left:auto;display:flex;gap:6px}
+.lensstrip-line{margin:0;font-size:14px;line-height:1.4}.lensstrip-acts{margin:0;padding-left:18px;font-size:12px;line-height:1.5}.lensstrip-prompt{margin:0;font-size:12px;line-height:1.4}.lensstrip-prompt span{text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
+@keyframes lensstrip-in{from{opacity:0;transform:translate(-50%,-6px)}to{opacity:1;transform:translateX(-50%)}}
+.emptyload{margin:6px 4px}
