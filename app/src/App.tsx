@@ -61,8 +61,10 @@ import { localEdits, propTokenRequest, themeRequest, easeRequest, tokenRequest }
 import { suggestions, type SuggestProps } from './say/suggest';
 import { canSpark, DIRECTIONS, discardTakes, isTake, keepTake, runSpark } from './say/spark';
 import { buildSystemPrompt } from './say/prompt';
+import { LENSES, type Lens } from './tour/lenses';
+import { LensStrip } from './tour/LensStrip';
+import { buildSample, isSampleName, TOUR_FLAG } from './tour/sample';
 const TOKEN = (import.meta.env.VITE_HELPER_TOKEN as string | undefined) ?? 'dev-token';
-const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'Pulse', 'Brand', 'Diagram'] as const;
 export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
@@ -571,6 +573,18 @@ export function App() {
   useEffect(() => { const t = setInterval(() => { const v = window.__swift?.view(); if (v) setZoomPct((p) => { const n = Math.round(v.s * 100); return p === n ? p : n; }); }, 250); return () => clearInterval(t); }, []);
   const actualSize = useCallback(() => { const r = document.querySelector('[data-testid=canvas]')?.getBoundingClientRect(); const v = window.__swift?.view(); if (r && v && window.__swift) window.__swift.setView(zoomAt(v, r.width / 2, r.height / 2, 1 / v.s)); }, []);
   const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
+  // Lens tour (#1843): one sample project, every lens in turn; a lens opens its own tools exactly as a click on it does.
+  const pickLens = useCallback((l: Lens) => { setLens(l); setFrameMenuOpen(l === 'Prototype' || l === 'Motion' || l === 'Effects' || l === 'Critique'); /* a lens opens its own tools; Design and 3D close the menu */ }, []);
+  const [tour, setTour] = useState(false); const tourBtn = useRef<HTMLButtonElement>(null); const [hintsOff, setHintsOff] = useState(() => { try { return localStorage.getItem('swift-canvas.lensstrip.off') === '1'; } catch { return false; } });
+  const loadSample = useCallback(async () => { const s = buildSample(); const next = addProject(reg, uniqueName(reg.list, s.name)); if (!next) { setSayStatus('Too many projects to add the sample'); return; } const e1 = saveDoc(s.frames, undefined, next.active); if (e1) { setSayStatus(`Sample not loaded: ${e1}`); return; } saveBrand(s.brand, undefined, next.active); saveTimeline(next.active, s.motion); saveLinks(next.active, s.links); saveScene(next.active, s.scene); try { sessionStorage.setItem(TOUR_FLAG, '1'); } catch { /* the tour then starts from the Tour button */ } await goTo(next); }, [reg, goTo]);
+  const startTour = useCallback(() => { if (!isSampleName(project.name)) { void loadSample(); return; } setTour(true); pickLens('Design'); setTimeout(() => window.__swift?.fitAll(), 50); }, [project.name, loadSample, pickLens]);
+  const stepTour = useCallback((l: Lens) => { pickLens(l); setTimeout(() => window.__swift?.fitAll(), 50); }, [pickLens]);
+  const exitTour = useCallback(() => { setTour(false); pickLens('Design'); tourBtn.current?.focus(); }, [pickLens]);
+  useEffect(() => { try { if (sessionStorage.getItem(TOUR_FLAG) !== '1') return; sessionStorage.removeItem(TOUR_FLAG); } catch { return; } if (isSampleName(project.name)) setTour(true); }, [project.name]);
+  const tourFrame = frames.find((f) => surfaceOf(f) === 'phone' && f.html.includes('id="sample-close"'));
+  useEffect(() => { if (tour && lens === 'Critique' && tourFrame) { setSelection({ frameId: tourFrame.id, el: tourFrame.root }); setTimeout(() => window.__swift?.fitTo([tourFrame.id]), 50); } }, [tour, lens, tourFrame?.id]); // the sample's phone frame holds the finding
+  useEffect(() => { if (tour && lens === 'Critique' && ready && tourFrame && selection?.frameId === tourFrame.id && checkedFrame.current !== tourFrame.id && !critiquing) void checkFrame(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tour, lens, ready, selection?.frameId]); // the local audit is free and instant: the tour arrives at real findings
+  useEffect(() => { if (tour && lens === 'Motion' && motion.tracks.length) void scrub(Math.round(motion.duration / 2)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tour, lens]); // a still frame mid-animation; the tour never autoplays (reduced motion)
   useEffect(() => { if (!frameMenuOpen && lens !== 'Pulse') return; let alive = true; const tick = () => { void conn.current?.poolStatus().then((p) => { if (alive) setPool(p); }); }; tick(); const t = setInterval(tick, 3000); return () => { alive = false; clearInterval(t); }; }, [frameMenuOpen, lens]); // Pulse: the Claude pool while the menu is open
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   // In-app MCP server (#1712): the helper relays design-op calls from Claude Code sessions here; a batch = ONE undo step. The ref keeps the handler on the latest state.
@@ -661,7 +675,8 @@ export function App() {
         {shortcutsOpen && <Shortcuts onClose={() => { setShortcutsOpen(false); kbRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
-          {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => { setLens(l); setFrameMenuOpen(l === 'Prototype' || l === 'Motion' || l === 'Effects' || l === 'Critique'); /* a lens opens its own tools; Design and 3D close the menu */ }}>{l}</button>))}
+          {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => pickLens(l)}>{l}</button>))}
+          <button ref={tourBtn} className={`rb seg tourbtn${tour ? ' on' : ''}`} aria-pressed={tour} onClick={() => (tour ? exitTour() : startTour())} title={isSampleName(project.name) ? 'Step through every lens (→ ← Esc)' : 'Open the sample project and step through every lens'} data-testid="tour-button">Tour</button>
         </nav>
         <div className="gl isl speed" role="status" aria-live="polite" data-testid="helper-status">
           <span className={`dot ${dot}`} aria-hidden />
@@ -700,7 +715,7 @@ export function App() {
         <span className="pal-sep" aria-hidden="true" />
         <button className="rb ib ib-ac" aria-label="Spark 4 takes" title="Spark: 4 takes of the selection" disabled={sparking} onClick={() => void spark(4)} data-testid="tool-spark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
       </div>
-      {lens === 'Critique' && <CritiquePanel findings={findings} note={checkNote} busy={critiquing} onRun={() => void checkFrame()} onSelect={(f) => { setSelection({ frameId: f.frame, el: f.el }); window.__swift?.fitTo([f.frame]); }} onFix={(f) => void fixFinding(f)} />}
+      {lens === 'Critique' && <CritiquePanel onLoadSample={isSampleName(project.name) ? undefined : () => void loadSample()} findings={findings} note={checkNote} busy={critiquing} onRun={() => void checkFrame()} onSelect={(f) => { setSelection({ frameId: f.frame, el: f.el }); window.__swift?.fitTo([f.frame]); }} onFix={(f) => void fixFinding(f)} />}
       {switcherOpen && <ProjectSwitcher projects={reg.list} active={project.id} recent={recent} onClose={() => setSwitcherOpen(false)} onPick={(id) => { setSwitcherOpen(false); if (id !== project.id) { saveRecent(touchRecent(recent, id)); void goTo(switchProject(reg, id)); } }} onCreate={(name) => { setSwitcherOpen(false); const next = addProject(reg, name); if (next) { saveRecent(touchRecent(recent, next.active)); void goTo(next); } else setSayStatus('Could not create that project (name needs letters or digits, or the limit of 50 is reached)'); }} />}
       {shipDone && <ShipBoard run={summarizeRun(shipLog, shipDone.since, shipDone.ms)} artifactUrl={artifact?.url} onAgain={() => { setShipDone(null); void runShip(); }} onClose={() => setShipDone(null)} />}
       {lens === 'Pulse' && (
@@ -734,7 +749,8 @@ export function App() {
             <div className="projs"><button className="rb btn" onClick={() => void loadCrewFolder()} data-testid="crew-load" title="Read .swift-canvas/crew/*.md from a project folder; its sheets add to or replace the bundled five">Load crew from folder…</button></div>
         </aside>
       )}
-      {lens === 'Motion' && <MotionStrip motion={motion} t={mt} playing={playing} onScrub={(ms) => void scrub(ms)} onPlay={() => { if (mt >= motion.duration) setMt(0); setPlaying((p) => !p); }} onRender={() => void renderMotion()} />}
+      {lens === 'Motion' && <MotionStrip onLoadSample={isSampleName(project.name) ? undefined : () => void loadSample()} motion={motion} t={mt} playing={playing} onScrub={(ms) => void scrub(ms)} onPlay={() => { if (mt >= motion.duration) setMt(0); setPlaying((p) => !p); }} onRender={() => void renderMotion()} />}
+      {(tour || (lens !== 'Design' && !hintsOff)) && <LensStrip lens={lens} tour={tour} onStep={stepTour} onExit={exitTour} onHide={() => { setHintsOff(true); try { localStorage.setItem('swift-canvas.lensstrip.off', '1'); } catch { /* per-session then */ } }} />}
       <footer className="gl isl tools" aria-label="Canvas tools">
         <button className="rb btn" onClick={() => window.__swift?.fitAll()}>Fit</button>
         {sparking ? <>{selection && takesRunning.current.has(selection.frameId) && <button className="rb btn" onClick={() => takesRunning.current.get(selection.frameId)?.abort()} data-testid="cancel-take">Cancel this take</button>}<button className="rb btn" onClick={() => sparkAbort.current?.abort()} data-testid="spark-cancel">Cancel Spark</button></> : <button className="rb btn" onClick={() => void spark(4)} data-testid="spark-button" title={`Spark ×4 costs about ${tokensShort((e => e.input + e.output)(estimateSpark(usage, 4)))} tokens (from your recent requests, cached input included)`}>Spark ×4</button>}
