@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motionMs } from '../a11y';
 import { surfaceOf } from './frames';
 import { frameDoc, FrameBridge, type TreeNode, type AuditFacts, type ElSig } from './bridge';
 import type { FrameDef } from './fixtures';
@@ -76,7 +77,7 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
     window.__swift = {
       frames: frames.map((f) => f.id), view: () => ({ ...viewRef.current }), setView: (v) => { viewRef.current = v; sync(); },
       fitAll: () => { const r = rect(); viewRef.current = fit(frames, r.width, r.height, 90); sync(); },
-      glideTo: (ids, ms = 260) => new Promise<void>((resolve) => { // an eased move of the view to frames (Prototype Play), cancelled by the next glide or fit
+      glideTo: (ids, ms = 260) => new Promise<void>((resolve) => { ms = motionMs(ms); if (ms === 0) { cancelAnimationFrame(glideRaf.current); const r0 = rect(); viewRef.current = fit(frames.filter((f) => ids.includes(f.id)), r0.width, r0.height, 110); sync(); resolve(); return; } // an eased move of the view to frames (Prototype Play), cancelled by the next glide or fit
         const r = rect(); const to = fit(frames.filter((f) => ids.includes(f.id)), r.width, r.height, 110); const from = { ...viewRef.current }; const t0 = performance.now(); cancelAnimationFrame(glideRaf.current);
         const step = (now: number): void => { const k = Math.min(1, (now - t0) / ms); const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; viewRef.current = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e, s: from.s + (to.s - from.s) * e }; sync(); if (k < 1) glideRaf.current = requestAnimationFrame(step); else resolve(); }; glideRaf.current = requestAnimationFrame(step);
       }),
@@ -122,7 +123,7 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
   const selFrame0 = selection ? frames.find((f) => f.id === selection.frameId) : undefined; selBoxRef.current = selFrame0 && selRect ? { x: selFrame0.x + selRect.x, y: selFrame0.y + selRect.y, w: selRect.w, h: selRect.h } : null;
   const selFrame = selection ? frames.find((f) => f.id === selection.frameId) : undefined;
   return (
-    <div ref={hostRef} className="canvas" data-testid="canvas">
+    <div ref={hostRef} className="canvas" data-testid="canvas" role="region" aria-label="Canvas. Enter selects the first screen, Enter again goes into it, Escape clears" tabIndex={0}>
       <div ref={worldRef} className="world" data-chrome={chrome ? '1' : '0'}>
         {frames.map((f) => (
           <div key={f.id} className="fr" data-surface={surfaceOf(f)} data-testid="frame-tile" style={{ left: f.x, top: f.y, width: f.w, height: f.h, display: visible.has(f.id) ? 'block' : 'none' }}>
@@ -130,7 +131,7 @@ export function Canvas({ frames, selection, extras = [], onSelect, revision, onR
             {painting?.has(f.id) && <div className="fr-busy" data-testid="frame-busy" aria-label="Claude is painting this take" />}
             {editing === f.id
               ? <input className="fr-label fr-edit" aria-label="Frame name" data-testid="frame-name" autoFocus defaultValue={f.title} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') { onRename?.(f.id, e.currentTarget.value); setEditing(null); } else if (e.key === 'Escape') setEditing(null); }} onBlur={(e) => { if (editing === f.id) { onRename?.(f.id, e.currentTarget.value); setEditing(null); } }} />
-              : <span className="fr-label" data-testid="frame-label" title="Double-click to rename" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={() => setEditing(f.id)}>{f.title}{!/\d+\s*[×x]\s*\d+/.test(f.title) && <span className="fr-size"> {f.w}×{f.h}</span>}</span>}
+              : <span className="fr-label" data-testid="frame-label" role="button" tabIndex={0} aria-label={`Rename ${f.title}`} title="Double-click, or press Enter or F2, to rename" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={() => setEditing(f.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); e.stopPropagation(); setEditing(f.id); } }}>{f.title}{!/\d+\s*[×x]\s*\d+/.test(f.title) && <span className="fr-size"> {f.w}×{f.h}</span>}</span>}
           </div>
         ))}
         {selFrame && selRect && onResize && selection?.el !== selFrame.root && <div className="sel-h" data-testid="resize-handle" style={{ left: selFrame.x + selRect.x + selRect.w, top: selFrame.y + selRect.y + selRect.h }} />}

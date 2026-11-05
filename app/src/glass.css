@@ -184,3 +184,17 @@ nav.lens{z-index:40} /* above the menu scrim: switching lenses works while a len
 
 /* Effects stack rows: name, cost, switch */
 .fxrow{display:flex;align-items:center;gap:10px;width:100%}.fxrow .fxname{flex:1;text-transform:capitalize}.fxrow[data-on=false] .fxname{opacity:.5}.fxsw{min-width:56px;height:30px;padding:0 12px}.fxsw.on{background:linear-gradient(165deg,color-mix(in srgb,var(--ac) 40%,transparent),color-mix(in srgb,var(--ac) 18%,transparent))}
+
+/* Accessibility (task #1840): a visible focus ring on every control, the canvas included; less motion; more contrast on request */
+:is(input,select,textarea,summary,[tabindex]):focus-visible { outline:2px solid var(--ac); outline-offset:2px; }
+.canvas:focus-visible { outline:2px solid var(--ac); outline-offset:-4px; }
+.say:focus-within { box-shadow:0 0 0 2px var(--ac); } /* the Say input has no outline of its own, the island carries the ring */
+.fr-label[role=button]:focus-visible { outline:2px solid var(--ac); outline-offset:2px; border-radius:6px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto !important; } .btn:active,.seg:active,.chip:active { transform:none; } }
+@media (prefers-contrast: more) {
+  :root { --bd:rgba(255,255,255,.7); --mu:var(--tx); }
+  .mu { opacity:1; }
+  button:focus-visible,:is(input,select,textarea,summary,[tabindex]):focus-visible { outline-width:3px; }
+  .gl { --blur:0px; }
+}
+@media (forced-colors: active) { .seg.on,.rb.on { outline:2px solid Highlight; } .say:focus-within { outline:2px solid Highlight; } }
