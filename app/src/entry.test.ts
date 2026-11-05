@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 describe('popup', () => {
   it('lists the same lenses, in the same order, as the app lens bar', () => {
     const lensesOf = (src: string) => /LENSES = (\[[^\]]*\])/.exec(src)?.[1]?.replace(/'/g, '"') ?? '';
-    const app = JSON.parse(lensesOf(readFileSync('app/src/App.tsx', 'utf8'))); const popup = JSON.parse(lensesOf(readFileSync('extension/popup.js', 'utf8')));
+    const app = JSON.parse(lensesOf(readFileSync('app/src/tour/lenses.ts', 'utf8'))); const popup = JSON.parse(lensesOf(readFileSync('extension/popup.js', 'utf8')));
     expect(popup).toEqual(app);
   });
   it('ships a popup, a side panel and a CSP-safe page (no inline script)', () => {

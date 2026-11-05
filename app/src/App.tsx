@@ -43,6 +43,7 @@ import { capturedFrame, duplicateFrame, duplicateId, newFrame, PRESETS, renameFr
 import { clearDoc, fitLog, loadDoc, loadLog, nextSparkN, parseDoc, parseLog, saveDoc } from './doc';
 import { connectHelper, type HelperConnection, type HelperState } from './helper';
 import { handleMcp, type McpEnv } from './mcp';
+import { STARTERS } from './templates/starters';
 import { runSayRepairing } from './say/say';
 import { compareKits, isColorValue, kitColors, loadBrand, replaceColor, saveBrand, shareToken, toBrandTokens } from './brand';
 import { parseEntry, lensForKey } from './entry';
@@ -595,7 +596,7 @@ export function App() {
     const c = conn.current; if (!c) { reject(new Error('helper offline')); return; } if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { reject(new Error(`Claude is not ready: ${helper.claudeStatus.message}`)); return; }
     let text = '', err = ''; c.say(system, prompt, (e) => { if (e.kind === 'delta') text += e.text; else { if (e.kind === 'error') err = e.text; if (err && !text) reject(new Error(`Claude failed: ${err}`)); else resolve(text); } });
   });
-  const mcpEnv = useRef<McpEnv | null>(null); mcpEnv.current = { project: project.name, api: window.__swift, frames, selection, record: recordOp, bump: () => setRevision((n) => n + 1), undo: async () => { if (!L.canUndo(logRef.current)) return false; await undo(); return true; }, brand, ask: askOnce, addFrames: (defs) => setFrames((f) => [...f, ...defs.filter((d) => !f.some((x) => x.id === d.id))]), setBrandToken: (name, value) => setBrand((b) => { const next = { ...b, [name]: value }; saveBrand(next, undefined, project.id); return next; }), projectFile: async () => { const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift?.snapshot(f.id)) || f.html }))); return serializeProject(project.name, snaps, brand, logRef.current, motion, links, scene3d); } };
+  const mcpEnv = useRef<McpEnv | null>(null); mcpEnv.current = { project: project.name, api: window.__swift, frames, selection, record: recordOp, bump: () => setRevision((n) => n + 1), undo: async () => { if (!L.canUndo(logRef.current)) return false; await undo(); return true; }, brand, ask: askOnce, builtinTemplates: STARTERS, addFrames: (defs) => setFrames((f) => [...f, ...defs.filter((d) => !f.some((x) => x.id === d.id))]), setBrandToken: (name, value) => setBrand((b) => { const next = { ...b, [name]: value }; saveBrand(next, undefined, project.id); return next; }), projectFile: async () => { const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift?.snapshot(f.id)) || f.html }))); return serializeProject(project.name, snaps, brand, logRef.current, motion, links, scene3d); } };
   useEffect(() => { conn.current?.setMcpHandler((tool, args) => handleMcp(mcpEnv.current!, tool, args)); }, []);
   const dot = helper.status === 'connected' ? (helper.claudeStatus && helper.claudeStatus.state !== 'ready' ? 'warn' : 'ok') : helper.status === 'connecting' ? 'warn' : 'bad';
   return (
