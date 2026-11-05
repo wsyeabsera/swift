@@ -1,0 +1,6 @@
+{"id":"copy","description":"Marketing copy by tone.","fields":{
+"headline":{"kind":"pick","values":{"en":["Ship the thing your customers keep asking for","Less busywork. More finished work.","Your whole team, finally on the same page","Plans that fit how you actually work"],"de":["Liefern Sie, was Ihre Kunden sich wünschen","Weniger Aufwand. Mehr Ergebnisse.","Ihr ganzes Team endlich auf einer Seite","Tarife, die zu Ihrer Arbeitsweise passen"]}},
+"subhead":{"kind":"pick","values":{"en":["Set up in minutes, no credit card needed.","Trusted by 4,000 teams across 60 countries.","Cancel any time. Your data stays yours."],"de":["In Minuten eingerichtet, ohne Kreditkarte.","4.000 Teams in 60 Ländern vertrauen uns.","Jederzeit kündbar. Ihre Daten gehören Ihnen."]}},
+"cta":{"kind":"pick","values":{"en":["Start free","Book a demo","See pricing","Get started"],"de":["Kostenlos starten","Demo buchen","Preise ansehen","Loslegen"]}},
+"quote":{"kind":"pick","values":{"en":["We cut our review cycle from two weeks to three days.","It paid for itself in the first month.","The first tool our whole team actually opens every day."],"de":["Unser Review-Zyklus sank von zwei Wochen auf drei Tage.","Hat sich im ersten Monat bezahlt gemacht.","Das erste Tool, das unser ganzes Team täglich öffnet."]}}},
+"records":{"hero":["headline","subhead","cta"]},"templates":{}}
