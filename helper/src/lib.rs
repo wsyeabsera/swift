@@ -12,6 +12,7 @@ pub mod data;
 pub mod templates;
 pub mod repo;
 pub mod render;
+pub mod live;
 use say::Pool;
 use status::Shared;
 use std::{io, net::TcpListener, sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc}, thread, time::Duration};
@@ -64,11 +65,11 @@ fn forbidden() -> ErrorResponse { http::Response::builder().status(403).body(Som
 /// Accept loop: one thread per connection. Returns only on listener error.
 pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
     let busy = Arc::new(AtomicUsize::new(0)); let pool = Arc::new(Pool::new(&cfg.claude_bin, &cfg.model)); let picked: Picked = Arc::new(std::sync::Mutex::new(Vec::new())); let shared = Arc::new(Shared::new(&cfg.claude_bin)); let next_id = Arc::new(AtomicUsize::new(0));
-    let hub = Arc::new(mcp::Hub::default()); if let Err(e) = mcp::write_token_file(&cfg.data_dir, cfg.port, &cfg.token) { eprintln!("cannot write the MCP token file in {}: {e} (`swift-canvas-helper mcp` will not connect)", cfg.data_dir.display()); } // port is the configured one (tests bind port 0 and do not use MCP)
+    let hub = Arc::new(mcp::Hub::default()); let live = Arc::new(live::LiveHub::default()); if let Err(e) = mcp::write_token_file(&cfg.data_dir, cfg.port, &cfg.token) { eprintln!("cannot write the MCP token file in {}: {e} (`swift-canvas-helper mcp` will not connect)", cfg.data_dir.display()); } // port is the configured one (tests bind port 0 and do not use MCP)
     { let shared = shared.clone(); let every = Duration::from_millis(std::env::var("SWIFT_STATUS_POLL_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(5000)); thread::spawn(move || loop { thread::sleep(every); if shared.get().state != "ready" { shared.refresh(false); } }); } // re-check only while not ready
     { let pool = pool.clone(); thread::spawn(move || loop { thread::sleep(Duration::from_secs(10)); pool.reap(std::time::Instant::now(), say::SPARE_IDLE); }); }
     for stream in listener.incoming() {
-        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone(); let pool = pool.clone(); let picked = picked.clone(); let shared = shared.clone(); let cid = next_id.fetch_add(1, Ordering::SeqCst); let hub = hub.clone();
+        let stream = stream?; let cfg = cfg.clone(); let busy = busy.clone(); let pool = pool.clone(); let picked = picked.clone(); let shared = shared.clone(); let cid = next_id.fetch_add(1, Ordering::SeqCst); let hub = hub.clone(); let live = live.clone();
         thread::spawn(move || {
             let mcp_role = std::cell::Cell::new(false);
             let check = |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
@@ -87,14 +88,15 @@ pub fn serve(listener: TcpListener, cfg: Config) -> io::Result<()> {
             let (tx, rx) = mpsc::channel::<String>(); shared.subscribe(cid, tx.clone()); let _ = ws.get_mut().set_read_timeout(Some(Duration::from_millis(30)));
             loop {
                 while let Ok(m) = rx.try_recv() { if ws.send(Message::text(m)).is_err() { return; } }
+                for m in live.drain(cid) { if ws.send(Message::text(m)).is_err() { live.disconnect(cid); return; } }
                 match ws.read() {
-                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy, &pool, &picked, &shared, &hub, cid, is_mcp),
+                    Ok(Message::Text(t)) => handle_text(t.as_str(), &cfg, &tx, &busy, &pool, &picked, &shared, &hub, &live, cid, is_mcp),
                     Ok(Message::Close(_)) | Err(WsError::ConnectionClosed) | Err(WsError::AlreadyClosed) => break,
                     Err(WsError::Io(e)) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => continue,
                     Err(_) => break, Ok(_) => {}
                 }
             }
-            shared.unsubscribe(cid); hub.unregister_app(cid);
+            shared.unsubscribe(cid); hub.unregister_app(cid); live.disconnect(cid);
         });
     }
     Ok(())
@@ -110,14 +112,27 @@ fn pick_folder(bin: &str) -> Result<String, String> {
 /// Messages from the app: ping, and say {id, system, request}. Everything is validated; unknown or malformed input is ignored, never executed.
 /// Folders the user chose in the native dialog this run: choosing one is consent to read it, so they count as allowed roots (never anything the client merely names).
 type Picked = Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>;
-fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>, picked: &Picked, shared: &Arc<Shared>, hub: &Arc<mcp::Hub>, cid: usize, is_mcp: bool) {
+fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<AtomicUsize>, pool: &Arc<Pool>, picked: &Picked, shared: &Arc<Shared>, hub: &Arc<mcp::Hub>, live: &Arc<live::LiveHub>, cid: usize, is_mcp: bool) {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
     let ty = v.get("type").and_then(|t| t.as_str());
     // MCP processes may only call MCP tools (and ping); app connections may not call them
-    if is_mcp && !matches!(ty, Some("mcp.call" | "ping")) { return; }
+    if is_mcp && !matches!(ty, Some("mcp.call" | "ping" | "live.event" | "live.subscribe")) { return; }
     if !is_mcp && ty == Some("mcp.call") { return; }
     match v.get("type").and_then(|t| t.as_str()) {
         Some("mcp.register") => hub.register_app(cid, tx.clone()), // the app announces itself as the target of relayed design ops
+        // Live agent stream (#1803). The browser role registers like the app does for MCP; Claude Code (the mcp role) and the app/panel/extension all publish and subscribe.
+        Some("live.register") => { if !is_mcp && v.get("role").and_then(|x| x.as_str()) == Some("browser") { live.register_browser(cid); let _ = tx.send("{\"type\":\"live.registered\",\"role\":\"browser\"}".to_string()); } }
+        Some("live.subscribe") => { live.subscribe(cid); let _ = tx.send("{\"type\":\"live.subscribed\"}".to_string()); }
+        Some("live.event") => {
+            let run: String = v.get("run").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect();
+            let parsed = serde_json::from_value::<swift_canvas_core::live::LiveEvent>(v.get("event").cloned().unwrap_or(serde_json::Value::Null)).map_err(|e| e.to_string()).and_then(|e| e.validate().map(|_| e));
+            match parsed { Ok(ev) if !run.is_empty() => {
+                    let source = if is_mcp { swift_canvas_core::live::Source::Agent } else { swift_canvas_core::live::Source::Browser };
+                    let d = live.publish(cid, &run, source, ev); // the sender learns whether anyone listens and whether a browser role exists: absent browser is reported, not silent
+                    let _ = tx.send(serde_json::json!({ "type": "live.ack", "run": run, "seq": d.seq, "delivered": d.delivered, "browser": d.browser }).to_string()); }
+                Ok(_) => { let _ = tx.send("{\"type\":\"live.nack\",\"error\":\"run id required\"}".to_string()); }
+                Err(e) => { let _ = tx.send(serde_json::json!({ "type": "live.nack", "run": run, "error": e }).to_string()); } }
+        }
         Some("mcp.res") => { if let Some(id) = v.get("id").and_then(|x| x.as_str()) { hub.deliver(id, v.clone()); } }
         Some("mcp.call") => {
             let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let tool = v.get("tool").and_then(|x| x.as_str()).unwrap_or("").to_string(); let args = v.get("args").cloned().unwrap_or(serde_json::Value::Null);
