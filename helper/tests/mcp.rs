@@ -12,7 +12,7 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
     let mut be = Fake(vec![], Ok(json!({ "applied": 1 })));
     let r = talk("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"1\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"apply_ops\",\"arguments\":{\"ops\":[]}}}\n", &mut be);
     assert_eq!(r.len(), 3, "the notification gets no reply"); assert_eq!(r[0]["result"]["protocolVersion"], "2024-11-05"); assert_eq!(r[0]["id"], 1);
-    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "list_frames", "check", "screenshot", "export", "fill_from_data", "undo"]);
+    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "list_frames", "check", "screenshot", "export", "fill_from_data", "save_template", "undo"]);
     assert_eq!(r[2]["result"]["content"][0]["text"], "{\"applied\":1}"); assert_eq!(be.0[0].0, "apply_ops");
 }
 #[test] fn protocol_errors_are_reported() {
@@ -44,6 +44,7 @@ fn rig_roots(with_app: bool, roots: Vec<std::path::PathBuf>) -> Rig {
                 "tree" => json!({ "frame": "tv", "tree": [{ "id": "root", "parent": null, "tag": "div", "text": "" }, { "id": "clock", "parent": "root", "tag": "div", "text": "12:00" }] }),
                 "apply_ops" => { ap.lock().unwrap().push(v["args"].clone()); json!({ "applied": v["args"]["ops"].as_array().unwrap().len() }) }
                 "fill_rows" => { ap.lock().unwrap().push(v["args"].clone()); json!({ "rows": v["args"]["rows"].as_array().unwrap().len() }) }
+                "save_template" => if v["args"]["name"] == "boom" { json!({ "slug": "../x", "files": { "template.json": "{}" } }) } else { json!({ "slug": "my-t", "name": v["args"]["name"], "slots": 1, "warnings": [], "files": { "template.json": "{\"n\":1}", "frames/home.html": "<div id=\"home\"></div>" }, "sawScan": v["args"].get("scan").is_some() }) },
                 _ => json!({ "ok": true }) };
             ws.send(Message::text(json!({ "type": "mcp.res", "id": v["id"], "ok": true, "result": res }).to_string())).unwrap(); } }); thread::sleep(std::time::Duration::from_millis(200)); }
     Rig { port, dir, applied, calls }
@@ -144,4 +145,12 @@ fn frames() -> Value { json!([{ "id": "tv-1", "title": "Living room", "w": 1920,
     for bad in [outside.to_str().unwrap(), "../sc-secret.csv", "nope.csv"] { assert!(call(&r, "fill_from_data", json!({ "path": bad, "el": "list" })).is_err(), "{bad}"); }
     assert_eq!(r.applied.lock().unwrap().len(), 1, "a refused path never reaches the app");
     let none = rig_roots(true, vec![]); assert!(call(&none, "fill_from_data", json!({ "path": "users.csv" })).unwrap_err().contains("no project folder"));
+}
+#[test] fn save_template_writes_the_folder_the_app_built_and_refuses_unsafe_ones() {
+    let r = rig(true); let ok = call(&r, "save_template", json!({ "name": "My T" })).unwrap();
+    let dir = r.dir.join("templates/my-t"); assert_eq!(ok["saved"], dir.display().to_string()); assert_eq!(std::fs::read_to_string(dir.join("template.json")).unwrap(), "{\"n\":1}"); assert!(dir.join("frames/home.html").exists());
+    assert!(call(&r, "save_template", json!({ "name": "My T" })).unwrap_err().contains("already exists")); assert!(call(&r, "save_template", json!({ "name": "My T", "overwrite": true })).is_ok());
+    assert!(call(&r, "save_template", json!({ "name": "boom" })).unwrap_err().contains("bad template folder name")); assert!(!r.dir.join("x").exists());
+    assert!(call(&r, "save_template", json!({})).unwrap_err().contains("name is required"));
+    assert!(call(&r, "save_template", json!({ "name": "a", "from_repo": "/etc" })).unwrap_err().contains("not allowed")); assert!(call(&r, "save_template", json!({ "name": "a", "dest": "repo" })).unwrap_err().contains("from_repo")); assert!(call(&r, "save_template", json!({ "name": "a", "dest": "nope" })).unwrap_err().contains("dest must be"));
 }

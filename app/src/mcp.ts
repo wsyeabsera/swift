@@ -12,6 +12,7 @@ import { exportDoc, exportName } from './canvas/exportHtml';
 import { componentName, frameToTsx } from './canvas/exportReact';
 import { dtcgString } from './dtcg';
 import { isTarget } from './ship';
+import { templateFromFrames, templateFromScan, type ScanLike } from './saveTemplate';
 import { applyFill, containerOf, parseTable, planFill } from './dataFill';
 export type McpEnv = { project?: string; api: CanvasApi | undefined; frames: FrameDef[]; selection: Sel | null; record: (op: Op) => void; undo: () => Promise<boolean>; bump: () => void;
   /** One Claude answer for `check` with judge:true (rejects with the reason; the app's Say connection in production, a fake in tests). */ ask?: (system: string, prompt: string) => Promise<string>; brand?: Record<string, string>; /** The project file text, for export target `project`. */ projectFile?: () => Promise<string> };
@@ -33,7 +34,15 @@ async function applyOne(api: CanvasApi, frame: string, root: string, op: SayOp):
     case 'ask': return true;
   }
 }
+/** Needs no open canvas tab for a scan; frames come from the env. Returns the template folder's files; the helper writes them to disk. */
+function saveTemplate(env: McpEnv, args: Record<string, unknown>): unknown {
+  if (!isStr(args.name)) throw new Error('name is required');
+  const desc = isStr(args.description) ? args.description : undefined;
+  const r = args.scan ? templateFromScan(args.scan as ScanLike, { name: args.name, description: desc }) : templateFromFrames(Array.isArray(args.frames) && args.frames.length ? args.frames.map((id) => pick(env, id)) : [pick(env, args.frame)], { name: args.name, description: desc });
+  if (!r.ok) throw new Error(r.error); return { slug: r.slug, name: r.name, slots: r.slots, warnings: r.warnings, files: r.folder.files };
+}
 export async function handleMcp(env: McpEnv, tool: string, args: Record<string, unknown>): Promise<unknown> {
+  if (tool === 'save_template') return saveTemplate(env, args);
   const api = env.api; if (!api) throw new Error('the canvas is not ready');
   switch (tool) {
     case 'tree': { const f = pick(env, args.frame); const t = await api.tree(f.id); return { frame: f.id, tree: t.map((n) => ({ id: n.id, parent: n.parent, tag: n.tag, text: n.text })) }; }

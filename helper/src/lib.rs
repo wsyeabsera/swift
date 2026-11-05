@@ -9,6 +9,7 @@ pub mod status;
 pub mod store;
 pub mod mcp;
 pub mod data;
+pub mod templates;
 pub mod repo;
 pub mod render;
 use say::Pool;
@@ -121,7 +122,7 @@ fn handle_text(text: &str, cfg: &Config, tx: &mpsc::Sender<String>, busy: &Arc<A
         Some("mcp.call") => {
             let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("").chars().take(64).collect::<String>(); let tool = v.get("tool").and_then(|x| x.as_str()).unwrap_or("").to_string(); let args = v.get("args").cloned().unwrap_or(serde_json::Value::Null);
             let (tx, hub) = (tx.clone(), hub.clone()); let mut roots = cfg.project_roots.clone(); roots.extend(picked.lock().map(|p| p.clone()).unwrap_or_default()); let ctx = mcp::Ctx { roots, data_dir: cfg.data_dir.clone(), chrome: std::env::var("SWIFT_CHROME_BIN").ok().filter(|b| !b.is_empty()).unwrap_or_else(|| "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome".to_string()) };
-            thread::spawn(move || { let reply = match mcp::run_tool(&hub, &ctx, &tool, &args) { Ok(r) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": true, "result": r }), Err(e) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
+            thread::spawn(move || { let r = if tool == "save_template" { templates::save_tool(&hub, &ctx.data_dir, &ctx.roots, &args) } else { mcp::run_tool(&hub, &ctx, &tool, &args) }; let reply = match r { Ok(r) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": true, "result": r }), Err(e) => serde_json::json!({ "type": "mcp.result", "id": id, "ok": false, "error": e }) }; let _ = tx.send(reply.to_string()); });
         }
         Some("ping") => { let _ = tx.send("{\"type\":\"pong\"}".to_string()); }
         Some("project.scan") => {
