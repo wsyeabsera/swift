@@ -5,8 +5,17 @@ import type { FrameDef } from './canvas/fixtures';
 import { checkLine, type Op as SayOp } from './say/ops';
 import type { Op } from './oplog';
 import { buildArtifactPage } from './publish';
-export type McpEnv = { project?: string; api: CanvasApi | undefined; frames: FrameDef[]; selection: Sel | null; record: (op: Op) => void; undo: () => Promise<boolean>; bump: () => void };
-export const MCP_MAX_OPS = 200; const MAX_NODES = 400; const MAX_HTML = 6000;
+import { surfaceOf } from './canvas/frames';
+import { auditFacts } from './canvas/audit';
+import { CRITIQUE_SYSTEM, critiquePrompt, parseCritique } from './canvas/critique';
+import { exportDoc, exportName } from './canvas/exportHtml';
+import { componentName, frameToTsx } from './canvas/exportReact';
+import { dtcgString } from './dtcg';
+import { isTarget } from './ship';
+export type McpEnv = { project?: string; api: CanvasApi | undefined; frames: FrameDef[]; selection: Sel | null; record: (op: Op) => void; undo: () => Promise<boolean>; bump: () => void;
+  /** One Claude answer for `check` with judge:true (rejects with the reason; the app's Say connection in production, a fake in tests). */ ask?: (system: string, prompt: string) => Promise<string>; brand?: Record<string, string>; /** The project file text, for export target `project`. */ projectFile?: () => Promise<string> };
+export const MCP_MAX_OPS = 200; const MAX_NODES = 400; const MAX_HTML = 6000; export const MCP_MAX_EXPORT = 1024 * 1024; const PREVIEW_LINES = 40; const PREVIEW_CHARS = 3000;
+const EXPORT_TARGETS = ['html', 'react', 'tokens', 'project'];
 const isStr = (v: unknown): v is string => typeof v === 'string';
 function pick(env: McpEnv, frame: unknown): FrameDef {
   if (frame !== undefined && frame !== null && !isStr(frame)) throw new Error('frame must be a string');
@@ -47,6 +56,29 @@ export async function handleMcp(env: McpEnv, tool: string, args: Record<string, 
     case 'artifact_page': { // the whole project (or the frames asked for) as one page; nothing in the design changes
       const want = Array.isArray(args.frames) ? args.frames.filter(isStr) : null; const list = want ? env.frames.filter((f) => want.includes(f.id)) : env.frames; if (want && list.length !== new Set(want).size) throw new Error(`unknown frame in ${JSON.stringify(want)} (frames: ${env.frames.map((x) => x.id).join(', ')})`);
       const pageFrames = await Promise.all(list.map(async (f) => ({ id: f.id, title: f.title, w: f.w, h: f.h, html: (await api.snapshot(f.id)) || f.html }))); const r = buildArtifactPage(env.project || 'Swift Canvas project', pageFrames); if (!r.ok) throw new Error(r.error); return { title: env.project || 'Swift Canvas project', frames: r.frames, bytes: r.bytes, html: r.html };
+    }
+    case 'list_frames': return { source: 'open app', project: env.project ?? null, selected: env.selection, frames: env.frames.map((f) => ({ id: f.id, name: f.title, w: f.w, h: f.h, lens: surfaceOf(f) })) };
+    case 'frame_html': { const f = pick(env, args.frame); const html = (await api.snapshot(f.id)) || f.html; if (!html) throw new Error(`frame ${f.id} is not ready`); return { frame: f.id, w: f.w, h: f.h, html }; }
+    case 'check': { // Critique: the local pre-pass (always), then Claude's judgment only when asked; every finding is numbered and names a known element id
+      if (args.judge !== undefined && typeof args.judge !== 'boolean') throw new Error('judge must be true or false');
+      const f = pick(env, args.frame); const facts = await api.audit(f.id); if (!facts) throw new Error(`frame ${f.id} did not answer the audit`); const surface = surfaceOf(f); const local = auditFacts(facts, surface);
+      let judged: ReturnType<typeof parseCritique> = { findings: [], rejected: 0 };
+      if (args.judge === true) {
+        if (!env.ask) throw new Error('Claude is not available in the app (check the helper connection); run check without judge for the local checks');
+        const text = await env.ask(CRITIQUE_SYSTEM, critiquePrompt(facts, surface === 'tv' ? 'TV screen' : surface === 'phone' ? 'phone screen' : 'desktop screen', local)); judged = parseCritique(text, facts.nodes.map((n) => n.id));
+      }
+      const all = [...local, ...judged.findings]; return { frame: f.id, surface, local: local.length, judged: judged.findings.length, rejected: judged.rejected, findings: all.map((x, i) => ({ n: i + 1, el: x.el, kind: x.kind, message: x.message, ...(x.fix ? { fix: x.fix } : {}) })) };
+    }
+    case 'export': { // the Ship board's paths as text; a preview first, the full content only with confirm:true. Nothing is written anywhere.
+      const target = args.target; if (!isStr(target) || !isTarget(target) || !EXPORT_TARGETS.includes(target)) throw new Error(`unknown export target ${JSON.stringify(target)} (one of: ${EXPORT_TARGETS.join(', ')})`);
+      if (args.confirm !== undefined && typeof args.confirm !== 'boolean') throw new Error('confirm must be true or false');
+      let name: string, content: string, f: FrameDef | undefined;
+      if (target === 'tokens') { if (!env.brand || !Object.keys(env.brand).length) throw new Error('the project has no brand tokens to export'); name = 'tokens.json'; content = dtcgString(env.brand); }
+      else if (target === 'project') { if (!env.projectFile) throw new Error('the project file is not available'); name = `${(env.project || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'project'}.swiftcanvas.json`; content = await env.projectFile(); }
+      else { f = pick(env, args.frame); const html = await api.snapshot(f.id); if (!html) throw new Error(`frame ${f.id} is not ready`); if (target === 'html') { name = exportName(f.title); content = exportDoc(f.title, html); } else { name = `${componentName(f.title)}.tsx`; content = frameToTsx(f.title, html, { tailwind: true, tokens: env.brand ?? {} }); } }
+      const bytes = new TextEncoder().encode(content).length; const lines = content.split('\n'); const head = { target, name, ...(f ? { frame: f.id } : {}), bytes, lines: lines.length };
+      if (args.confirm === true) { if (bytes > MCP_MAX_EXPORT) throw new Error(`${name} is ${bytes} bytes; over the ${MCP_MAX_EXPORT} byte limit for MCP (export it from the app's Ship board)`); return { ...head, content }; }
+      return { ...head, preview: lines.slice(0, PREVIEW_LINES).join('\n').slice(0, PREVIEW_CHARS), truncated: lines.length > PREVIEW_LINES || content.length > PREVIEW_CHARS, next: 'call export again with confirm: true to receive the full content' };
     }
     case 'undo': return { undone: await env.undo() };
     default: throw new Error(`unknown tool ${tool}`);
