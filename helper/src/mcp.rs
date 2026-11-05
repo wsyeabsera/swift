@@ -253,13 +253,15 @@ fn apply(hub: &Hub, args: &Value) -> Result<Value, String> {
 pub struct WsBackend { data_dir: std::path::PathBuf, ws: Option<tungstenite::WebSocket<std::net::TcpStream>>, n: usize }
 impl WsBackend {
     pub fn new(data_dir: std::path::PathBuf) -> Self { WsBackend { data_dir, ws: None, n: 0 } }
-    fn connect(&self) -> Result<tungstenite::WebSocket<std::net::TcpStream>, String> {
-        let p = self.data_dir.join(TOKEN_FILE); let raw = std::fs::read_to_string(&p).map_err(|e| format!("cannot read {} ({e}): is the Swift Canvas helper running?", p.display()))?;
-        let v: Value = serde_json::from_str(&raw).map_err(|e| format!("bad {}: {e}", p.display()))?; let port = v["port"].as_u64().ok_or("no port in the token file")?; let token = v["token"].as_str().ok_or("no token in the token file")?;
-        let s = std::net::TcpStream::connect_timeout(&std::net::SocketAddr::from(([127, 0, 0, 1], port as u16)), Duration::from_secs(3)).map_err(|e| format!("helper not reachable on 127.0.0.1:{port} ({e}): start it with `swift-canvas-helper`"))?;
-        s.set_read_timeout(Some(Duration::from_secs(60))).ok();
-        let url = format!("ws://127.0.0.1:{port}/?token={token}&role=mcp"); let (ws, _) = tungstenite::client(url.as_str(), s).map_err(|e| format!("helper refused the connection: {e}"))?; Ok(ws)
-    }
+    fn connect(&self) -> Result<tungstenite::WebSocket<std::net::TcpStream>, String> { connect_ws(&self.data_dir, Some(Duration::from_secs(60))) }
+}
+/// Connect to the running helper as the local `mcp` role (no Origin; the token comes from the 0600 file). `read_timeout` is the socket read timeout.
+pub fn connect_ws(data_dir: &std::path::Path, read_timeout: Option<Duration>) -> Result<tungstenite::WebSocket<std::net::TcpStream>, String> {
+    let p = data_dir.join(TOKEN_FILE); let raw = std::fs::read_to_string(&p).map_err(|e| format!("cannot read {} ({e}): is the Swift Canvas helper running?", p.display()))?;
+    let v: Value = serde_json::from_str(&raw).map_err(|e| format!("bad {}: {e}", p.display()))?; let port = v["port"].as_u64().ok_or("no port in the token file")?; let token = v["token"].as_str().ok_or("no token in the token file")?;
+    let s = std::net::TcpStream::connect_timeout(&std::net::SocketAddr::from(([127, 0, 0, 1], port as u16)), Duration::from_secs(3)).map_err(|e| format!("helper not reachable on 127.0.0.1:{port} ({e}): start it with `swift-canvas-helper`"))?;
+    s.set_read_timeout(read_timeout).ok();
+    let url = format!("ws://127.0.0.1:{port}/?token={token}&role=mcp"); let (ws, _) = tungstenite::client(url.as_str(), s).map_err(|e| format!("helper refused the connection: {e}"))?; Ok(ws)
 }
 impl Backend for WsBackend {
     fn call(&mut self, tool: &str, args: Value) -> Result<Value, String> {
