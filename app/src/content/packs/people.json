@@ -1,0 +1,9 @@
+{"id":"people","description":"Names, roles, companies, cities.","fields":{
+"first":{"kind":"pick","values":["Amara","Lukas","Priya","Mateo","Hannah","Kenji","Sofia","Daniel","Leila","Tomás","Ingrid","Omar","Chloe","Jonas","Nadia","Felix"]},
+"last":{"kind":"pick","values":["Okafor","Brandt","Raman","Alvarez","Keller","Tanaka","Rossi","Whitfield","Haddad","Silva","Lindqvist","Farouk","Moreau","Weber","Petrov","Novak"]},
+"role":{"kind":"pick","values":{"en":["Product Designer","Engineering Manager","Data Analyst","Customer Success Lead","Head of Growth","Staff Engineer","Operations Director"],"de":["Produktdesignerin","Engineering Manager","Datenanalyst","Leiterin Kundenerfolg","Head of Growth","Staff Engineer","Betriebsleiter"]}},
+"company":{"kind":"pick","values":["Northwind Labs","Brightline","Helio Systems","Fernhill","Orbit & Oak","Kestrel Works","Lumen Freight","Tidewater"]},
+"city":{"kind":"pick","values":{"en":["Berlin","Lisbon","Toronto","Austin","Nairobi","Osaka","Amsterdam"],"de":["Berlin","Lissabon","Toronto","Austin","Nairobi","Osaka","Amsterdam"]}},
+"joined":{"kind":"date","from":"2021-01-04","to":"2025-10-30"}},
+"records":{"person":["first","last","role","company","city"]},
+"templates":{"name":"{first} {last}","email":"{first}.{last}@example.com"}}
