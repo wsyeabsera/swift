@@ -12,7 +12,7 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
     let mut be = Fake(vec![], Ok(json!({ "applied": 1 })));
     let r = talk("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"1\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"apply_ops\",\"arguments\":{\"ops\":[]}}}\n", &mut be);
     assert_eq!(r.len(), 3, "the notification gets no reply"); assert_eq!(r[0]["result"]["protocolVersion"], "2024-11-05"); assert_eq!(r[0]["id"], 1);
-    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "undo"]);
+    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "list_frames", "check", "screenshot", "export", "undo"]);
     assert_eq!(r[2]["result"]["content"][0]["text"], "{\"applied\":1}"); assert_eq!(be.0[0].0, "apply_ops");
 }
 #[test] fn protocol_errors_are_reported() {
@@ -23,23 +23,28 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
     let r = talk(&big, &mut be); assert_eq!(r[0]["result"]["isError"], true); assert_eq!(be.0.len(), 1, "oversized call never reached the backend");
 }
 
-struct Rig { port: u16, dir: std::path::PathBuf, applied: Arc<Mutex<Vec<Value>>> }
+struct Rig { port: u16, dir: std::path::PathBuf, applied: Arc<Mutex<Vec<Value>>>, calls: Arc<Mutex<Vec<(String, Value)>>> }
 /// A real helper, plus a fake app: an allowed-origin client that registers and answers `tree` / `apply_ops` / `undo` relays.
 fn rig(with_app: bool) -> Rig {
     let l = TcpListener::bind(("127.0.0.1", 0)).unwrap(); let port = l.local_addr().unwrap().port(); let dir = std::env::temp_dir().join(format!("sc-mcp-{port}"));
     let cfg = Config { port, token: "tok".into(), allowed: vec!["http://app.test".into()], claude_bin: "claude".into(), model: "haiku".into(), project_roots: vec![], data_dir: dir.clone(), picker_bin: "osascript".into(), min_free_mb: 0 };
     thread::spawn(move || { let _ = serve(l, cfg); }); thread::sleep(std::time::Duration::from_millis(100));
-    let applied = Arc::new(Mutex::new(Vec::new()));
-    if with_app { let ap = applied.clone(); thread::spawn(move || {
+    let applied = Arc::new(Mutex::new(Vec::new())); let calls = Arc::new(Mutex::new(Vec::new()));
+    if with_app { let ap = applied.clone(); let cl = calls.clone(); thread::spawn(move || {
         let mut r = format!("ws://127.0.0.1:{port}/?token=tok").into_client_request().unwrap(); r.headers_mut().insert("Origin", "http://app.test".parse().unwrap()); let (mut ws, _) = connect(r).unwrap();
         ws.send(Message::text("{\"type\":\"mcp.register\"}")).unwrap();
         loop { let Ok(Message::Text(t)) = ws.read() else { return }; let v: Value = serde_json::from_str(t.as_str()).unwrap(); if v["type"] != "mcp.req" { continue; }
+            cl.lock().unwrap().push((v["tool"].as_str().unwrap().to_string(), v["args"].clone()));
             let res = match v["tool"].as_str().unwrap() {
+                "list_frames" => json!({ "frames": [{ "id": "tv", "name": "TV", "w": 1920, "h": 1080, "lens": "tv" }] }),
+                "check" => json!({ "frame": "tv", "findings": [{ "n": 1, "el": "clock", "kind": "contrast", "message": "low", "fix": { "prop": "color", "value": "#fff" } }] }),
+                "frame_html" => json!({ "frame": "tv", "w": 320, "h": 240, "html": "<p>hi</p>" }),
+                "export" => json!({ "target": v["args"]["target"], "preview": "x", "confirm": v["args"]["confirm"] }),
                 "tree" => json!({ "frame": "tv", "tree": [{ "id": "root", "parent": null, "tag": "div", "text": "" }, { "id": "clock", "parent": "root", "tag": "div", "text": "12:00" }] }),
                 "apply_ops" => { ap.lock().unwrap().push(v["args"].clone()); json!({ "applied": v["args"]["ops"].as_array().unwrap().len() }) }
                 _ => json!({ "ok": true }) };
             ws.send(Message::text(json!({ "type": "mcp.res", "id": v["id"], "ok": true, "result": res }).to_string())).unwrap(); } }); thread::sleep(std::time::Duration::from_millis(200)); }
-    Rig { port, dir, applied }
+    Rig { port, dir, applied, calls }
 }
 fn call(rig: &Rig, tool: &str, args: Value) -> Result<Value, String> { let mut be = mcp::WsBackend::new(rig.dir.clone()); be.call(tool, args) }
 
@@ -78,4 +83,51 @@ fn call(rig: &Rig, tool: &str, args: Value) -> Result<Value, String> { let mut b
     let Message::Text(t) = ws.read().unwrap() else { panic!() }; assert!(t.as_str().contains("pong"), "say from an mcp connection is ignored: {t}");
     let tok = std::fs::read_to_string(r.dir.join(mcp::TOKEN_FILE)).unwrap(); assert!(tok.contains("\"token\":\"tok\""));
     #[cfg(unix)] { use std::os::unix::fs::PermissionsExt; assert_eq!(std::fs::metadata(r.dir.join(mcp::TOKEN_FILE)).unwrap().permissions().mode() & 0o777, 0o600); }
+}
+
+// ---- read-side tools (#1828)
+use std::time::Duration;
+fn script(n: &str, body: &str) -> String { let p = std::env::temp_dir().join(format!("sc-mcp-{n}-{}.sh", std::process::id())); std::fs::write(&p, format!("#!/bin/sh\n{body}\n")).unwrap(); #[cfg(unix)] { use std::os::unix::fs::PermissionsExt; std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap(); } p.to_string_lossy().into() }
+const CHROME: &str = r#"for a in "$@"; do case "$a" in --screenshot=*) f="${a#--screenshot=}";; esac; done; printf 'PNGDATA' > "$f""#;
+fn ctx(n: &str, chrome: &str) -> mcp::Ctx { let d = std::env::temp_dir().join(format!("sc-mcp-ctx-{n}-{}", std::process::id())); let _ = std::fs::remove_dir_all(&d); std::fs::create_dir_all(&d).unwrap(); mcp::Ctx { data_dir: d, chrome: chrome.into() } }
+fn save(c: &mcp::Ctx, id: &str, frames: Value) { std::fs::write(c.data_dir.join(format!("{id}.project.json")), json!({ "swiftCanvas": 1, "name": id, "frames": frames }).to_string()).unwrap(); }
+fn frames() -> Value { json!([{ "id": "tv-1", "title": "Living room", "w": 1920, "h": 1080, "html": "<div id=\"tv-1\">a</div>" }, { "id": "phone-1", "title": "Phone", "w": 390, "h": 844, "html": "<div>b</div>" }]) }
+
+#[test] fn image_results_become_mcp_image_blocks() {
+    let mut be = Fake(vec![], Ok(json!({ "frame": "tv", "_image": { "mimeType": "image/png", "data": "QUJD" } })));
+    let r = talk("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"screenshot\"}}\n", &mut be);
+    let c = r[0]["result"]["content"].as_array().unwrap(); assert_eq!(c.len(), 2); assert_eq!(c[1]["type"], "image"); assert_eq!(c[1]["data"], "QUJD"); assert_eq!(c[1]["mimeType"], "image/png"); assert!(!c[0]["text"].as_str().unwrap().contains("QUJD"), "the bytes are not repeated in the text");
+}
+#[test] fn headless_list_frames_from_a_saved_project_and_from_the_project_list() {
+    let c = ctx("list", "unused"); save(&c, "demo", frames()); save(&c, "empty", json!([])); std::fs::write(c.data_dir.join("broken.project.json"), "{}").unwrap(); let hub = mcp::Hub::default();
+    let r = mcp::run_tool(&hub, &c, "list_frames", &json!({ "project": "demo" })).unwrap(); assert_eq!(r["frames"][0], json!({ "id": "tv-1", "name": "Living room", "w": 1920.0, "h": 1080.0, "lens": "tv" })); assert_eq!(r["frames"][1]["lens"], "phone");
+    let r = mcp::run_tool(&hub, &c, "list_frames", &json!({})).unwrap(); let ps = r["projects"].as_array().unwrap(); assert_eq!(ps.iter().map(|p| p["project"].as_str().unwrap()).collect::<Vec<_>>(), ["broken", "demo", "empty"]); assert_eq!(ps[1]["frames"], 2); assert!(ps[0]["error"].as_str().unwrap().contains("no frames"), "a bad file is reported, not skipped");
+    assert!(mcp::run_tool(&hub, &c, "list_frames", &json!({ "project": "nope" })).unwrap_err().contains("no saved project"));
+    for bad in [json!("../x"), json!("A"), json!(5)] { assert!(mcp::run_tool(&hub, &c, "list_frames", &json!({ "project": bad })).is_err()); }
+}
+#[test] fn headless_screenshot_renders_the_saved_frame_and_cleans_up() {
+    let c = ctx("shot", &script("ok", CHROME)); save(&c, "demo", frames()); let hub = mcp::Hub::default();
+    let r = mcp::run_tool(&hub, &c, "screenshot", &json!({ "project": "demo", "frame": "phone-1" })).unwrap(); assert_eq!(r["frame"], "phone-1"); assert_eq!(r["bytes"], 7); assert_eq!(r["_image"]["mimeType"], "image/png"); assert_eq!(r["_image"]["data"], "UE5HREFUQQ==");
+    assert!(mcp::run_tool(&hub, &c, "screenshot", &json!({ "project": "demo" })).is_ok(), "default = first frame");
+    assert!(mcp::run_tool(&hub, &c, "screenshot", &json!({ "project": "demo", "frame": "zz" })).unwrap_err().contains("unknown frame"));
+    assert!(mcp::run_tool(&hub, &c, "screenshot", &json!({ "project": "demo", "frame": 3 })).unwrap_err().contains("frame must be a string"));
+    save(&c, "tiny", json!([{ "id": "a", "title": "A", "w": 10, "h": 10, "html": "x" }])); assert!(mcp::run_tool(&hub, &c, "screenshot", &json!({ "project": "tiny" })).unwrap_err().contains("outside"));
+    save(&c, "huge", json!([{ "id": "a", "title": "A", "w": 400, "h": 400, "html": "x".repeat(2 * 1024 * 1024 + 1) }])); assert!(mcp::run_tool(&hub, &c, "screenshot", &json!({ "project": "huge" })).unwrap_err().contains("too large"));
+}
+#[test] fn a_failing_browser_is_an_error_not_an_empty_image() { let c = ctx("badshot", &script("bad", "exit 3")); save(&c, "demo", frames()); let e = mcp::run_tool(&mcp::Hub::default(), &c, "screenshot", &json!({ "project": "demo" })).unwrap_err(); assert!(e.contains("browser failed"), "{e}"); let c2 = ctx("nochrome", "/no/such/chrome"); save(&c2, "demo", frames()); assert!(mcp::run_tool(&mcp::Hub::default(), &c2, "screenshot", &json!({ "project": "demo" })).unwrap_err().contains("cannot start the browser")); }
+#[test] fn without_an_app_check_export_and_live_screenshot_say_so() {
+    let r = rig(false); for (t, a) in [("check", json!({})), ("export", json!({ "target": "html" })), ("screenshot", json!({}))] { let e = call(&r, t, a).unwrap_err(); assert!(e.contains("no Swift Canvas app"), "{t}: {e}"); }
+    assert!(call(&r, "list_frames", json!({})).is_ok(), "list_frames falls back to the saved projects");
+}
+#[test] fn read_side_tools_relay_to_the_app_with_validated_args() {
+    let r = rig(true);
+    assert_eq!(call(&r, "list_frames", json!({})).unwrap()["frames"][0]["id"], "tv");
+    assert_eq!(call(&r, "check", json!({ "frame": "tv", "judge": true })).unwrap()["findings"][0]["el"], "clock");
+    let e = call(&r, "export", json!({ "target": "html" })).unwrap(); assert_eq!(e["confirm"], false); assert_eq!(call(&r, "export", json!({ "target": "react", "confirm": true })).unwrap()["confirm"], true);
+    { let c = r.calls.lock().unwrap(); let chk = c.iter().find(|x| x.0 == "check").unwrap(); assert_eq!(chk.1, json!({ "frame": "tv", "judge": true })); }
+    let n = r.calls.lock().unwrap().len();
+    for (t, a, why) in [("export", json!({}), "target must be a string"), ("export", json!({ "target": "glb" }), "unknown export target"), ("export", json!({ "target": "../x" }), "unknown export target"), ("export", json!({ "target": "html", "confirm": "yes" }), "confirm must be"), ("export", json!({ "target": "html", "frame": 1 }), "frame must be"), ("check", json!({ "judge": 1 }), "judge must be"), ("check", json!({ "frame": ["a"] }), "frame must be")] {
+        let e = call(&r, t, a).unwrap_err(); assert!(e.contains(why), "{t}: {e} should mention {why}"); }
+    assert_eq!(r.calls.lock().unwrap().len(), n, "bad arguments never reached the app");
+    let _ = Duration::from_millis(1);
 }

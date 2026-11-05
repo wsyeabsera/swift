@@ -572,7 +572,11 @@ export function App() {
   useEffect(() => { if (!frameMenuOpen && lens !== 'Pulse') return; let alive = true; const tick = () => { void conn.current?.poolStatus().then((p) => { if (alive) setPool(p); }); }; tick(); const t = setInterval(tick, 3000); return () => { alive = false; clearInterval(t); }; }, [frameMenuOpen, lens]); // Pulse: the Claude pool while the menu is open
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   // In-app MCP server (#1712): the helper relays design-op calls from Claude Code sessions here; a batch = ONE undo step. The ref keeps the handler on the latest state.
-  const mcpEnv = useRef<McpEnv | null>(null); mcpEnv.current = { project: project.name, api: window.__swift, frames, selection, record: recordOp, bump: () => setRevision((n) => n + 1), undo: async () => { if (!L.canUndo(logRef.current)) return false; await undo(); return true; } };
+  const askOnce = (system: string, prompt: string) => new Promise<string>((resolve, reject) => { // one Claude answer for the MCP `check` tool (same Say connection as the Critique button)
+    const c = conn.current; if (!c) { reject(new Error('helper offline')); return; } if (helper.claudeStatus && helper.claudeStatus.state !== 'ready') { reject(new Error(`Claude is not ready: ${helper.claudeStatus.message}`)); return; }
+    let text = '', err = ''; c.say(system, prompt, (e) => { if (e.kind === 'delta') text += e.text; else { if (e.kind === 'error') err = e.text; if (err && !text) reject(new Error(`Claude failed: ${err}`)); else resolve(text); } });
+  });
+  const mcpEnv = useRef<McpEnv | null>(null); mcpEnv.current = { project: project.name, api: window.__swift, frames, selection, record: recordOp, bump: () => setRevision((n) => n + 1), undo: async () => { if (!L.canUndo(logRef.current)) return false; await undo(); return true; }, brand, ask: askOnce, projectFile: async () => { const snaps = await Promise.all(frames.map(async (f) => ({ ...f, html: (await window.__swift?.snapshot(f.id)) || f.html }))); return serializeProject(project.name, snaps, brand, logRef.current, motion, links, scene3d); } };
   useEffect(() => { conn.current?.setMcpHandler((tool, args) => handleMcp(mcpEnv.current!, tool, args)); }, []);
   const dot = helper.status === 'connected' ? (helper.claudeStatus && helper.claudeStatus.state !== 'ready' ? 'warn' : 'ok') : helper.status === 'connecting' ? 'warn' : 'bad';
   return (
