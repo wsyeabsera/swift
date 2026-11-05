@@ -42,6 +42,59 @@ impl LiveHub {
     }
 }
 
+/// Run id for everything Claude Code does through MCP tool calls (so a tail shows each step with no extra setup).
+pub const MCP_RUN: &str = "mcp";
+pub fn announce_start(live: &LiveHub, cid: usize, id: &str, tool: &str) { live.publish(cid, MCP_RUN, Source::Agent, LiveEvent::ToolStart { id: id.to_string(), tool: tool.to_string() }); }
+/// tool.end (with the error text when it failed) and, for a successful apply_ops, one `op` event per op so a watcher sees what changed.
+pub fn announce_end(live: &LiveHub, cid: usize, id: &str, tool: &str, args: &serde_json::Value, r: &Result<serde_json::Value, String>) {
+    if r.is_ok() && tool == "apply_ops" { if let Some(ops) = args.get("ops").and_then(|o| o.as_array()) { for op in ops.iter().take(50) { live.publish(cid, MCP_RUN, Source::Agent, LiveEvent::Op { op: op.clone() }); } } }
+    live.publish(cid, MCP_RUN, Source::Agent, LiveEvent::ToolEnd { id: id.to_string(), ok: r.is_ok(), detail: r.as_ref().err().map(|e| e.chars().take(300).collect()) });
+}
+
+/// One plain-text line for the terminal tail (`swift-canvas-helper watch`): what happened, never the screenshot bytes.
+pub fn format_line(env: &LiveEnvelope) -> String {
+    let who = match env.source { Source::Agent => "agent", Source::Browser => "you" };
+    let cut = |t: &str, n: usize| { let one: String = t.split_whitespace().collect::<Vec<_>>().join(" "); if one.chars().count() > n { format!("{}...", one.chars().take(n).collect::<String>()) } else { one } };
+    let what = match &env.event {
+        LiveEvent::ThinkingDelta { text } => format!("thinking: {}", cut(text, 100)),
+        LiveEvent::Op { op } => format!("op: {}", cut(&op.to_string(), 120)),
+        LiveEvent::ToolStart { tool, .. } => format!("tool.start {tool}"),
+        LiveEvent::ToolEnd { ok, detail, .. } => if *ok { "tool.end ok".to_string() } else { format!("tool.end FAILED {}", cut(detail.as_deref().unwrap_or(""), 120)) },
+        LiveEvent::Shot { png } => format!("shot ({} bytes)", png.len() * 3 / 4),
+        LiveEvent::Snapshot { text } => format!("snapshot ({} chars)", text.len()),
+        LiveEvent::UserAction { action, detail } => format!("user.action {action} {}", cut(detail.as_deref().unwrap_or(""), 80)).trim_end().to_string(),
+        LiveEvent::Error { message } => format!("error: {}", cut(message, 160)),
+        LiveEvent::Done { summary } => format!("done {}", cut(summary.as_deref().unwrap_or(""), 120)).trim_end().to_string(),
+    };
+    format!("{}:{:<3} {who:<5} {what}", env.run, env.seq)
+}
+
+/// The read-only tail: connect as a local (mcp-role) client, subscribe, print one line per event. Sends nothing but `live.subscribe`. Reconnects when the helper restarts.
+pub fn watch(data_dir: &std::path::Path, mut out: impl std::io::Write, stop: &std::sync::atomic::AtomicBool) {
+    let mut announced = false;
+    while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+        match crate::mcp::connect_ws(data_dir, Some(std::time::Duration::from_millis(200))) {
+            Err(e) => { if !announced { let _ = writeln!(out, "waiting for the helper: {e}"); announced = true; } std::thread::sleep(std::time::Duration::from_millis(500)); }
+            Ok(mut ws) => {
+                announced = false; if ws.send(tungstenite::Message::text("{\"type\":\"live.subscribe\"}")).is_err() { continue; }
+                while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                    match ws.read() {
+                        Ok(tungstenite::Message::Text(t)) => { let Ok(v) = serde_json::from_str::<serde_json::Value>(t.as_str()) else { continue };
+                            match v["type"].as_str() {
+                                Some("live.subscribed") => { let _ = writeln!(out, "watching (read-only)"); let _ = out.flush(); }
+                                Some("live.dropped") => { let _ = writeln!(out, "-- {} events dropped (this reader was too slow)", v["count"]); let _ = out.flush(); }
+                                Some("live.event") => { if let Ok(e) = serde_json::from_value::<LiveEnvelope>(v["envelope"].clone()) { let _ = writeln!(out, "{}", format_line(&e)); let _ = out.flush(); } }
+                                _ => {} } }
+                        Ok(tungstenite::Message::Close(_)) | Err(tungstenite::Error::ConnectionClosed) | Err(tungstenite::Error::AlreadyClosed) => break,
+                        Err(tungstenite::Error::Io(e)) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => continue,
+                        Err(_) => break, Ok(_) => {} }
+                }
+                if !stop.load(std::sync::atomic::Ordering::SeqCst) { let _ = writeln!(out, "helper connection lost, reconnecting..."); let _ = out.flush(); std::thread::sleep(std::time::Duration::from_millis(500)); }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,5 +116,12 @@ mod tests {
     }
     #[test] fn done_ends_the_run_sequence() {
         let h = LiveHub::default(); h.publish(1, "r", Source::Agent, ev("a")); h.publish(1, "r", Source::Agent, LiveEvent::Done { summary: None }); assert_eq!(h.publish(1, "r", Source::Agent, ev("b")).seq, 1);
+    }
+    #[test] fn tail_lines_are_one_plain_line_per_event_and_never_dump_images() {
+        let e = |event| LiveEnvelope { run: "r".into(), seq: 3, source: Source::Agent, event };
+        assert_eq!(format_line(&e(LiveEvent::ToolStart { id: "1".into(), tool: "apply_ops".into() })), "r:3   agent tool.start apply_ops");
+        assert!(format_line(&e(LiveEvent::ToolEnd { id: "1".into(), ok: false, detail: Some("bad\nop".into()) })).ends_with("tool.end FAILED bad op"));
+        let shot = format_line(&e(LiveEvent::Shot { png: "A".repeat(4000) })); assert!(shot.len() < 60 && shot.contains("3000 bytes"), "{shot}");
+        assert!(!format_line(&e(LiveEvent::ThinkingDelta { text: "x\ny".repeat(500) })).contains('\n'));
     }
 }

@@ -20,6 +20,8 @@ Or load `extension/` unpacked in Chromium after `npm run build` (the helper then
 ## Use it from Claude Code
 Register the in-app MCP server once (`claude mcp add swift -- swift-canvas-helper mcp`), keep the helper and an app tab open, then ask Claude Code to start from a template, fill it from your brief and repo data, check it, screenshot it and export it. Steps, the tool list and the design loop: `docs/claude-code-quickstart.md`. Writing your own templates: `docs/template-authoring.md`. Not built yet: starter templates, template screens in the app, `swift-canvas new`.
 
+Watch a run from a second terminal: `swift-canvas-helper watch` prints one read-only line per step (tool start/end, ops) of what Claude Code does through MCP, and reconnects if the helper restarts. It is a plain text tail of the helper's live event stream (`live.subscribe`); it cannot send anything.
+
 ## Test it
 `npm run typecheck`, `npm test` (Vitest), `npm run helper:test` (Rust), `npm run e2e` (real unpacked extension + web page, speed budgets in `e2e/budgets.json`), `npm run e2e:contrast`. Run the UI tests in the background; they own ports 7431 and 5173. Timings: `docs/dev-speed.md`.
 
