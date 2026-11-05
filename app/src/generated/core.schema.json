@@ -28,6 +28,390 @@
     "title": "FlatNode",
     "type": "object"
   },
+  "LiveEnvelope": {
+    "$defs": {
+      "LiveEvent": {
+        "oneOf": [
+          {
+            "properties": {
+              "kind": {
+                "const": "thinking.delta",
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "text"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A design op the agent applied (opaque JSON: validated by the core `Op` type where it is applied).",
+            "properties": {
+              "kind": {
+                "const": "op",
+                "type": "string"
+              },
+              "op": true
+            },
+            "required": [
+              "kind",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "const": "tool.start",
+                "type": "string"
+              },
+              "tool": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "tool"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "const": "tool.end",
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "ok"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A screenshot (PNG, base64).",
+            "properties": {
+              "kind": {
+                "const": "shot",
+                "type": "string"
+              },
+              "png": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "png"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A page snapshot (text with stable @refs).",
+            "properties": {
+              "kind": {
+                "const": "snapshot",
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "text"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Something the user did in the page or the overlay (steer, pause, take over...).",
+            "properties": {
+              "action": {
+                "type": "string"
+              },
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "const": "user.action",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "action"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "kind": {
+                "const": "error",
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "kind": {
+                "const": "done",
+                "type": "string"
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Source": {
+        "description": "Who produced an event: the agent side (Claude Code through MCP) or the browser side (the extension worker, the page, the user).",
+        "enum": [
+          "agent",
+          "browser"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What a subscriber receives: the event with its run and a per-run sequence number, so gaps (drops) are visible.",
+    "properties": {
+      "event": {
+        "$ref": "#/$defs/LiveEvent"
+      },
+      "run": {
+        "type": "string"
+      },
+      "seq": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "source": {
+        "$ref": "#/$defs/Source"
+      }
+    },
+    "required": [
+      "run",
+      "seq",
+      "source",
+      "event"
+    ],
+    "title": "LiveEnvelope",
+    "type": "object"
+  },
+  "LiveEvent": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "properties": {
+          "kind": {
+            "const": "thinking.delta",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "A design op the agent applied (opaque JSON: validated by the core `Op` type where it is applied).",
+        "properties": {
+          "kind": {
+            "const": "op",
+            "type": "string"
+          },
+          "op": true
+        },
+        "required": [
+          "kind",
+          "op"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "tool.start",
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "tool"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "tool.end",
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "ok"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "A screenshot (PNG, base64).",
+        "properties": {
+          "kind": {
+            "const": "shot",
+            "type": "string"
+          },
+          "png": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "png"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "A page snapshot (text with stable @refs).",
+        "properties": {
+          "kind": {
+            "const": "snapshot",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "Something the user did in the page or the overlay (steer, pause, take over...).",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "const": "user.action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "action"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "kind": {
+            "const": "error",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "message"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "kind": {
+            "const": "done",
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      }
+    ],
+    "title": "LiveEvent"
+  },
   "Node": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "description": "One element. `style` holds CSS properties; `html` is opaque markup for nodes the helper only knows from an `add` op.",
