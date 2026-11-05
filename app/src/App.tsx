@@ -45,6 +45,7 @@ import { connectHelper, type HelperConnection, type HelperState } from './helper
 import { handleMcp, type McpEnv } from './mcp';
 import { runSayRepairing } from './say/say';
 import { compareKits, isColorValue, kitColors, loadBrand, replaceColor, saveBrand, shareToken, toBrandTokens } from './brand';
+import { parseEntry, lensForKey } from './entry';
 import { activeProject, addProject, uniqueName, loadRegistry, saveRegistry, switchProject, DEFAULT_PROJECT, loadRecent, saveRecent, touchRecent, type Registry } from './projects';
 import { loadScene, saveScene, type Scene3D } from './studio3d/scene';
 import { Studio3D } from './studio3d/Studio3D';
@@ -66,7 +67,7 @@ const LENSES = ['Design', 'Prototype', 'Motion', 'Effects', '3D', 'Critique', 'P
 export function App() {
   const [helper, setHelper] = useState<HelperState>({ status: 'connecting' }); const conn = useRef<HelperConnection | null>(null);
   const [sayText, setSayText] = useState(''); const [pendingAsk, setPendingAsk] = useState<{ question: string; original: string } | null>(null); const [saying, setSaying] = useState(false); const [sayStatus, setSayStatus] = useState('');
-  const [reg] = useState<Registry>(() => loadRegistry()); const project = activeProject(reg);
+  const [entry] = useState(() => parseEntry(location.hash, LENSES)); const [reg] = useState<Registry>(() => { const r = loadRegistry(); if (!entry.project) return r; const n = switchProject(r, entry.project); if (n !== r) saveRecent(touchRecent(loadRecent(), n.active)); if (n !== r) saveRegistry(n); return n; }); const project = activeProject(reg); // popup / side panel links: #project=<id>&lens=3&say=1 const project = activeProject(reg);
   const hadLocal = useRef(loadDoc(undefined, project.id) !== null); const [ready, setReady] = useState(hadLocal.current); const [epoch, setEpoch] = useState(0);
   const [frames, setFrames] = useState<FrameDef[]>(() => loadDoc(undefined, project.id) ?? (project.id === DEFAULT_PROJECT.id ? makeFrames(20) : blankFrames())); const [saveStatus, setSaveStatus] = useState('');
   // Pulse telemetry (local only): one record per local edit / Say / Spark; an undo marks its record, a redo unmarks it.
@@ -570,7 +571,10 @@ export function App() {
   const [zoomPct, setZoomPct] = useState(100);
   useEffect(() => { const t = setInterval(() => { const v = window.__swift?.view(); if (v) setZoomPct((p) => { const n = Math.round(v.s * 100); return p === n ? p : n; }); }, 250); return () => clearInterval(t); }, []);
   const actualSize = useCallback(() => { const r = document.querySelector('[data-testid=canvas]')?.getBoundingClientRect(); const v = window.__swift?.view(); if (r && v && window.__swift) window.__swift.setView(zoomAt(v, r.width / 2, r.height / 2, 1 / v.s)); }, []);
-  const [lens, setLens] = useState<(typeof LENSES)[number]>('Design');
+  const [lens, setLens] = useState<(typeof LENSES)[number]>((entry.lens as (typeof LENSES)[number] | undefined) ?? 'Design');
+  const pickLens = (l: (typeof LENSES)[number]) => { setLens(l); setFrameMenuOpen(l === 'Prototype' || l === 'Motion' || l === 'Effects' || l === 'Critique'); /* a lens opens its own tools; Design and 3D close the menu */ };
+  useEffect(() => { const k = (e: KeyboardEvent) => { const t = e.target; if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable)) return; const l = lensForKey(e, LENSES); if (l) { e.preventDefault(); pickLens(l as (typeof LENSES)[number]); } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []); // 1..9 pick the lens in bar order (not while typing)
+  useEffect(() => { if (entry.say) setTimeout(() => sayRef.current?.focus(), 50); }, [entry.say]);
   useEffect(() => { if (!frameMenuOpen && lens !== 'Pulse') return; let alive = true; const tick = () => { void conn.current?.poolStatus().then((p) => { if (alive) setPool(p); }); }; tick(); const t = setInterval(tick, 3000); return () => { alive = false; clearInterval(t); }; }, [frameMenuOpen, lens]); // Pulse: the Claude pool while the menu is open
   useEffect(() => { const c = connectHelper(TOKEN, setHelper); conn.current = c; return c.close; }, []);
   // In-app MCP server (#1712): the helper relays design-op calls from Claude Code sessions here; a batch = ONE undo step. The ref keeps the handler on the latest state.
@@ -661,7 +665,7 @@ export function App() {
         {shortcutsOpen && <Shortcuts onClose={() => { setShortcutsOpen(false); kbRef.current?.focus(); }} />}
         {appearanceOpen && <Appearance theme={theme} onChange={(p) => setTheme((t) => sanitize({ ...t, ...p }))} onClose={closeAppearance} />}
         <nav className="gl isl lens" aria-label="Lens">
-          {LENSES.map((l) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} onClick={() => { setLens(l); setFrameMenuOpen(l === 'Prototype' || l === 'Motion' || l === 'Effects' || l === 'Critique'); /* a lens opens its own tools; Design and 3D close the menu */ }}>{l}</button>))}
+          {LENSES.map((l, n) => (<button key={l} className={`rb seg${l === lens ? ' on' : ''}`} aria-pressed={l === lens} aria-label={l} aria-keyshortcuts={String(n + 1)} title={`${l} (${n + 1})`} data-testid={`lens-${l}`} onClick={() => pickLens(l)}>{l}<kbd className="lensnum mono" aria-hidden="true">{n + 1}</kbd></button>))}
         </nav>
         <div className="gl isl speed" role="status" aria-live="polite" data-testid="helper-status">
           <span className={`dot ${dot}`} aria-hidden />

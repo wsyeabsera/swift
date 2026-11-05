@@ -1,5 +1,7 @@
 { "manifest_version": 3, "name": "Swift Canvas", "version": "0.0.1", "description": "AI-native design tool: open the app in a tab.",
-  "background": { "service_worker": "background.js" }, "action": { "default_title": "Open Swift Canvas" },
+  "background": { "service_worker": "background.js" }, "action": { "default_title": "Swift Canvas", "default_popup": "popup.html" },
+  "permissions": ["sidePanel"], "side_panel": { "default_path": "app/index.html#say=1" },
+  "commands": { "_execute_action": { "suggested_key": { "default": "Alt+Shift+S" }, "description": "Open the Swift Canvas popup" } },
   "sandbox": { "pages": ["frame.html"] },
   "host_permissions": ["http://127.0.0.1/*"],
   "content_security_policy": { "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" } }

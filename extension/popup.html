@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Swift Canvas</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--tx:#14141a;--mu:#55555f;--card:rgba(255,255,255,.7);--bd:rgba(0,0,0,.16);--ac:#3b5bdb}
+@media (prefers-color-scheme:dark){:root{--bg:#16161d;--tx:#f3f3f7;--mu:#b4b4c0;--card:rgba(255,255,255,.08);--bd:rgba(255,255,255,.22);--ac:#8da2ff}}
+body{margin:0;width:320px;padding:12px;background:var(--bg);color:var(--tx);font:13px/1.35 system-ui,-apple-system,sans-serif}
+h1{font-size:13px;margin:0 0 8px;font-weight:600}h2{font-size:11px;margin:12px 0 4px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+button{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:36px;padding:0 12px;border-radius:12px;background:var(--card);border:1px solid var(--bd);cursor:pointer;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+button:hover{border-color:var(--ac)}button:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.mu{color:var(--mu);font:11px ui-monospace,monospace}
+.lenses{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.lenses button{padding:0 8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<h1>Swift Canvas</h1>
+<button id="cmd" aria-keyshortcuts="Control+K Meta+K"><span>Command bar: say what to change</span><span class="mu">⌘K</span></button>
+<h2 id="rh">Recent projects</h2><ul id="recent" aria-labelledby="rh"></ul>
+<h2>New</h2><ul><li><button id="new"><span>New from template…</span><span class="mu">in the app</span></button></li></ul>
+<h2 id="lh">Open a lens</h2><div class="lenses" id="lenses" role="group" aria-labelledby="lh"></div>
+<h2>Side panel</h2><ul><li><button id="panel"><span>Open in side panel</span></button></li></ul>
+<script src="popup.js"></script></body></html>
