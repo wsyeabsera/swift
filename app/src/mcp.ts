@@ -5,6 +5,7 @@ import type { FrameDef } from './canvas/fixtures';
 import { checkLine, type Op as SayOp } from './say/ops';
 import type { Op } from './oplog';
 import { buildArtifactPage } from './publish';
+import { templateFromFrames, templateFromScan, type ScanLike } from './saveTemplate';
 export type McpEnv = { project?: string; api: CanvasApi | undefined; frames: FrameDef[]; selection: Sel | null; record: (op: Op) => void; undo: () => Promise<boolean>; bump: () => void };
 export const MCP_MAX_OPS = 200; const MAX_NODES = 400; const MAX_HTML = 6000;
 const isStr = (v: unknown): v is string => typeof v === 'string';
@@ -23,7 +24,15 @@ async function applyOne(api: CanvasApi, frame: string, root: string, op: SayOp):
     case 'ask': return true;
   }
 }
+/** Needs no open canvas tab for a scan; frames come from the env. Returns the template folder's files; the helper writes them to disk. */
+function saveTemplate(env: McpEnv, args: Record<string, unknown>): unknown {
+  if (!isStr(args.name)) throw new Error('name is required');
+  const desc = isStr(args.description) ? args.description : undefined;
+  const r = args.scan ? templateFromScan(args.scan as ScanLike, { name: args.name, description: desc }) : templateFromFrames(Array.isArray(args.frames) && args.frames.length ? args.frames.map((id) => pick(env, id)) : [pick(env, args.frame)], { name: args.name, description: desc });
+  if (!r.ok) throw new Error(r.error); return { slug: r.slug, name: r.name, slots: r.slots, warnings: r.warnings, files: r.folder.files };
+}
 export async function handleMcp(env: McpEnv, tool: string, args: Record<string, unknown>): Promise<unknown> {
+  if (tool === 'save_template') return saveTemplate(env, args);
   const api = env.api; if (!api) throw new Error('the canvas is not ready');
   switch (tool) {
     case 'tree': { const f = pick(env, args.frame); const t = await api.tree(f.id); return { frame: f.id, tree: t.map((n) => ({ id: n.id, parent: n.parent, tag: n.tag, text: n.text })) }; }
