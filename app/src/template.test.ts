@@ -56,7 +56,7 @@ test('sources: disk folders, precedence builtin < user < repo, duplicates and ba
   const outside = join(tmp, 'secret.html'); writeFileSync(outside, '<div id="home">secret</div>'); symlinkSync(outside, join(tmp, 'user', 'other', 'frames', 'home.html') + '.bak'); // non-html symlink ignored
   const b = (parseTemplate(folder(manifest({ name: 'Landing', description: 'builtin' }))) as { ok: true }).ok; expect(b).toBe(true);
   const r = loadTemplates({ builtin: [{ dir: 'builtin:landing', folder: folder(manifest({ description: 'builtin' })) }], userDir: join(tmp, 'user'), repoDir: join(tmp, 'repo') });
-  expect(r.templates.map((t) => [t.name, t.source, t.description])).toEqual([['Landing', 'repo', 'repo one'], ['Other', 'user', 'A hero']]); expect(r.templates[0]!.shadows).toEqual(['builtin']);
+  expect(r.templates.map((t) => [t.name, t.source, t.description])).toEqual([['Landing', 'repo', 'repo one'], ['Other', 'user', 'A hero']]); expect(r.templates[0]!.shadows).toEqual(['builtin', 'user']);
   expect(r.problems.map((p) => [p.source, p.dir.split('/').pop(), p.error])).toEqual([['user', 'broken', 'template.json is not JSON'], ['user', 'landing-copy', expect.stringMatching(/duplicate template name "Landing"/)]]);
   expect(loadTemplates({ userDir: join(tmp, 'nope') })).toEqual({ templates: [], problems: [] });
 });
