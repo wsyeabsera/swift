@@ -12,7 +12,7 @@ fn talk(input: &str, be: &mut dyn Backend) -> Vec<Value> { let mut out = Vec::ne
     let mut be = Fake(vec![], Ok(json!({ "applied": 1 })));
     let r = talk("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"1\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"apply_ops\",\"arguments\":{\"ops\":[]}}}\n", &mut be);
     assert_eq!(r.len(), 3, "the notification gets no reply"); assert_eq!(r[0]["result"]["protocolVersion"], "2024-11-05"); assert_eq!(r[0]["id"], 1);
-    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "list_frames", "check", "screenshot", "export", "fill_from_data", "save_template", "undo"]);
+    let names: Vec<&str> = r[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect(); assert_eq!(names, ["read_subtree", "apply_ops", "set_token", "artifact_page", "list_frames", "check", "screenshot", "export", "fill_from_data", "save_template", "list_templates", "new_from_template", "fill_slots", "undo"]);
     assert_eq!(r[2]["result"]["content"][0]["text"], "{\"applied\":1}"); assert_eq!(be.0[0].0, "apply_ops");
 }
 #[test] fn protocol_errors_are_reported() {
@@ -47,7 +47,11 @@ fn rig_roots(with_app: bool, roots: Vec<std::path::PathBuf>) -> Rig {
                 "save_template" => if v["args"]["name"] == "boom" { json!({ "slug": "../x", "files": { "template.json": "{}" } }) } else { json!({ "slug": "my-t", "name": v["args"]["name"], "slots": 1, "warnings": [], "files": { "template.json": "{\"n\":1}", "frames/home.html": "<div id=\"home\"></div>" }, "sawScan": v["args"].get("scan").is_some() }) },
                 _ => json!({ "ok": true }) };
             ws.send(Message::text(json!({ "type": "mcp.res", "id": v["id"], "ok": true, "result": res }).to_string())).unwrap(); } }); thread::sleep(std::time::Duration::from_millis(200)); }
-    Rig { port, dir, applied, calls }
+    let rig = Rig { port, dir, applied, calls };
+    if with_app { for _ in 0..60 { // wait until the app has registered (a fixed sleep raced under load)
+        if mcp::WsBackend::new(rig.dir.clone()).call("undo", json!({})).is_ok() { break; } thread::sleep(std::time::Duration::from_millis(50)); }
+        rig.calls.lock().unwrap().clear(); }
+    rig
 }
 fn call(rig: &Rig, tool: &str, args: Value) -> Result<Value, String> { let mut be = mcp::WsBackend::new(rig.dir.clone()); be.call(tool, args) }
 
@@ -153,4 +157,30 @@ fn frames() -> Value { json!([{ "id": "tv-1", "title": "Living room", "w": 1920,
     assert!(call(&r, "save_template", json!({ "name": "boom" })).unwrap_err().contains("bad template folder name")); assert!(!r.dir.join("x").exists());
     assert!(call(&r, "save_template", json!({})).unwrap_err().contains("name is required"));
     assert!(call(&r, "save_template", json!({ "name": "a", "from_repo": "/etc" })).unwrap_err().contains("not allowed")); assert!(call(&r, "save_template", json!({ "name": "a", "dest": "repo" })).unwrap_err().contains("from_repo")); assert!(call(&r, "save_template", json!({ "name": "a", "dest": "nope" })).unwrap_err().contains("dest must be"));
+}
+
+#[test] fn template_tools_validate_args_then_relay_with_the_users_template_folders() {
+    let r = rig(true); let t = r.dir.join("templates");
+    std::fs::create_dir_all(t.join("mine/frames")).unwrap(); std::fs::write(t.join("mine/template.json"), "{\"name\":\"Mine\"}").unwrap(); std::fs::write(t.join("mine/frames/a.html"), "<div id=\"a\">{{x}}</div>").unwrap(); std::fs::write(t.join("mine/frames/skip.txt"), "no").unwrap();
+    std::fs::create_dir_all(t.join("big")).unwrap(); std::fs::write(t.join("big/template.json"), "x".repeat(300_000)).unwrap();
+    #[cfg(unix)] { std::fs::create_dir_all(r.dir.join("elsewhere")).unwrap(); std::os::unix::fs::symlink(r.dir.join("elsewhere"), t.join("link")).unwrap(); }
+    assert_eq!(call(&r, "list_templates", json!({})).unwrap()["ok"], true);
+    let calls = r.calls.lock().unwrap().clone(); let (name, a) = calls.last().unwrap(); assert_eq!(name, "list_templates");
+    let us = a["userTemplates"].as_array().unwrap(); let mine = us.iter().find(|u| u["dir"] == "mine").unwrap(); assert!(mine["files"]["template.json"].is_string()); assert!(mine["files"]["frames/a.html"].is_string()); assert!(mine["files"].get("frames/skip.txt").is_none());
+    assert!(us.iter().find(|u| u["dir"] == "big").unwrap()["error"].as_str().unwrap().contains("too large"), "oversize is reported, not read"); assert!(us.iter().all(|u| u["dir"] != "link"), "symlinked folders are skipped");
+    drop(calls);
+    let n0 = r.calls.lock().unwrap().len();
+    assert_eq!(call(&r, "new_from_template", json!({ "template": "Pricing", "values": { "a": "b" } })).unwrap()["ok"], true);
+    assert_eq!(call(&r, "fill_slots", json!({ "instance": "t1", "values": { "headline": "Hi" } })).unwrap()["ok"], true);
+    let c = r.calls.lock().unwrap().clone(); assert_eq!(c.len(), n0 + 2); assert_eq!(c[n0].1["values"]["a"], "b"); assert_eq!(c[n0 + 1].1["instance"], "t1");
+    let bad: Vec<(&str, Value, &str)> = vec![
+        ("new_from_template", json!({}), "template must be a string"), ("new_from_template", json!({ "template": 5 }), "template must be a string"), ("new_from_template", json!({ "template": "  " }), "1-80"), ("new_from_template", json!({ "template": "x".repeat(81) }), "1-80"),
+        ("new_from_template", json!({ "template": "a", "values": [1] }), "object"), ("fill_slots", json!({}), "object"), ("fill_slots", json!({ "values": "x" }), "object"), ("fill_slots", json!({ "values": {} }), "empty"),
+        ("fill_slots", json!({ "values": { "a": "b" }, "instance": 3 }), "instance"), ("fill_slots", json!({ "values": { "a": "b" }, "instance": "" }), "instance"),
+        ("fill_slots", json!({ "values": (0..41).map(|i| (format!("s{i}"), json!("v"))).collect::<serde_json::Map<_, _>>() }), "too many")];
+    for (tool, args, why) in bad { let e = call(&r, tool, args.clone()).unwrap_err(); assert!(e.contains(why), "{tool} {args}: {e}"); }
+    assert_eq!(r.calls.lock().unwrap().len(), n0 + 2, "bad arguments never reached the app");
+}
+#[test] fn template_tools_without_an_app_say_to_open_it() {
+    let r = rig(false); for (t, a) in [("list_templates", json!({})), ("new_from_template", json!({ "template": "x" })), ("fill_slots", json!({ "values": { "a": "b" } }))] { assert!(call(&r, t, a).unwrap_err().contains("no Swift Canvas app")); }
 }

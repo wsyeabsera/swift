@@ -38,6 +38,12 @@ pub fn tools() -> Value {
           "inputSchema": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string", "description": "File path, relative to the project folder or absolute inside it." }, "frame": frame, "el": { "type": "string", "description": "Container element id to fill (its first child is the row template). Omit to only read the data." }, "max_rows": { "type": "integer", "minimum": 1, "maximum": 200, "description": "Rows to keep (default 50)." }, "columns": { "type": "array", "items": { "type": "string" }, "maxItems": 20, "description": "Columns to use, in this order (default: all, first 20)." }, "pointer": { "type": "string", "description": "JSON pointer to the array inside a JSON file, e.g. /data/items." }, "example": { "type": "string", "description": "OpenAPI: part of the example label to use, e.g. \"GET /users 200\" (default: the first list example). The labels found are returned." } } } },
         { "name": "save_template", "description": "Save a smart template to disk (a folder: template.json + frames/*.html with {{slots}}). From the design: the selected frame (or `frames`), where every plain text becomes a text slot (bare <li> runs become a list slot) and --custom-properties on the frame root become template tokens. From a repo: pass from_repo (an allowed project folder) and its scanned tokens/colours/fonts become a branded starter. Saved to ~/.swift-canvas/templates (dest user) or <repo>/.swift-canvas/templates (dest repo, needs from_repo). Refuses to replace an existing template unless overwrite is true.",
           "inputSchema": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string", "description": "Template name (also the folder name, slugified)." }, "description": { "type": "string" }, "frame": frame, "frames": { "type": "array", "items": { "type": "string" }, "maxItems": 12, "description": "Frame ids to save together (default: the selected frame)." }, "from_repo": { "type": "string", "description": "Repository folder to scan for tokens instead of saving frames." }, "dest": { "type": "string", "enum": ["user", "repo"] }, "overwrite": { "type": "boolean" } } } },
+        { "name": "list_templates", "description": "List the smart templates you can start from (built into the app and in ~/.swift-canvas/templates): name, description, slot count and frames. Read-only. Next: new_from_template.",
+          "inputSchema": { "type": "object", "properties": {} } },
+        { "name": "new_from_template", "description": "Add a template's frames (and brand tokens) to the open project with default content, as ONE undo step, and return its slots (id, type text|list|image|color, label, what to write, default, required) and an `instance` id. YOU fill the slots from the user's brief: read the slots, then call fill_slots. Optional `values` fills some slots right away.",
+          "inputSchema": { "type": "object", "required": ["template"], "properties": { "template": { "type": "string", "description": "Template name from list_templates." }, "values": { "type": "object", "description": "Optional slotId -> value." } } } },
+        { "name": "fill_slots", "description": "Fill a template instance's slots: `values` maps slot id to a value (text: string; list: array of strings; image: https or data:image URL; color: a color literal). Values are validated first (type, size, no markup: text is escaped) and nothing changes if any is bad; one undo step. A value may use {{pack.field}} markers (e.g. {{people.name}}, {{products.price}}) for realistic data. Then run check and screenshot.",
+          "inputSchema": { "type": "object", "required": ["values"], "properties": { "instance": { "type": "string", "description": "Instance id from new_from_template (default: the latest)." }, "values": { "type": "object", "description": "slotId -> value." } } } },
         { "name": "undo", "description": "Undo the last step in the app (the same as the Undo button): an apply_ops batch is one step.",
           "inputSchema": { "type": "object", "properties": {} } }
     ])
@@ -120,6 +126,16 @@ pub fn run_tool(hub: &Hub, ctx: &Ctx, tool: &str, args: &Value) -> Result<Value,
         "apply_ops" => apply(hub, args),
         "list_frames" => list_frames(hub, ctx, args),
         "screenshot" => screenshot(hub, ctx, args),
+        "list_templates" => { check_no_args(args, &[])?; hub.ask_app("list_templates", json!({ "userTemplates": user_templates(ctx) }), WAIT) }
+        "new_from_template" => {
+            let t = args.get("template").and_then(|t| t.as_str()).ok_or("template must be a string (see list_templates)")?; if t.trim().is_empty() || t.len() > 80 { return Err("template must be 1-80 characters".into()); }
+            let mut a = json!({ "template": t, "userTemplates": user_templates(ctx) }); if let Some(v) = values_arg(args)? { a["values"] = v; } hub.ask_app("new_from_template", a, WAIT)
+        }
+        "fill_slots" => {
+            let v = values_arg(args)?.ok_or("values must be an object of slot id -> value")?; if v.as_object().map_or(true, |m| m.is_empty()) { return Err("values is empty: pass {slotId: value}".into()); }
+            let mut a = json!({ "values": v }); match args.get("instance") { None | Some(Value::Null) => {}, Some(Value::String(i)) if !i.is_empty() && i.len() <= 20 => a["instance"] = json!(i), Some(_) => return Err("instance must be an id from new_from_template".into()) }
+            hub.ask_app("fill_slots", a, WAIT)
+        }
         "check" => { let judge = opt_bool(args, "judge")?; check_frame_arg(args)?; hub.ask_app("check", with_frame(json!({ "judge": judge })), WAIT_CHECK) }
         "export" => {
             let target = args.get("target").and_then(|t| t.as_str()).ok_or("target must be a string")?;
@@ -130,6 +146,30 @@ pub fn run_tool(hub: &Hub, ctx: &Ctx, tool: &str, args: &Value) -> Result<Value,
         "fill_from_data" => fill_from_data(hub, args, &ctx.roots),
         _ => Err(format!("unknown tool {tool}")),
     }
+}
+fn check_no_args(_args: &Value, _allowed: &[&str]) -> Result<(), String> { Ok(()) }
+fn values_arg(args: &Value) -> Result<Option<Value>, String> {
+    match args.get("values") { None | Some(Value::Null) => Ok(None), Some(v @ Value::Object(m)) => if m.len() > 40 { Err("too many values (max 40 slots)".into()) } else { Ok(Some(v.clone())) }, Some(_) => Err("values must be an object of slot id -> value".into()) }
+}
+pub const MAX_TEMPLATE_DIRS: usize = 100; const MAX_MANIFEST: u64 = 64 * 1024; const MAX_FRAME_FILE: u64 = 200_000;
+/// The user's template folders (`<data_dir>/templates/<name>/template.json` + `frames/*.html`) as raw files for the app to parse (the loader is TypeScript). Symlinks and big files are skipped or reported, never read.
+pub fn user_templates(ctx: &Ctx) -> Value {
+    let root = ctx.data_dir.join("templates"); let Ok(rd) = std::fs::read_dir(&root) else { return json!([]) };
+    let mut dirs: Vec<std::path::PathBuf> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| std::fs::symlink_metadata(p).map(|m| m.is_dir()).unwrap_or(false)).collect(); dirs.sort(); dirs.truncate(MAX_TEMPLATE_DIRS);
+    let read = |p: &std::path::Path, cap: u64| -> Result<Option<String>, String> {
+        match std::fs::symlink_metadata(p) { Err(_) => Ok(None), Ok(m) if !m.is_file() => Ok(None), Ok(m) if m.len() > cap * 4 => Err(format!("{} is too large", p.file_name().and_then(|n| n.to_str()).unwrap_or("file"))), Ok(_) => std::fs::read_to_string(p).map(Some).map_err(|e| format!("cannot read {}: {e}", p.display())) }
+    };
+    json!(dirs.iter().map(|d| {
+        let name = d.file_name().and_then(|n| n.to_str()).unwrap_or("?").to_string();
+        let one = || -> Result<serde_json::Map<String, Value>, String> {
+            let mut files = serde_json::Map::new();
+            if let Some(t) = read(&d.join("template.json"), MAX_MANIFEST)? { files.insert("template.json".into(), json!(t)); }
+            if let Ok(fr) = std::fs::read_dir(d.join("frames")) { let mut names: Vec<String> = fr.filter_map(|e| e.ok()).filter_map(|e| e.file_name().into_string().ok()).filter(|n| n.ends_with(".html")).collect(); names.sort(); names.truncate(100);
+                for n in names { if let Some(t) = read(&d.join("frames").join(&n), MAX_FRAME_FILE)? { files.insert(format!("frames/{n}"), json!(t)); } } }
+            Ok(files)
+        };
+        match one() { Ok(f) => json!({ "dir": name, "files": f }), Err(e) => json!({ "dir": name, "error": e }) }
+    }).collect::<Vec<_>>())
 }
 fn opt_bool(args: &Value, k: &str) -> Result<bool, String> { match args.get(k) { None | Some(Value::Null) => Ok(false), Some(Value::Bool(b)) => Ok(*b), Some(_) => Err(format!("{k} must be true or false")) } }
 fn check_frame_arg(args: &Value) -> Result<(), String> { match args.get("frame") { None | Some(Value::Null) | Some(Value::String(_)) => Ok(()), Some(_) => Err("frame must be a string".into()) } }
