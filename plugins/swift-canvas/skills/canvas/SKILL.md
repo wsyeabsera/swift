@@ -14,3 +14,5 @@ Tools (they show as `mcp__plugin_swift-canvas_swift__<name>`):
 - `undo`: undo the last step. Use it when an edit went wrong.
 
 Order: `read_subtree`, then `apply_ops` (or `set_token`), then `read_subtree` again to confirm. Prefer one batch over many small calls.
+
+More tools: `list_frames`, `check`, `screenshot`, `export`, `artifact_page` (read side), `list_templates`, `new_from_template`, `fill_slots` (templates). For "make a page for X" use the `template` skill; for edits and fixes use the `design-loop` skill.
